@@ -8,6 +8,7 @@ import {
   type EngineAgent,
   type EngineTickLog,
   type LlmOutput,
+  type ProviderLog,
   type QueuedEvent,
   type RunConfig,
   type TurnContext,
@@ -15,6 +16,8 @@ import {
   type World,
 } from './engine-types';
 import { toLlmOutput } from './llm-adapter';
+import type { CallMetrics } from './llm/client';
+import { withRequestMetrics } from './llm/telemetry';
 import { crackOrderFromEvents, firstQuitTime } from './metrics';
 import { DEFAULT_PARAMS, type Params } from './params';
 import { rngFactory, stream } from './rng';
@@ -129,18 +132,35 @@ async function callProvider(
   agent: EngineAgent,
   ctx: TurnContext,
   retries: number,
-): Promise<{ output: LlmOutput | null; reason: string | null }> {
+): Promise<{ output: LlmOutput | null; reason: string | null; providerLog: ProviderLog }> {
   let reason: string | null = null;
+  const providerLog: ProviderLog = {
+    attempts: 0, retry_count: 0, cache_hit: null, latency_ms: null, usage: null, requests: [],
+  };
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const metrics: CallMetrics[] = [];
+    providerLog.attempts++;
+    providerLog.retry_count = attempt;
     try {
-      const r = toLlmOutput(await provider(agent.profile, ctx));
-      if (r.output) return r;
+      const r = toLlmOutput(await withRequestMetrics(metrics, () => provider(agent.profile, ctx)));
       reason = r.reason;
+      if (r.output) return { output: r.output, reason: null, providerLog };
     } catch {
       reason = 'provider_error';
+    } finally {
+      for (const metric of metrics) {
+        providerLog.requests.push({ ...metric, attempt: attempt + 1, validation_error: reason });
+        providerLog.cache_hit = false;
+        providerLog.latency_ms = (providerLog.latency_ms ?? 0) + metric.latencyMs;
+        if (metric.usage) {
+          providerLog.usage ??= { promptTokens: 0, completionTokens: 0 };
+          providerLog.usage.promptTokens += metric.usage.promptTokens;
+          providerLog.usage.completionTokens += metric.usage.completionTokens;
+        }
+      }
     }
   }
-  return { output: null, reason };
+  return { output: null, reason, providerLog };
 }
 
 function summarise(world: World, d: Decision, agentId: string, r: ResolveResult, quit: boolean): string {
@@ -214,7 +234,7 @@ export async function runTick(
   const activeIds = w.ids.filter((id) => w.agents[id].status === 'active');
   const order = stream(w.seed, t, '*', 'order').shuffle(activeIds);
 
-  const llm: Record<string, { output: LlmOutput | null; reason: string | null }> = {};
+  const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
   if (LLM_MODES.includes(config.mode)) {
     const results = await Promise.all(
       activeIds.map((id) =>
@@ -245,6 +265,10 @@ export async function runTick(
       params,
       options: { gossip: config.gossip, fallbackReason: llm[id]?.reason ?? null },
     });
+    if (llm[id]?.providerLog) {
+      decisions[id].log.provider = llm[id].providerLog;
+      if (decisions[id].log.llm) decisions[id].log.llm!.cache_hit = llm[id].providerLog!.cache_hit;
+    }
   }
 
   // 4. Resolve in order.

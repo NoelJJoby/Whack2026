@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
 import { llmConfig } from './config';
+import { recordRequestMetrics } from './telemetry';
 
 export interface CallMetrics {
   latencyMs: number;
@@ -37,6 +38,7 @@ export function createMessageClient(options: ClientOptions = {}) {
   });
 
   function record(metrics: CallMetrics) {
+    recordRequestMetrics(metrics);
     // Never log SDK errors, prompts, response bodies or credentials.
     console.info('anthropic_request', metrics);
     try {

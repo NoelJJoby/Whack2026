@@ -165,6 +165,23 @@ export type TurnProvider = (agent: EngineProfile, ctx: TurnContext) => Promise<u
 
 // --- Decisions and logs -----------------------------------------------------
 
+export interface ProviderLog {
+  attempts: number;
+  retry_count: number;
+  /** False for measured API calls; null when an injected provider reports no telemetry. */
+  cache_hit: boolean | null;
+  latency_ms: number | null;
+  /** Sum of reported API usage, including responses rejected by the engine. */
+  usage: { promptTokens: number; completionTokens: number } | null;
+  requests: Array<{
+    attempt: number;
+    latencyMs: number;
+    outcome: 'success' | 'error';
+    usage: { promptTokens: number; completionTokens: number } | null;
+    validation_error: string | null;
+  }>;
+}
+
 export interface DecisionLog {
   run: number;
   tick: number;
@@ -174,6 +191,8 @@ export interface DecisionLog {
   effective_mode: Mode;
   fallback: string | null;
   llm: { proposals: Proposal[]; cache_hit: boolean | null } | null;
+  /** Present when the engine invokes a provider; agent/tick are supplied above. */
+  provider?: ProviderLog;
   state: { stress: number; burnout: number; loyalty: number; trust_mgmt: number };
   fresh: boolean;
   masked: Action[];
