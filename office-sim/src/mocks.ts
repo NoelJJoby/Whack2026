@@ -1,5 +1,5 @@
 // Design-preview data, shaped like the real API. Only used when VITE_USE_MOCKS=true.
-import type { CastResponse, SimResponse, TickFrame } from '../shared/api';
+import type { CastResponse, PriceDTO, SimResponse, TickFrame } from '../shared/api';
 import type { Action, AgentProfile, AgentRuntimeState, EventType, SimulationState, TickRecord } from '../shared/types';
 
 interface MockPerson {
@@ -92,11 +92,21 @@ function recordsAt(t: number): TickRecord[] {
   }));
 }
 
+function priceAt(t: number): PriceDTO {
+  const price = 100 - t * 2;
+  return { tick: t, price, ret: t ? Math.log(price / (price + 2)) : 0,
+    rawOutput: 0.85, effectiveOutput: 0.85, oEma: 0.85, outputLog: 0, newsLevel: Math.log(price / 100), noise: 0,
+    headcount: 8, morale: 0.6 - t * 0.02, feedback: false,
+    guards: { outputFloor: false, priceBound: null, rawLogPrice: Math.log(price), logPrice: Math.log(price) },
+    markers: events[t] ? [{ id: `preview-${t}`, kind: events[t].type, event: 'headline' }] : [],
+  };
+}
+
 export const mockCast: CastResponse = { agents: profiles };
 
 export const mockHistory: TickFrame[] = Array.from({ length: TICKS }, (_, i) => {
   const t = i + 1;
-  return { tick: t, records: recordsAt(t), events: events[t] ? [events[t]] : [], state: stateAt(t) };
+  return { price: priceAt(t), tick: t, records: recordsAt(t), events: events[t] ? [events[t]] : [], state: stateAt(t) };
 });
 
-export const mockResponse: SimResponse = { mode: 'rules', mode_reason: 'configured', max_ticks: 16, state: stateAt(TICKS) };
+export const mockResponse: SimResponse = { price: priceAt(TICKS), initial_price: 100, price_feedback: false, mode: 'rules', mode_reason: 'configured', max_ticks: 16, state: stateAt(TICKS) };

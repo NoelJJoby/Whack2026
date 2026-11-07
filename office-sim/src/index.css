@@ -1433,3 +1433,23 @@ h2 {
 .burnout-rule { border-left: 2px solid var(--gold); padding: 10px 12px; font-size: 13px; line-height: 1.6; background: #303329; }
 .inspector .stat > span { width: 75px; }
 @media (max-width: 600px) { .brand { font-size: 21px; } }
+
+.price-panel { margin: 24px 0; padding: 24px; }
+.price-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; }
+.price-heading small { color: var(--muted); font-size: 10px; letter-spacing: .12em; }
+.price-heading h2 { font-size: 18px; font-weight: 500; margin: 8px 0; }
+.price-heading h2 strong { color: var(--mint); font-size: 28px; margin-left: 14px; }
+.price-heading span, .price-feedback { font-size: 12px; }
+.price-feedback { display: block; padding: 8px 0; }
+.price-feedback input { accent-color: var(--mint); }
+.price-feedback small { display: block; letter-spacing: 0; margin: 8px 0 0 20px; }
+.price-chart { margin-top: 22px; }
+.price-chart svg { width: 100%; overflow: visible; }
+.price-chart text { fill: var(--muted); font: 10px 'Space Grotesk', sans-serif; }
+.price-chart [role=button] { cursor: pointer; }
+.price-chart [role=button]:focus { outline: none; stroke: var(--gold); stroke-width: 2; }
+.price-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.price-detail { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; display: flex; gap: 12px 22px; flex-wrap: wrap; font-size: 12px; }
+.price-detail b { color: var(--gold); }
+.price-detail-note { width: 100%; color: var(--muted); font-size: 11px; }
+@media (max-width: 650px) { .price-panel { padding: 16px; } .price-heading { flex-direction: column; gap: 8px; } .price-heading h2 strong { font-size: 24px; } }

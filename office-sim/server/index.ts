@@ -16,7 +16,8 @@ import type {
 import type { DecisionLog, EventType, SimulationMode, SimulationState, TickRecord } from '../shared/types';
 import type { CastMember, DecisionLog as EngineDecisionLog, TurnProvider, World } from './engine-types';
 import { createTurnProvider } from './llm';
-import { eventParams } from './params';
+import { DEFAULT_PARAMS, eventParams } from './params';
+import { toPriceDTO, workforceReport } from './price';
 import { SHOCK_SCENARIO, fixtureCast } from './scripts/fixture';
 import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
 
@@ -38,7 +39,7 @@ const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 
 const injectSchema = z.object({ type: z.enum(EVENT_TYPES), is_true: z.boolean().optional() }).strict();
-const settingsSchema = z.object({ max_ticks: z.number().int().min(1).max(TICK_LIMIT) }).strict() satisfies z.ZodType<SettingsRequest>;
+const settingsSchema = z.object({ max_ticks: z.number().int().min(1).max(TICK_LIMIT).optional(), price_feedback: z.boolean().optional() }).strict().refine(v => v.max_ticks !== undefined || v.price_feedback !== undefined) satisfies z.ZodType<SettingsRequest>;
 
 class ApiFailure extends Error {
   constructor(
@@ -99,6 +100,7 @@ class OfficeSimManager {
   private mode: SimulationMode = 'rules';
   private modeReason: ModeReason = 'no_api_key';
   private maxTicks = DEFAULT_TICKS;
+  private priceFeedback = false;
   private started = false;
   private running = false;
   private timer: NodeJS.Timeout | null = null;
@@ -144,7 +146,7 @@ class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: SHOCK_SCENARIO, gossip: true, billboard: true };
+    return { mode: this.mode, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: this.priceFeedback };
   }
 
   state(): SimulationState {
@@ -159,7 +161,14 @@ class OfficeSimManager {
   }
 
   response(): SimResponse {
-    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state() };
+    const current = this.world.price;
+    const price = this.world.priceRecord ? toPriceDTO(this.world.priceRecord) : {
+      tick: 0, price: current.price, ret: 0, rawOutput: current.oEma, oEma: current.oEma,
+      effectiveOutput: current.oEma, outputLog: 0, newsLevel: 0, noise: 0,
+      ...workforceReport(this.world.ids.map(id => ({ id, active: this.world.agents[id].status === 'active', state: this.world.agents[id].state }))),
+      feedback: this.priceFeedback, markers: [], guards: { outputFloor: false, priceBound: null, rawLogPrice: Math.log(current.price), logPrice: Math.log(current.price) },
+    };
+    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
   }
 
   history(): HistoryResponse {
@@ -245,7 +254,7 @@ class OfficeSimManager {
       this.clearTimer();
     }
 
-    const frame: TickFrame = { tick: this.world.tick, records, events, state: this.state() };
+    const frame: TickFrame = { price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state() };
     this.frames.push(frame);
     if (this.frames.length > MAX_HISTORY) this.frames.shift();
     this.emit({ type: 'tick', frame, ...this.response() });
@@ -294,13 +303,18 @@ class OfficeSimManager {
   settings(body: unknown) {
     const parsed = settingsSchema.safeParse(body);
     if (!parsed.success) {
-      throw new ApiFailure(400, 'invalid_settings', `Expected { max_ticks: an integer from 1 to ${TICK_LIMIT} }.`, parsed.error.issues);
+      throw new ApiFailure(400, 'invalid_settings', `Expected max_ticks (integer 1–${TICK_LIMIT}) and/or price_feedback (boolean).`, parsed.error.issues);
     }
-    const { max_ticks } = parsed.data;
+    const max_ticks = parsed.data.max_ticks ?? this.maxTicks;
+    const priceFeedback = parsed.data.price_feedback ?? this.priceFeedback;
+    if (priceFeedback !== this.priceFeedback && (this.started || this.inFlight)) {
+      throw new ApiFailure(409, 'reset_required', 'Reset before changing price feedback.');
+    }
     if (max_ticks < this.world.tick) {
       throw new ApiFailure(409, 'below_current_tick', `The run is already at tick ${this.world.tick}; the run length can't go below that.`);
     }
     this.maxTicks = max_ticks;
+    this.priceFeedback = priceFeedback;
     if (this.world.tick >= this.maxTicks && this.running) {
       this.running = false;
       this.clearTimer();

@@ -2,7 +2,7 @@
 // `useSimulation()` for the SSE stream and the controls.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ApiError, CastResponse, HistoryResponse, ModeReason, SimResponse, StreamMessage, TickFrame } from '../shared/api';
+import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 
@@ -46,6 +46,10 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   cast: AgentProfile[];
   maxTicks: number;
+  price: PriceDTO | null;
+  initialPrice: number | null;
+  priceFeedback: boolean;
+  setPriceFeedback: (enabled: boolean) => Promise<boolean>;
   mode: SimulationMode | null;
   modeReason: ModeReason | null;
   state: SimulationState | null;
@@ -78,7 +82,7 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, state: next.state, price: next.price, price_feedback: next.price_feedback, initial_price: next.initial_price });
   }, []);
 
   const replaceHistory = useCallback(
@@ -155,6 +159,10 @@ export function useSimulation(): Simulation {
   const running = snapshot?.state.running ?? false;
   return {
     cast: cast?.agents ?? [],
+    price: snapshot?.price ?? null,
+    initialPrice: snapshot?.initial_price ?? null,
+    priceFeedback: snapshot?.price_feedback ?? false,
+    setPriceFeedback: (enabled) => post('/sim/settings', { price_feedback: enabled }),
     maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,

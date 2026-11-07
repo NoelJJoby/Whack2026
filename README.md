@@ -32,7 +32,7 @@ The Fastify server runs the real simulation engine. Types for every request, res
 - `GET /api/sim/state`: `{ mode, mode_reason, state }`
 - `GET /api/sim/history`: the same, plus `history` (one frame per tick)
 - `POST /api/sim/start`, `/play`, `/pause`, `/reset`, `/step`
-- `POST /api/sim/settings` with `{ "max_ticks": 1-128 }`: the run length (default 16, can't go below the current tick, kept across reset). Every response includes `max_ticks`.
+- `POST /api/sim/settings` with `{ "max_ticks": 1-128 }` and/or `{ "price_feedback": true|false }` (feedback defaults off and changes require reset once started): the run length (default 16, can't go below the current tick, kept across reset). Every response includes `max_ticks`.
 - `POST /api/sim/inject` with `{ "type": EventType, "is_true"?: boolean }`. Applied at the start of the next tick.
 - `GET /api/events`: SSE. It sends `history` on connect (and after reset), then a `tick` message per tick and a `state` message on play, pause or inject.
 
@@ -57,3 +57,9 @@ The UI shows the active mode in the top bar.
 - Confirm start/play/pause/reset/step routes mutate the singleton state.
 - Confirm inject accepts a valid event type and truth flag, and rejects anything else with a 400.
 - Confirm state payloads and feed history remain consistent across updates.
+
+## Share price
+
+The deterministic share price combines fixed-seat workforce output, decaying public news, claim-specific market corrections and an isolated seeded noise stream. The UI includes a price chart, event/correction markers, decomposition and morale. Initial/current price and feedback settings are additive API fields; existing SSE envelopes remain unchanged.
+
+See [implementation and measured acceptance](docs/share-price-implementation.md) for configuration, reproducible commands, ten-seed results and the remaining calm-volatility tuning target.
