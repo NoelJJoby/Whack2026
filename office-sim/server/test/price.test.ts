@@ -162,7 +162,11 @@ test('feedback off preserves the versioned legacy fixture over ten seeds and thi
   for (let seed = 1; seed <= 10; seed++) {
     const scenario = buildScenario(seed, 30);
     const r = await runSimulation(fixtureCast(seed), config({ seed, scenario }), createStubProvider(seed), legacyParams);
-    results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs: r.logs.map(({ price: _price, ...log }) => log), records: r.records });
+    // Voice fields are new log metadata; stripping them shows the workforce run itself is unchanged.
+    const logs = r.logs.map(({ price: _price, voices: _v, examples: _e, speech: _s, ...log }) => ({
+      ...log, decisions: log.decisions.map(({ speech: _d, ...d }) => d),
+    }));
+    results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs, records: r.records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
   // v2: false announcements no longer apply factual shocks; added employee actions are explicitly masked.

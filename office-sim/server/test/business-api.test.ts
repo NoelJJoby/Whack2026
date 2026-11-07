@@ -20,6 +20,19 @@ function gateProvider(phase: string) {
   return { provider,reached,release: () => release() };
 }
 describe('business API commit and generation isolation', () => {
+  it('journals generated custom event effects before accepting the input', async () => {
+    const m = new OfficeSimManager(temp()); const id = m.response().run_id!;
+    const input = { text: 'Free lunch on Fridays for everyone', is_true: true };
+    const commit = m.store.commit.bind(m.store);
+    m.store.commit = () => { throw new Error('disk unavailable'); };
+    await assert.rejects(m.injectCustom(input),/disk unavailable/);
+    assert.equal(m.response().state.queue.length,0);
+    m.store.commit = commit; await m.injectCustom(input);
+    const queued = m.store.recover(id).queue[0];
+    assert.equal(queued.text,input.text); assert.equal(queued.custom,true);
+    assert.ok(queued.customEffects); assert.ok(queued.customMeta);
+    assert.equal(m.store.read(id).at(-1)!.kind,'input');
+  });
   for (const phase of ['ceo','ops','employee']) it(`discards a reset during ${phase} without any old commit or report`, async () => {
     const gate = gateProvider(phase); const m = new OfficeSimManager(temp(),{provider:gate.provider});
     m.injectBusiness({template_id:'client_win'}); const oldRun = m.response().run_id!;

@@ -67,10 +67,14 @@ describe('role calls through the actual Anthropic prompt, parser, schemas and en
       if (managementLine) {
         const ctx = JSON.parse(managementLine) as ManagementContext; calls.push({kind:ctx.kind,ctx});
         output = ctx.kind === 'ceo' ? fallbackCeo(ctx) : fallbackOps(ctx);
+      } else if (prompt.includes('Small talk only:')) {
+        output = { lines: ['Rain again.', 'The bus was late.', 'I made soup.'] };
       } else {
         const prefix = 'Your current role, supervisor, assignments, directive versions and known evidence: ';
         const line = prompt.split('\n').find(l => l.startsWith(prefix))!;
-        const ctx = JSON.parse(line.slice(prefix.length)) as NonNullable<TurnContext['work']>; calls.push({kind:'employee',ctx});
+        const ctx = JSON.parse(line.slice(prefix.length)) as NonNullable<TurnContext['work']>;
+        const regenerating = prompt.includes('You were going to say:') || prompt.includes('Your thoughts were going to be:');
+        calls.push({kind:regenerating ? 'speech' : 'employee',ctx});
         const task = ctx.reviewable[0] ?? ctx.assignments[0];
         output = { proposals: [task ? { action: ctx.reviewable.length ? 'review_work' : 'work', weight: 1, task_id: task.id, assignment_version: task.version } : { action: 'slack_off', weight: 1 }], public_line:'I will follow the current plan.', inner_monologue:'I should check the acceptance criteria.', beliefs:{} };
       }
@@ -79,7 +83,9 @@ describe('role calls through the actual Anthropic prompt, parser, schemas and en
     try {
       let w = queueEvent(world(),{type:'new_management',templateId:'client_win'});
       const before = structuredClone(w); w = await advance(w,1,provider);
-      assert.deepEqual(calls.map(c => c.kind),['ceo','ops',...Array(6).fill('employee')]);
+      assert.deepEqual(calls.filter(c => c.kind !== 'speech').map(c => c.kind),['ceo','ops',...Array(6).fill('employee')]);
+      assert.ok(calls.slice(8).every(c => c.kind === 'speech'));
+      assert.equal(Object.keys(w.speech!.examples).length,6);
       assert.deepEqual(before.business.contracts.length,3);
       assert.equal(w.business.contracts.length,4); assert.equal(w.business.bookings,10_000_000);
       const e = w.eventState.cases[0]; assert.equal(e.target,100_000_000); assert.equal(e.value/e.target,0.1);

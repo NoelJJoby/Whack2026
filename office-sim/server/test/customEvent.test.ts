@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type Anthropic from '@anthropic-ai/sdk';
 
-import { CUSTOM_EVENT_KINDS, checkHeadline, headlineKey } from '../../shared/customEvent';
+import { CUSTOM_EVENT_KINDS, checkHeadline, clampCustomEventEffects, createFallbackCustomEvent, headlineKey, inferCustomEventKind } from '../../shared/customEvent';
 import type { MessageResult } from '../llm/client';
 import { createHeadlineReviewer, parseVerdict, reviewPrompt } from '../llm/moderation';
 import { fixtureCast } from '../scripts/fixture';
@@ -66,8 +66,30 @@ describe('custom event headlines', () => {
     assert.equal(headlineKey('New coffee machine, Monday!'), headlineKey('  new COFFEE machine monday '));
   });
 
+  it('infers tariff and cost shocks as harsh_policy rather than leadership', () => {
+    assert.equal(inferCustomEventKind('Tariffs are raising shipping costs and the team expects a hiring freeze.'), 'harsh_policy');
+    assert.equal(inferCustomEventKind('Rumours of layoffs are spreading through customer support.'), 'job_rumour');
+  });
+
   it('every kind borrows a real built-in event', () => {
     for (const kind of Object.values(CUSTOM_EVENT_KINDS)) assert.ok(kind.base);
+  });
+
+  it('creates bounded custom effects for good and bad office events', () => {
+    const good = createFallbackCustomEvent('good_news', 'Free lunch on Fridays for everyone', true);
+    const bad = createFallbackCustomEvent('scandal', 'The board hid a data breach from staff', true);
+    assert.ok(good.effects.morale > 0);
+    assert.ok(bad.effects.trust < 0);
+    assert.deepEqual(clampCustomEventEffects({ morale: 999, trust: -999, stress: 999, burnout: 999, productivity: 999, churnRisk: 999, rumorSpread: 999, priceImpact: 999 }), {
+      morale: 30,
+      trust: -30,
+      stress: 35,
+      burnout: 30,
+      productivity: 25,
+      churnRisk: 25,
+      rumorSpread: 35,
+      priceImpact: 0.15,
+    });
   });
 });
 
@@ -87,10 +109,10 @@ describe('custom event review', () => {
     assert.equal(parseVerdict(reply('', 'refusal'))?.allowed, false);
   });
 
-  it('fences the headline as data and names the chosen kind', () => {
+  it('fences the headline as data without locking the review to a legacy category', () => {
     const prompt = reviewPrompt('Free lunch on Fridays from now on', 'Good news');
     assert.ok(prompt.includes('<announcement>Free lunch on Fridays from now on</announcement>'));
-    assert.ok(prompt.includes('Category: "Good news"'));
+    assert.equal(prompt.includes('Category:'), false);
   });
 
   it('caches verdicts, and does not cache a failed call', async () => {

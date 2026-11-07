@@ -9,9 +9,11 @@ import assert from 'node:assert/strict';
 import type { Action, EngineProfile, RunConfig, TurnContext, TurnProvider } from '../engine-types';
 import { createTurnProvider } from '../llm';
 import { DEFAULT_PARAMS as P } from '../params';
-import { buildTurnPrompt } from '../llm/prompt';
+import { FEELING_TABLES } from '../llm/bands';
+import { buildTurnPrompt, claimKeys } from '../llm/prompt';
 import { buildScenario, fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
+import { NO_REGEN_PARAMS } from './helpers';
 
 const USAGE = { input_tokens: 900, output_tokens: 150 };
 const FLIGHT_PERSONA = fixtureCast(7).find((member) => member.profile.id === 'flight')!.profile.persona!;
@@ -30,8 +32,9 @@ function readPrompt(prompt: string): PromptFacts {
     .filter((l) => l.startsWith('- '))
     .map((l) => l.slice(2).split(':')[0] as Action);
   const coll = section('Colleagues still here: ').trim();
-  const colleagues = coll === 'None.' ? [] : coll.split(', ');
-  const claims = [...section("What you've heard:\n").matchAll(/\(id: ([^)]+)\)/g)].map((m) => m[1]);
+  // Colleagues by name ("Sam (Engineering)"), claims by key ("c1"): the prompt never shows ids.
+  const colleagues = coll === 'None.' ? [] : coll.split(', ').map((c) => c.replace(/ \([^)]*\)$/, ''));
+  const claims = [...section("What you've heard:\n").matchAll(/\(key: ([^)]+)\)/g)].map((m) => m[1]);
   return { available, colleagues, claims };
 }
 
@@ -52,11 +55,14 @@ function rng(seed: number) {
   };
 }
 
+/** High-band stress and burnout facts: what a model reads as "stressed". */
+const STRESSED = [...FEELING_TABLES.stress[2], ...FEELING_TABLES.burnout[2]];
+
 /** A deterministic stand-in model: answers depend only on the prompt text. */
 function fakeModelReply(prompt: string): Record<string, unknown> {
   const r = rng(hash(prompt));
   const facts = readPrompt(prompt);
-  const stressed = /overwhelmed|dread|running on fumes/.test(prompt);
+  const stressed = STRESSED.some((fact) => prompt.includes(fact));
   const pick = <T>(xs: T[]) => xs[Math.floor(r() * xs.length)];
   // Lean social when there is something to talk about, away from work when stressed.
   const preferred: Action[] = stressed
@@ -127,7 +133,8 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';
   console.info = () => {}; // the client logs one metrics line per request
   try {
-    const result = await runSimulation(fixtureCast(seed), config, provider);
+    // Exact call counts below: the fake model gives every agent the same line, so no regenerations.
+    const result = await runSimulation(fixtureCast(seed), config, provider, NO_REGEN_PARAMS);
     return { result, fake, captured };
   } finally {
     console.info = originalInfo;
@@ -172,8 +179,10 @@ describe('LLM provider x engine: full run through the real provider chain', () =
           // The prompt advertises exactly what the engine will accept.
           const facts = readPrompt(c.prompt);
           assert.deepEqual(facts.available, c.ctx.available);
-          assert.deepEqual(facts.colleagues, c.ctx.colleagues.map((x) => x.id));
-          assert.deepEqual(facts.claims, c.ctx.claims.map((x) => x.id));
+          const keys = claimKeys(c.ctx);
+          assert.deepEqual(facts.colleagues, c.ctx.colleagues.map((x) => x.name));
+          assert.deepEqual(facts.claims, c.ctx.claims.map((x) => keys.get(x.id)));
+          for (const id of r.world.ids) assert.ok(!facts.colleagues.includes(id), 'no ids in the colleague list');
           assert.ok(!/is_true|truth/i.test(c.prompt), 'no truth tags reach the model');
 
           // Nothing the model proposed from the prompt was dropped or masked.
@@ -189,30 +198,32 @@ describe('LLM provider x engine: full run through the real provider chain', () =
               from === 'mgmt' ? c.ctx.state.trust_mgmt : c.ctx.state.source_trust[from] ?? P.rules.defaultSourceTrust;
             const share = P.bias.beliefLlmShare;
             for (const x of c.ctx.claims.filter((y) => y.scandal)) {
-              const eff = share * said[x.id] + (1 - share) * trust(x.from);
+              const eff = share * said[keys.get(x.id)!] + (1 - share) * trust(x.from);
               assert.ok(eff < P.bias.leakBeliefThreshold, 'leak withdrawn only because the reply lowered belief');
             }
           }
 
-          // The model's own target and claim are used when it picked a valid one.
+          // The model's own target and claim, named in the prompt's terms, are mapped back and used.
           const mine = sent.find((p) => p.action === d.chosen.action);
+          const idOfName = (n: string) => c.ctx.colleagues.find((x) => x.name === n)?.id;
+          const idOfKey = (k: string) => [...keys].find(([, key]) => key === k)?.[0];
           if (mine?.target && (d.chosen.action === 'complain' || d.chosen.action === 'gossip')) {
-            assert.equal(d.chosen.target, mine.target, `${d.agent} t${log.tick} ${d.chosen.action} target`);
+            assert.equal(d.chosen.target, idOfName(mine.target), `${d.agent} t${log.tick} ${d.chosen.action} target`);
           }
           if (mine?.claim && (d.chosen.action === 'gossip' || d.chosen.action === 'verify')) {
-            assert.equal(d.chosen.claim, mine.claim, `${d.agent} t${log.tick} ${d.chosen.action} claim`);
+            assert.equal(d.chosen.claim, idOfKey(mine.claim), `${d.agent} t${log.tick} ${d.chosen.action} claim`);
           }
         }
 
         // A claim passed on this tick shows up in the hearer's next prompt.
         for (const h of log.hops) {
           const next = byTurn.get(`${log.tick + 1}:${h.to}`);
-          if (next) assert.ok(readPrompt(next.prompt).claims.includes(h.delivered), `${h.to} hears ${h.delivered}`);
+          if (next) assert.ok(readPrompt(next.prompt).claims.includes(claimKeys(next.ctx).get(h.delivered)!), `${h.to} hears ${h.delivered}`);
         }
         // Quitters drop out of everyone's colleague list from the next tick.
         for (const q of log.quits) {
           for (const c of captured.filter((x) => x.tick > log.tick)) {
-            assert.ok(!readPrompt(c.prompt).colleagues.includes(q), `${q} still listed at t${c.tick}`);
+            assert.ok(!readPrompt(c.prompt).colleagues.includes(r.world.agents[q].profile.name), `${q} still listed at t${c.tick}`);
           }
         }
       }
@@ -222,11 +233,16 @@ describe('LLM provider x engine: full run through the real provider chain', () =
       assert.ok(r.logs.some((l) => l.hops.length > 0) || r.logs.some((l) => l.events.length > 0), 'at least one live event or gossip step happened');
       assert.ok(captured.some((c) => c.ctx.claims.some((x) => r.world.claims[x.id].parentId !== null)) || r.logs.some((l) => l.events.length > 0), 'the model saw a real claim or the run processed scheduled events');
 
-      // Beliefs from the model are stored on every held, unverified claim.
+      // Beliefs from the model are stored on every held, unverified claim the
+      // agent has had a turn since hearing (gossip on the last tick lands after the last turn).
+      const lastHops = new Set(r.logs.at(-1)!.hops.map((h) => `${h.to}:${h.delivered}`));
       for (const id of r.world.ids) {
         const a = r.world.agents[id];
         if (a.status !== 'active') continue;
-        for (const h of a.claims) if (!h.verified) assert.notEqual(h.belief, null, `${id} ${h.claimId}`);
+        for (const h of a.claims) {
+          if (h.verified || lastHops.has(`${id}:${h.claimId}`)) continue;
+          assert.notEqual(h.belief, null, `${id} ${h.claimId}`);
+        }
       }
       // The model's lines reach the record.
       assert.ok(r.logs.every((l) => l.lines.every((x) => x.public_line && x.inner_monologue)));

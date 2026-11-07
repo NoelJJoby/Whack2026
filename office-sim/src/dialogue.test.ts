@@ -24,7 +24,7 @@ const typeAll = (state: PlayerState, showThoughts = true) => {
   return state;
 };
 const line = (agent: string, publicLine = 'Hi.', inner = 'Hm.'): DialogueLine =>
-  ({ key: agent, tick: 1, agent, publicLine, inner, quit: false, tier: 6, stress: 50, stressDelta: 0 });
+  ({ key: agent, tick: 1, agent, publicLine, inner, quit: false, action: 'work', emotion: 'normal', tier: 6, stress: 50, stressDelta: 0 });
 
 test('round skips empty lines and orders quit > leak > gossip > stress jump > other', () => {
   const prev = frame(1, []);

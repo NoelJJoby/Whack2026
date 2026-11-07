@@ -13,17 +13,19 @@ function Typed({ text, shown, typing }: { text: string; shown: number; typing: b
 
 export interface Speaker { name: string; team: string; look: Pick<Look, 'color' | 'hair' | 'skin'> }
 
-export function DialogueBar({ state, line, speaker, auto, showThoughts, hidden, onNext, onSkip, onAuto, onHistory }: {
+export function DialogueBar({ state, line, speaker, auto, voices, showThoughts, hidden, onNext, onSkip, onAuto, onVoices, onHistory }: {
   state: PlayerState;
   line: DialogueLine | null;
   speaker: Speaker | null;
   auto: boolean;
+  voices: boolean;
   showThoughts: boolean;
   /** A menu is open over the office. */
   hidden: boolean;
   onNext: () => void;
   onSkip: () => void;
   onAuto: () => void;
+  onVoices: () => void;
   onHistory: () => void;
 }) {
   // Keep the last line on screen while the bar fades out.
@@ -39,7 +41,7 @@ export function DialogueBar({ state, line, speaker, auto, showThoughts, hidden, 
   const thoughts = showThoughts && Boolean(shown.line.inner);
   const innerStarted = !active || phase === 'inner' || phase === 'reading';
   const announcement = `${shown.speaker.name}: “${shown.line.publicLine}”${thoughts ? ` Thinks: ${shown.line.inner}` : ''}`;
-  return <section className={`dialogue-bar ${open ? 'open' : ''}`} aria-label="Dialogue">
+  return <section className={`dialogue-bar ${open ? 'open' : ''}`} aria-label="Dialogue" data-emotion={shown.line.emotion}>
     <div className="dialogue-plate"><strong>{shown.speaker.name}</strong>{shown.speaker.team && <small>· {shown.speaker.team}</small>}{shown.line.quit && <span className="dialogue-tag">Left the company</span>}</div>
     <div className="dialogue-box">
       <Portrait look={shown.speaker.look} mood={moodFor(shown.line.stress)}/>
@@ -53,6 +55,7 @@ export function DialogueBar({ state, line, speaker, auto, showThoughts, hidden, 
         <button onClick={onNext} aria-label="Next line" title="Next line (Enter or N)">▶</button>
         <button onClick={onSkip} aria-label="Skip round" title="Skip round (S)">⏭</button>
         <button onClick={onAuto} aria-pressed={auto} aria-label="Auto advance" title="Auto advance (A)">AUTO</button>
+        <button onClick={onVoices} aria-pressed={voices} aria-label="Voices" title="Voices (M)">VOX</button>
         <button onClick={onHistory} aria-label="Open dialogue history in Office wire" title="History">LOG</button>
       </div>
     </div>

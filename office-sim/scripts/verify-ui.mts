@@ -8,7 +8,7 @@ const artifacts = process.env.UI_ARTIFACT_DIR ?? join(tmpdir(), 'daily-grind-ui'
 mkdirSync(artifacts, { recursive: true });
 import { mockCast, mockHistory, mockResponse } from '../src/mocks.ts';
 import assert from 'node:assert/strict';
-const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE, args: ['--autoplay-policy=no-user-gesture-required'] });
 const page = await browser.newPage();
 await page.clock.install({time:new Date('2026-11-07T12:00:00Z')});
 await page.clock.pauseAt(new Date('2026-11-07T12:00:01Z'));
@@ -21,6 +21,16 @@ await page.addInitScript(`
     constructor() { window.__stream = this; }
     close() {}
   };
+  // Record every babble syllable: starts, and stops with their fade length in seconds.
+  window.__audio = [];
+  const source = AudioBufferSourceNode.prototype, start = source.start, stop = source.stop;
+  window.__sounding = 0;
+  source.start = function (...args) {
+    window.__audio.push({ ev: 'start' }); window.__sounding++;
+    this.addEventListener('ended', () => window.__sounding--);
+    return start.apply(this, args);
+  };
+  source.stop = function (...args) { window.__audio.push({ ev: 'stop', fade: (args[0] ?? 0) - this.context.currentTime }); return stop.apply(this, args); };
 `);
 await page.route('**/api/**', route => route.fulfill({json: route.request().url().endsWith('/cast') ? mockCast : mockResponse}));
 await page.goto(process.env.UI_URL ?? 'http://127.0.0.1:5173/');
@@ -84,6 +94,10 @@ for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   const progress=()=>page.locator('.dialogue-progress').innerText();
   // Wait for React to render a new round before pressing keys.
   const showing=(name:string)=>page.locator('.dialogue-bar.open .dialogue-plate',{hasText:name}).waitFor();
+  const emotion=()=>bar.getAttribute('data-emotion');
+  // Babble syllables recorded since `mark`. Synthesis runs in real time, so wait briefly after a line starts.
+  const sounds=async(mark=0)=>(await page.evaluate(()=>(window as any).__audio as Array<{ev:string;fade?:number}>)).slice(mark);
+  const mark=async()=>(await sounds()).length;
   await page.setViewportSize({width:1920,height:1080});
   // Enter on a focused button keeps its native action, so start from the page body.
   await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
@@ -94,11 +108,19 @@ for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   assert.equal(await speaking(),'Inspect Lena');
   assert.equal(await progress(),'1/5');
   assert.ok((await untyped()).length>0,'text types out');
+  assert.equal(await emotion(),'angry','Lena quits with low trust in management');
+  await page.waitForTimeout(500);
+  const typingFrom=await mark();
   await page.clock.runFor(200);
   const partly=(await untyped()).length;
+  assert.ok((await sounds(typingFrom)).some(e=>e.ev==='start'),'letters babble while typing');
+  const nextFrom=await mark();
   await page.keyboard.press('n');
   assert.equal(await untyped(),'','Next completes the line');
   assert.ok(partly>0);
+  await page.waitForTimeout(30);
+  assert.equal(await page.evaluate(()=>(window as any).__sounding),0,'Next leaves nothing sounding');
+  assert.ok(!(await sounds(nextFrom)).some(e=>e.ev==='start'),'no voice after Next');
   await page.keyboard.press('n');
   assert.ok((await plate.innerText()).includes('Tom'),'leak ranks second');
   assert.equal(await speaking(),'Inspect Tom');
@@ -172,18 +194,59 @@ for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   await showing('newhire');
   assert.ok((await plate.innerText()).includes('newhire'));
   assert.equal(await page.locator('.dialogue-portrait svg').count(),1);
-  // Reduced motion shows text at once.
+  // Voices: the last typed letter ends the sound; emotions follow the data; M mutes.
+  await page.keyboard.press('s');
+  await send(frameWith(only({marcus:'Short line here.'})));
+  await showing('Marcus');
+  assert.equal(await emotion(),'normal');
+  await page.waitForTimeout(500);
+  const lineFrom=await mark();
+  await page.clock.runFor(3000);
+  assert.equal(await untyped(),'');
+  const line=await sounds(lineFrom);
+  assert.ok(line.filter(e=>e.ev==='start').length>=2,'spoken line and whispered thought');
+  await page.waitForTimeout(30);
+  assert.equal(await page.evaluate(()=>(window as any).__sounding),0,'nothing still sounding after the last letter');
+  const stops=line.filter(e=>e.ev==='stop');
+  assert.ok(stops.length>=1 && stops.every(e=>e.fade!>0.009&&e.fade!<0.015),'a sound still playing at the last letter fades out over 12 ms');
+  await page.keyboard.press('s');
+  await send({...frameWith(only({marcus:'A bonus!'})),events:[{type:'surprise_bonus',is_true:true,text:'Bonus.'}]});
+  await showing('Marcus');
+  assert.equal(await emotion(),'happy');
+  await page.getByRole('button',{name:'Dismiss announcement'}).click();
+  await page.keyboard.press('s');
+  await send(frameWith(r=>({...only({marcus:'I am done here.'})(r),quit:r.agent==='marcus'})));
+  await showing('Marcus');
+  assert.equal(await emotion(),'sad','a quit with trust in management intact');
+  await page.keyboard.press('s');
+  await page.keyboard.press('m');
+  assert.equal(await page.getByRole('button',{name:'Voices'}).getAttribute('aria-pressed'),'false');
+  await send(frameWith(only({dan:'Muted line.'})));
+  await showing('Dan');
+  await page.waitForTimeout(300);
+  const mutedFrom=await mark();
+  await page.clock.runFor(2000);
+  assert.ok(!(await sounds(mutedFrom)).some(e=>e.ev==='start'),'VOX off is silent');
+  await page.keyboard.press('m');
+  // Reduced motion shows text at once, without a voice.
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.keyboard.press('s');
+  const reducedFrom=await mark();
   await send(frameWith(only({lena:'No typing for me.'})));
   await showing('Lena');
   await page.waitForFunction(()=>Array.from(document.querySelectorAll('.dialogue-untyped')).every(el=>el.textContent===''));
+  await page.waitForTimeout(300);
+  assert.ok(!(await sounds(reducedFrom)).some(e=>e.ev==='start'),'reduced motion is silent');
   await page.emulateMedia({reducedMotion:null});
   // Every record of a round stays in the Office wire, beyond the five-line cap.
   await page.getByRole('button',{name:'Expand Office wire history',exact:true}).click();
   assert.equal(await page.locator('.feed-entry time',{hasText:/^Day 4 \(M1\), 13:00$/}).count(),base.records.length);
   await page.getByRole('button',{name:'Collapse Office wire history',exact:true}).click();
-  // Space is pause/play; Hold for dialogue pauses until the round has played.
+  // Space is pause/play; Hold for dialogue pauses until the round has played. Start from a fresh history so the run isn't finished.
+  await page.evaluate(data=>(window as any).__stream.onmessage({data:JSON.stringify(data)}),{type:'history',...mockResponse,history:mockHistory});
+  hour=base.tick;
+  await page.locator('.clock-readout',{hasText:'Day 1'}).waitFor();
+  await page.locator('.play-button:not(:disabled)').waitFor();
   const calls:string[]=[];
   const live=(running:boolean)=>({...mockResponse,state:{...mockResponse.state,tick:hour,running}});
   await page.route('**/api/sim/pause',route=>{calls.push('pause');return route.fulfill({json:live(false)});});
@@ -210,7 +273,7 @@ for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   // A replaced history (reconnect, reset) clears the bar without replaying.
   await page.evaluate(data=>(window as any).__stream.onmessage({data:JSON.stringify(data)}),{type:'history',...mockResponse,history:mockHistory});
   await page.locator('.dialogue-bar:not(.open)').waitFor({state:'attached'});
-  console.log('Dialogue layout, typing, Next, Skip round, Auto, new-round, keyboard, portrait, reduced-motion, feed and hold checks passed');
+  console.log('Dialogue layout, typing, voices, emotions, Next, Skip round, Auto, new-round, keyboard, portrait, reduced-motion, feed and hold checks passed');
 }
 
 await page.setViewportSize({width:1440,height:900});

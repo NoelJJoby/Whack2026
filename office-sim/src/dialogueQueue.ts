@@ -1,6 +1,8 @@
 // The dialogue bar's round queue and playback state. Pure: no React, no timers.
 import type { TickFrame } from '../shared/api';
 import { playerText } from './hudModel';
+import type { Action } from '../shared/types';
+import { emotionFor, type Emotion } from './voice/emotion';
 
 /** Lines shown per round; the rest stay in the Office wire only. */
 export const DIALOGUE_CAP = 5;
@@ -21,6 +23,8 @@ export interface DialogueLine {
   publicLine: string;
   inner: string;
   quit: boolean;
+  action: Action;
+  emotion: Emotion;
   /** 1 plays first: quit, leak, event reaction, gossip, stress jump, other. */
   tier: number;
   stress: number;
@@ -34,11 +38,16 @@ export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
     if (!publicLine) return [];
     const stress = frame.state.agents[record.agent]?.stress ?? record.state?.stress ?? 0;
     const stressDelta = stress - (prev?.state.agents[record.agent]?.stress ?? stress);
+    const agent = frame.state.agents[record.agent] ?? record.state;
+    const emotion = emotionFor({
+      quit: Boolean(record.quit), action: record.action, stress, stressDelta,
+      burnout: agent?.burnout ?? 0, trust: agent?.trust_mgmt ?? 50, events: frame.events.map(e => e.type),
+    });
     const tier = record.quit ? 1 : record.action === 'leak' ? 2 : frame.events.length ? 3
       : record.action === 'gossip' ? 4 : Math.abs(stressDelta) >= STRESS_JUMP ? 5 : 6;
     return [{ order, line: {
       key: `${frame.tick}-${record.agent}`, tick: frame.tick, agent: record.agent, publicLine,
-      inner: playerText(record.inner_monologue?.trim() ?? ''), quit: Boolean(record.quit), tier, stress, stressDelta,
+      inner: playerText(record.inner_monologue?.trim() ?? ''), quit: Boolean(record.quit), action: record.action, emotion, tier, stress, stressDelta,
     } }];
   });
   return lines

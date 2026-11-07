@@ -31,8 +31,9 @@ const ctx: TurnContext = {
 const prompt = buildTurnPrompt(agent, ctx, 'You remember favours and broken promises.');
 const sections = [
   'You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.',
-  'Who you are:', 'How you feel right now:', "What you've heard:",
-  "This tick's announcements:", 'Colleagues still here:', 'What you can do:', 'Respond with JSON only, in this shape:',
+  'Who you are:', 'It is day 2, 13:00.', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.",
+  "What you've heard:", 'Just announced:', 'Colleagues still here:', 'What you can do:', 'What you say out loud ("public_line"):',
+  'Respond with JSON only, in this shape:',
 ];
 let previous = -1;
 for (const section of sections) {
@@ -40,21 +41,27 @@ for (const section of sections) {
   assert.ok(index > previous, `Missing or misplaced section: ${section}`);
   previous = index;
 }
-assert.ok(prompt.includes('Who you are: You remember favours and broken promises.'));
-assert.ok(prompt.includes('from a2, heard 4 ticks ago. you generally trust them. This is a scandal claim.'));
-assert.ok(prompt.includes("from mgmt, heard 0 ticks ago. you don't believe much of what they say."));
-assert.ok(prompt.includes("from grapevine, heard 1 ticks ago. you're not sure how far to trust them."));
+assert.ok(prompt.includes("Who you are: You're A1. You work in Engineering. You remember favours and broken promises."));
+assert.ok(prompt.includes('(key: c1), from Rae, yesterday afternoon. you generally trust them. This is a scandal claim.'));
+assert.ok(prompt.includes("(key: c2), from management, just now. you don't believe much of what they say."));
+assert.ok(prompt.includes("(key: c3), from the grapevine, a couple of hours ago. you're not sure how far to trust them."));
 assert.ok(prompt.includes('A new manager arrives.'));
-assert.ok(prompt.includes('Colleagues still here: a2'));
+assert.ok(prompt.includes('Colleagues still here: Rae'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
-assert.ok(prompt.includes('30 words or fewer each'));
-assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs". Give one integer for every claim id.'));
+assert.ok(prompt.includes("- Don't repeat, quote or name the announcement. Don't open with a question about it."));
+assert.ok(prompt.includes('- About 15 words at most.'));
+assert.ok(prompt.includes("at most 30 words. Start them from what's on your mind, not with the announcement, and don't copy the facts above."));
+assert.ok(prompt.includes('"running on fumes"') && prompt.includes('"Sure."'), 'banned phrases are listed');
+assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.'));
+assert.doesNotMatch(prompt, /\btick|claim-[abc]|\ba2\b|grapevine,? heard/i);
+// Without a voice brief there is no style section; with one, it comes after the actions.
+assert.ok(!prompt.includes('How you talk:'));
 
 function example(text: string): unknown {
   return JSON.parse(text.split('Respond with JSON only, in this shape: ')[1].split('\n')[0]);
 }
 const desired = LlmOutputSchema.parse(example(prompt));
-assert.deepEqual(Object.keys(desired.beliefs), ctx.claims.map(claim => claim.id));
+assert.deepEqual(Object.keys(desired.beliefs), ['c1', 'c2', 'c3']);
 for (const action of ACTIONS) {
   const only = buildTurnPrompt(agent, { ...ctx, available: [action] });
   const offered = only.split('What you can do:\n')[1].split('\n\n')[0]
@@ -74,7 +81,7 @@ for (const invalid of [
 
 const empty = buildTurnPrompt(agent, { ...ctx, claims: [], colleagues: [], events: [], available: ['work'] });
 assert.ok(empty.includes("What you've heard:\nYou haven't heard anything new."));
-assert.ok(empty.includes('No new announcements.'));
+assert.ok(empty.includes('Nothing new has been announced.'));
 assert.ok(empty.includes('Colleagues still here: None.'));
 assert.deepEqual(LlmOutputSchema.parse(example(empty)).beliefs, {});
 // Each seed deals the placeholder personas out in its own order, one per character.
@@ -83,6 +90,32 @@ assert.deepEqual([...dealt].sort(), [...placeholderPersonas].sort());
 assert.notDeepEqual(dealt, fixtureCast(43).map((member) => member.profile.persona!));
 fixtureCast(42).forEach((member, index) => {
   assert.equal(temporaryPersonaFor(member.profile.id), placeholderPersonas[index]);
-  assert.ok(buildTurnPrompt(member.profile, ctx).includes(`Who you are: ${member.profile.persona}`));
+  const identity = buildTurnPrompt(member.profile, ctx).split('Who you are: ')[1].split('\n')[0];
+  assert.ok(identity.startsWith(`You're ${member.profile.name}. `) && identity.endsWith(member.profile.persona!));
 });
+
+// The voice brief, examples, colleagues' lines and the nudge render in order.
+const voiced = buildTurnPrompt(agent, {
+  ...ctx,
+  speech: {
+    voice: "You're clipped and terse.", manner: 'give a minimal reply, one to four words.', minimal: true,
+    feelings: { stress: [0, 0, 0], burnout: [0, 0, 0], loyalty: [0, 0, 0], trust: [0, 0, 0] },
+    examples: ['Rain again.'], recent: [{ name: 'Rae', line: 'Busy one.' }],
+    nudge: { line: 'Busy one, really.', against: 'Rae', thought: 'Two a.m. again.' },
+  },
+});
+let at = -1;
+for (const part of [
+  'What you can do:', "How you talk: You're clipped and terse.\nThis time: give a minimal reply, one to four words.",
+  "Things you've said at the coffee machine recently", '- "Rain again."',
+  "Lines colleagues have already said. Don't reuse their wording or structure:\n- Rae: \"Busy one.\"",
+  '- About 15 words at most. This time: one to four words.',
+  'You were going to say: "Busy one, really.". That\'s too close to what Rae said',
+  'Your thoughts were going to be: "Two a.m. again.". That\'s too close to how others are thinking',
+  'Respond with JSON only',
+]) {
+  const i = voiced.indexOf(part);
+  assert.ok(i > at, `Missing or misplaced: ${part}`);
+  at = i;
+}
 console.log('Prompt contract checks passed: context, actions, beliefs, desired schema and seeded persona assignment.');

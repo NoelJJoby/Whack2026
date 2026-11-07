@@ -2,7 +2,9 @@ import { buildManagementPrompt } from './llm/management-prompt';
 import type { EngineProfile, TurnProvider } from './engine-types';
 import { createMessageClient } from './llm/client';
 import { parseReply } from './llm/parse';
-import { buildTurnPrompt } from './llm/prompt';
+import { buildTurnPrompt, restoreIds } from './llm/prompt';
+import { examplesPrompt, validExamples } from './llm/voice';
+import { voiceParams } from './params';
 
 // The factory allows isolated transport checks without changing TurnProvider.
 // Client initialization is lazy so missing credentials resolve to null at the
@@ -13,17 +15,29 @@ export function createTurnProvider(
   } = {},
 ): TurnProvider {
   let request: ReturnType<typeof createMessageClient> | undefined;
-  return async (agent, ctx) => {
+  const provider: TurnProvider = async (agent, ctx) => {
     try {
       const prompt = ctx.management ? buildManagementPrompt(ctx.management) : buildTurnPrompt(agent, ctx, options.personaFor?.(agent));
       request ??= createMessageClient(options);
-      const result = await request(prompt, { purpose: ctx.management?.kind ?? 'employee', maxTokens: ctx.management ? 2200 : 600 });
+      const result = await request(prompt, { purpose: ctx.management?.kind ?? 'employee', ...(ctx.management ? { maxTokens: 2200 } : {}) });
+      // The prompt shows names and claim keys; the engine needs ids.
       // Engine validation, its one retry and rules fallback remain in tick.ts.
-      return result ? parseReply(result.message) : null;
+      return result ? restoreIds(parseReply(result.message), ctx) : null;
     } catch {
       return null;
     }
   };
+  // Example small talk for a voice card: one request, null on any failure.
+  provider.styleExamples = async (agent, voice) => {
+    try {
+      request ??= createMessageClient(options);
+      const result = await request(examplesPrompt(agent.name, voice, voiceParams));
+      return result ? validExamples(parseReply(result.message), voiceParams) : null;
+    } catch {
+      return null;
+    }
+  };
+  return provider;
 }
 
 export const getAgentTurn: TurnProvider = createTurnProvider();

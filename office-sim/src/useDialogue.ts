@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { TickFrame } from '../shared/api';
 import { buildRound, current, idle, playerReducer, readingDelay, typeDelay } from './dialogueQueue';
+import { useBabble } from './voice/useBabble';
 
 const typing = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -30,13 +31,16 @@ export interface DialogueOptions {
   setPlaying: (play: boolean) => boolean;
   /** Space: the existing pause/play toggle. */
   onSpace: () => void;
+  /** The speaker's archetype, which sets their voice's base pitch. */
+  archetypeOf: (id: string) => string | undefined;
 }
 
-export function useDialogue({ history, paused, setPlaying, onSpace }: DialogueOptions) {
+export function useDialogue({ history, paused, setPlaying, onSpace, archetypeOf }: DialogueOptions) {
   const [state, dispatch] = useReducer(playerReducer, idle);
   const [auto, setAuto] = useState(true);
   const [showThoughts, setShowThoughts] = useState(true);
   const [hold, setHold] = useState(false);
+  const [voices, setVoices] = useState(true);
   const reduced = useReducedMotion();
   const line = current(state);
   const held = useRef(false);
@@ -85,10 +89,12 @@ export function useDialogue({ history, paused, setPlaying, onSpace }: DialogueOp
     return () => clearTimeout(timer);
   }, [line, auto, paused, state.phase, showThoughts]);
 
+  useBabble({ state, line, active: voices && !reduced && !paused, showThoughts, archetypeOf });
+
   const next = useCallback(() => dispatch({ type: 'next', auto: latest.current.auto }), []);
   const skip = useCallback(() => dispatch({ type: 'skip' }), []);
 
-  // Space pause/play, Enter or N next, S skip round, A auto. Ignored while typing, with modifiers, or under a menu.
+  // Space pause/play, Enter or N next, S skip round, A auto, M voices. Ignored while typing, with modifiers, or under a menu.
   useEffect(() => {
     const ignored = (e: KeyboardEvent) => e.metaKey || e.ctrlKey || e.altKey || typing(e.target) || latest.current.paused;
     const down = (e: KeyboardEvent) => {
@@ -106,6 +112,8 @@ export function useDialogue({ history, paused, setPlaying, onSpace }: DialogueOp
         skip();
       } else if (e.code === 'KeyA') {
         setAuto(value => !value);
+      } else if (e.code === 'KeyM') {
+        setVoices(value => !value);
       }
     };
     const up = (e: KeyboardEvent) => { if (e.code === 'Space' && !ignored(e)) e.preventDefault(); };
@@ -114,5 +122,5 @@ export function useDialogue({ history, paused, setPlaying, onSpace }: DialogueOp
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   }, [next, skip]);
 
-  return { state, line, auto, setAuto, showThoughts, setShowThoughts, hold, setHold, next, skip, releaseHold };
+  return { state, line, auto, setAuto, showThoughts, setShowThoughts, hold, setHold, voices, setVoices, next, skip, releaseHold };
 }

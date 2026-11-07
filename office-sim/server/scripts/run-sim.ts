@@ -40,6 +40,13 @@ function printTick(r: TickResult, showLines: boolean): void {
   const name = (id: string | null) => (id ? world.agents[id]?.profile.name ?? id : '');
   const ev = log.events.map((e) => `${e.type} (${e.is_true ? 'true' : 'false'}) "${world.claims[e.claim].text}"`).join('; ');
   console.log(`\n== Tick ${log.tick}${ev ? ` | event: ${ev}` : ''}`);
+  if (log.voices) {
+    console.log('  voices:');
+    for (const [id, c] of Object.entries(log.voices)) {
+      console.log(`    ${pad(name(id), 7)} ${c.register}/${c.length}${c.fragments ? '+fragments' : ''}/${c.humour}/${c.tell}  habits ${c.habits.join(', ')}  topics ${c.topics.join('; ')}${c.resamples ? `  (resampled ${c.resamples}x)` : ''}`);
+    }
+  }
+  for (const [id, lines] of Object.entries(log.examples ?? {})) console.log(`    ${pad(name(id), 7)} small talk: ${lines.map((l) => `"${l}"`).join(' ') || '(none)'}`);
   for (const d of log.decisions) {
     const s = log.states[d.agent];
     const act = d.chosen.action + (d.chosen.target ? ` -> ${name(d.chosen.target)}` : '');
@@ -52,7 +59,8 @@ function printTick(r: TickResult, showLines: boolean): void {
       const proposed = d.llm?.proposals.map((q) => `${q.action} ${q.weight}`).join(', ');
       const line = log.lines.find((l) => l.agent === d.agent);
       if (proposed) console.log(`            proposed: ${proposed}`);
-      if (line?.public_line) console.log(`            says:     "${line.public_line}"`);
+      const how = d.speech ? ` [${d.speech.manner}${d.speech.regenerated ? ', regenerated' : d.speech.flags.length ? `, flagged: ${d.speech.flags.join(' ')}` : ''}]` : '';
+      if (line?.public_line) console.log(`            says:     "${line.public_line}"${how}`);
       if (line?.inner_monologue) console.log(`            thinks:   "${line.inner_monologue}"`);
     }
   }
@@ -65,6 +73,7 @@ function printTick(r: TickResult, showLines: boolean): void {
     const s = log.states[q];
     console.log(`  X ${name(q)} QUITS (burnout ${Math.round(s.burnout)}, loyalty ${Math.round(s.loyalty)}, trust ${Math.round(s.trust_mgmt)})`);
   }
+  if (log.speech) console.log(`  speech: ${log.speech.flagged} flagged, ${log.speech.regenerated} regenerated, ${log.speech.still_flagged} still flagged, ${log.speech.budget_left} requests spare`);
   console.log(`  reach: true ${log.reach.true_holders}, false ${log.reach.false_holders}`);
   console.log(`  price: ${log.price.price.toFixed(2)}, log return ${log.price.ret.toFixed(4)}, output ${log.price.outputLog.toFixed(4)}, news ${log.price.newsLevel.toFixed(4)}, noise ${log.price.noise.toFixed(4)}`);
   const usage = tickUsage(r);
@@ -166,7 +175,8 @@ async function main() {
   const fallbackReasons: Record<string, number> = {};
   for (const d of run.logs.flatMap((l) => l.decisions)) if (d.fallback) fallbackReasons[d.fallback] = (fallbackReasons[d.fallback] ?? 0) + 1;
 
-  const payload = { config, cast: args.cast ?? 'fixture', provider: llm ? llmConfig.model : 'stub', params: run.params, summary: run.summary, usage: totals, records: run.records, logs: run.logs };
+  const agentNames = Object.fromEntries(run.world.ids.map((id) => [id, run.world.agents[id].profile.name]));
+  const payload = { config, cast: args.cast ?? 'fixture', names: agentNames, provider: llm ? llmConfig.model : 'stub', params: run.params, summary: run.summary, usage: totals, records: run.records, logs: run.logs };
   if (typeof args.out === 'string') {
     mkdirSync(dirname(args.out), { recursive: true });
     writeFileSync(args.out, JSON.stringify(payload, null, 2) + '\n');

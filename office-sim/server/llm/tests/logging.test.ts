@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createTurnProvider } from '../../llm';
 import { fixtureCast } from '../../scripts/fixture';
 import { createWorld, runTick } from '../../tick';
+import { VOICE_OFF_PARAMS } from '../../test/helpers';
 import { llmConfig } from '../config';
 import { buildTurnPrompt } from '../prompt';
 
@@ -38,7 +39,8 @@ try {
       usage: { input_tokens: 100 + index, output_tokens: 10 + index },
     });
   } });
-  const result = await runTick(world, provider, { mode: 'llm_raw', scenario: [], gossip: true, billboard: true });
+  // Routed on exact prompts built without a voice brief, and exact attempt counts: voice off.
+  const result = await runTick(world, provider, { mode: 'llm_raw', scenario: [], gossip: true, billboard: true }, VOICE_OFF_PARAMS);
   for (const decision of result.log.decisions) {
     const index = world.ids.indexOf(decision.agent);
     const log = decision.provider;
