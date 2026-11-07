@@ -27,7 +27,7 @@ loadEnv({
   quiet: true,
 });
 
-const SEED = 42;
+const DEFAULT_SEED = 42;
 /** Default run length, and the most ticks a run may be set to. */
 export const DEFAULT_TICKS = 16;
 export const TICK_LIMIT = 128;
@@ -91,7 +91,8 @@ type Listener = (message: StreamMessage) => void;
 
 class OfficeSimManager {
   private readonly listeners = new Set<Listener>();
-  readonly cast: CastMember[] = fixtureCast(SEED);
+  private seed = DEFAULT_SEED;
+  cast: CastMember[] = fixtureCast(this.seed);
   private world!: World;
   private frames: TickFrame[] = [];
   private feed: string[] = [];
@@ -126,7 +127,7 @@ class OfficeSimManager {
     for (const listener of this.listeners) listener(message);
   }
 
-  private init() {
+  private init(seed = this.seed) {
     if (hasApiKey()) {
       this.provider ??= createTurnProvider();
       this.mode = 'llm_bias';
@@ -136,11 +137,22 @@ class OfficeSimManager {
       this.mode = 'rules';
       this.modeReason = 'no_api_key';
     }
-    this.world = createWorld(this.cast, SEED);
+    this.cast = fixtureCast(seed);
+    this.world = createWorld(this.cast, seed);
     this.frames = [];
     this.feed = ['Simulation ready.'];
     this.started = false;
     this.running = false;
+  }
+
+  reseed(seed?: number) {
+    const next = typeof seed === 'number' && Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1_000_000) + 1;
+    this.clearTimer();
+    this.generation += 1;
+    this.seed = next;
+    this.init(this.seed);
+    this.emit({ type: 'history', ...this.history() });
+    return this.response();
   }
 
   private tickConfig(): TickConfig {
@@ -276,7 +288,7 @@ class OfficeSimManager {
   reset() {
     this.clearTimer();
     this.generation += 1;
-    this.init();
+    this.init(this.seed);
     this.emit({ type: 'history', ...this.history() });
     return this.response();
   }
@@ -354,6 +366,11 @@ app.post('/api/sim/start', async () => sim.start());
 app.post('/api/sim/play', async () => sim.play());
 app.post('/api/sim/pause', async () => sim.pause());
 app.post('/api/sim/reset', async () => sim.reset());
+app.post('/api/sim/new-seed', async (request) => {
+  const body = request.body as { seed?: number } | undefined;
+  const seed = typeof body?.seed === 'number' ? body.seed : undefined;
+  return sim.reseed(seed);
+});
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
 app.post('/api/sim/settings', async (request) => sim.settings(request.body));
