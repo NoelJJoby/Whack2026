@@ -300,6 +300,206 @@ export const priceParams = {
 
 export type PriceParams = typeof priceParams;
 
+// ---------------------------------------------------------------------------
+// Voice: how agents talk (server/llm/voice.ts, server/speech.ts). Weights are
+// unnormalised. A rule reads one signal, scaled to 0-1: `hi` is how far above
+// 50 it is, `lo` how far below, `flag` is 1 when a boolean is true. `add`
+// rules run first (weight += add * f), then `mul` rules
+// (weight *= max(floor, 1 + mul * f)).
+// ---------------------------------------------------------------------------
+
+export type VoiceSignal =
+  | 'ambition' | 'financial_need' | 'ethics' | 'sociability' | 'impulsivity'
+  | 'loyalty' | 'trust' | 'stress' | 'burnout' | 'recruiter';
+
+export interface WeightRule<K extends string> {
+  option: K;
+  signal: VoiceSignal;
+  dir: 'hi' | 'lo' | 'flag';
+  add?: number;
+  mul?: number;
+  floor?: number;
+}
+
+export interface HabitDef {
+  id: string;
+  /** Sentence for the style brief. */
+  text: string;
+  /** Opening habits: at most one per agent. */
+  opener: boolean;
+}
+
+export const voiceParams = {
+  card: {
+    register: {
+      base: { casual: 1, plain: 1.5, corporate: 0.5, clipped: 0.5 },
+      rules: [
+        { option: 'corporate', signal: 'ambition', dir: 'hi', add: 2.5 },
+        { option: 'casual', signal: 'sociability', dir: 'hi', add: 2.5 },
+        { option: 'clipped', signal: 'sociability', dir: 'lo', add: 2.5 },
+      ] as WeightRule<string>[],
+    },
+    length: {
+      base: { short: 1, medium: 2, rambling: 0.5 },
+      rules: [
+        { option: 'rambling', signal: 'sociability', dir: 'hi', add: 3 },
+        { option: 'short', signal: 'sociability', dir: 'lo', add: 3 },
+      ] as WeightRule<string>[],
+      /** Chance of speaking in fragments = fragmentBase + fragmentImpulsivity * hi(impulsivity). */
+      fragmentBase: 0.1,
+      fragmentImpulsivity: 0.7,
+    },
+    humour: {
+      base: { none: 1, dry: 1, self_deprecating: 1, sarcastic: 0.7, goofy: 0.7 },
+      rules: [
+        { option: 'sarcastic', signal: 'trust', dir: 'lo', add: 2.5 },
+        { option: 'dry', signal: 'trust', dir: 'lo', add: 1.5 },
+        { option: 'goofy', signal: 'loyalty', dir: 'hi', add: 2 },
+        { option: 'self_deprecating', signal: 'loyalty', dir: 'hi', add: 1.5 },
+        { option: 'dry', signal: 'sociability', dir: 'lo', add: 1.5 },
+        { option: 'none', signal: 'sociability', dir: 'lo', add: 1.5 },
+        // Loyal agents are almost never sarcastic.
+        { option: 'sarcastic', signal: 'loyalty', dir: 'hi', mul: -1.5, floor: 0.05 },
+      ] as WeightRule<string>[],
+    },
+    tell: {
+      base: {
+        goes_quiet: 0.3, overly_cheerful: 0.3, practical_logistics: 0.3, others_reactions: 0.3,
+        opportunity: 0.3, life_outside_work: 0.3, asks_specifics: 0.3, polite_but_pointed: 0.3,
+        states_principle: 0.3,
+      },
+      rules: [
+        { option: 'practical_logistics', signal: 'financial_need', dir: 'hi', add: 3 },
+        { option: 'others_reactions', signal: 'sociability', dir: 'hi', add: 3 },
+        { option: 'opportunity', signal: 'ambition', dir: 'hi', add: 3 },
+        { option: 'overly_cheerful', signal: 'loyalty', dir: 'hi', add: 3 },
+        { option: 'life_outside_work', signal: 'loyalty', dir: 'lo', add: 3 },
+        { option: 'life_outside_work', signal: 'recruiter', dir: 'flag', add: 1.5 },
+        { option: 'states_principle', signal: 'ethics', dir: 'hi', add: 3 },
+        { option: 'goes_quiet', signal: 'sociability', dir: 'lo', add: 3 },
+        { option: 'asks_specifics', signal: 'impulsivity', dir: 'lo', add: 1.5 },
+        { option: 'polite_but_pointed', signal: 'trust', dir: 'lo', add: 1.5 },
+      ] as WeightRule<string>[],
+    },
+    /** Chance an agent gets two verbal habits rather than one. */
+    twoHabitsChance: 0.5,
+    habits: [
+      { id: 'right', text: 'You often start with "Right."', opener: true },
+      { id: 'honestly', text: 'You often start with "Honestly,"', opener: true },
+      { id: 'look', text: 'You often start with "Look,"', opener: true },
+      { id: 'okay_so', text: 'You often start with "Okay so"', opener: true },
+      { id: 'i_mean', text: 'You often start with "I mean,"', opener: true },
+      { id: 'listen', text: 'You often start with "Listen,"', opener: true },
+      { id: 'question', text: 'You often end on a question.', opener: false },
+      { id: 'anyway', text: 'You tend to trail off with "anyway."', opener: false },
+      { id: 'sports', text: 'You reach for sports metaphors.', opener: false },
+      { id: 'cooking', text: 'You reach for cooking metaphors.', opener: false },
+      { id: 'gardening', text: 'You reach for gardening metaphors.', opener: false },
+      { id: 'threes', text: 'You list things in threes.', opener: false },
+      { id: 'fair_enough', text: 'You say "fair enough" a lot.', opener: false },
+      { id: 'mate', text: 'You call people "mate".', opener: false },
+      { id: 'to_be_fair', text: 'You say "to be fair" a lot.', opener: false },
+      { id: 'understatement', text: 'You understate things ("not ideal").', opener: false },
+      { id: 'numbers', text: 'You like exact numbers.', opener: false },
+      { id: 'classic', text: 'You say "classic" when things go wrong.', opener: false },
+      { id: 'bless', text: 'You say "bless" about people.', opener: false },
+      { id: 'no_drama', text: 'You say "no drama" a lot.', opener: false },
+    ] as HabitDef[],
+    topicCount: 2,
+    topics: [
+      'the kids and the school run', 'the gym', 'football', 'cooking', 'the commute', 'your dog',
+      'your cat', 'your side project', 'holiday plans', 'coffee', 'your house plants',
+      'gigs and music', 'your running club', 'your allotment', 'a TV series you are hooked on',
+      'the bills', 'your elderly parent', 'your car',
+    ],
+    /** Topics made likelier by financial need: weight * (1 + financialTopicBoost * hi(financial_need)). */
+    financialTopics: ['the bills', 'the kids and the school run', 'your elderly parent'],
+    financialTopicBoost: 3,
+    /** Diversity check: redraws of register, humour and tell before forcing a free tell. */
+    maxResamples: 20,
+    /** Variants per feeling band (server/llm/bands.ts). */
+    feelingVariants: 3,
+  },
+  manner: {
+    base: {
+      deflect_joke: 1, practical_question: 1, change_subject: 0.9, personal_aside: 1,
+      overly_positive: 0.6, minimal: 0.7, talk_to_colleague: 1, comment_on_other: 0.8,
+      set_boundary: 0.6, gallows: 0.5,
+    },
+    rules: [
+      { option: 'minimal', signal: 'stress', dir: 'hi', mul: 2 },
+      { option: 'gallows', signal: 'stress', dir: 'hi', mul: 2 },
+      { option: 'overly_positive', signal: 'stress', dir: 'lo', mul: 1.5 },
+      { option: 'change_subject', signal: 'stress', dir: 'lo', mul: 1.5 },
+      { option: 'talk_to_colleague', signal: 'sociability', dir: 'hi', mul: 1.5 },
+      { option: 'comment_on_other', signal: 'sociability', dir: 'hi', mul: 1.5 },
+      { option: 'minimal', signal: 'sociability', dir: 'lo', mul: 1 },
+      { option: 'set_boundary', signal: 'burnout', dir: 'hi', mul: 1.5 },
+    ] as WeightRule<string>[],
+    /** Multiplier on the manner that matches the agent's displeasure tell. */
+    tellBoost: 2.5,
+    /** Multipliers when the card's humour is `none`. */
+    noHumour: { deflect_joke: 0.2, gallows: 0.2 } as Record<string, number>,
+    /** Multipliers by this turn's stance. */
+    stance: {
+      believer: { gallows: 0.3, set_boundary: 0.6 },
+      pragmatist: {},
+      sceptic: { overly_positive: 0.5 },
+    } as Record<string, Record<string, number>>,
+    /** At most this many agents share a manner in one round. */
+    roundCap: 2,
+    /** Chance the verbal habits appear in this turn's brief. */
+    habitShowChance: 0.6,
+    /** Added to affinity when drawing who to address. */
+    addresseeEpsilon: 1,
+  },
+  /** Stance toward leadership, from current trust_mgmt. */
+  stance: { believerMin: 65, scepticBelow: 40 },
+  /** Word limits written into the prompt. */
+  words: { publicMax: 15, innerMax: 30, minimalMax: 4, shortMin: 3, shortMax: 8, examplesMax: 20 },
+  /** Anti-repetition post-check. */
+  speech: {
+    /** Rounds of colleagues' lines shown in the prompt and checked against. */
+    recentRounds: 2,
+    /** Lines whose first this-many words match another agent's line this round are flagged. */
+    openerWords: 3,
+    /** Word-trigram Jaccard similarity above this is flagged. */
+    trigramThreshold: 0.5,
+    /** An echo opener has an event key term within this many leading words. */
+    echoWords: 5,
+    /** Flagged lines get one regeneration, within the tick's request budget. */
+    regenerate: true,
+  },
+  /** One call per agent for three small-talk lines used as style examples. */
+  examples: { enabled: true, count: 3 },
+  /** Banned in public lines. Phrases match anywhere; sentences only as a whole sentence. */
+  bannedPhrases: [
+    'Anyone actually know', 'keep my head down', 'running on fumes', "Let's see if it actually",
+    'before anyone panics', "it's not a plan, it's a threat",
+  ],
+  bannedSentences: ['Sure.'],
+  /** Case-insensitive regexes for archetype labels used as names. */
+  labelPatterns: [
+    '\\bclimbers?\\b', '\\bloyalists?\\b', '\\bgossip hubs?\\b', '\\bs[ck]eptics?\\b',
+    '\\bbreadwinners?\\b', '\\bflight risks?\\b', '\\bops (?:would|will|knows?|says?|thinks?|said)\\b',
+  ],
+  tickPatterns: ['\\bticks?\\b'],
+  /** Word prefixes that name each event, for the echo-opener check. Numbers in the text are added. */
+  eventKeyTerms: {
+    merger: ['merg', 'acqui', 'takeover', 'rival', 'combin', 'org chart'],
+    new_management: ['vp', 'new boss', 'new manag', 'shake up', 'memo', 'sacred'],
+    long_hours_policy: ['hour', 'policy', 'weekend', 'overtime', 'all nighter', 'launch'],
+    pr_scandal: ['breach', 'leak', 'hack', 'password', 'record', 'cover up', 'covered up', 'scandal', 'hushed'],
+    layoffs_rumour: ['layoff', 'laid off', 'cut', 'redundan', 'axe'],
+    surprise_bonus: ['bonus', 'paycheque', 'paycheck', 'payout'],
+    competitor_poaching: ['competitor', 'recruit', 'poach', 'rival', 'jump ship', 'signing'],
+  } as Record<EventType, string[]>,
+  /** Mirrors src/Workday.tsx: 16 ticks a day, the first at 09:00. */
+  clock: { ticksPerDay: 16, firstHour: 9, afternoonFrom: 12, eveningFrom: 17 },
+};
+
+export type VoiceParams = typeof voiceParams;
+
 export const DEFAULT_PARAMS = {
   bias: biasParams,
   rules: ruleParams,
@@ -307,6 +507,7 @@ export const DEFAULT_PARAMS = {
   quit: quitParams,
   setup: setupParams,
   price: priceParams,
+  voice: voiceParams,
 };
 
 export type Params = typeof DEFAULT_PARAMS;

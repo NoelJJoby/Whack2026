@@ -24,7 +24,9 @@ export type Purpose =
   | 'traits'
   | 'event'
   | 'price'
-  | 'text';
+  | 'text'
+  | 'voice'
+  | 'manner';
 
 /** FNV-1a over the joined key parts, finished with the murmur3 fmix32 avalanche. */
 export function hashKey(...parts: Array<string | number>): number {
