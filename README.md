@@ -28,10 +28,11 @@ This project provides the integration shell for an office simulation backend and
 The Fastify server runs the real simulation engine. Types for every request, response and stream message are in `office-sim/shared/api.ts`.
 
 - `GET /api/health`: `{ ok, mode, mode_reason }`
-- `GET /api/sim/cast`: the agent profiles and `max_ticks` (16)
+- `GET /api/sim/cast`: the agent profiles
 - `GET /api/sim/state`: `{ mode, mode_reason, state }`
 - `GET /api/sim/history`: the same, plus `history` (one frame per tick)
 - `POST /api/sim/start`, `/play`, `/pause`, `/reset`, `/step`
+- `POST /api/sim/settings` with `{ "max_ticks": 1-128 }`: the run length (default 16, can't go below the current tick, kept across reset). Every response includes `max_ticks`.
 - `POST /api/sim/inject` with `{ "type": EventType, "is_true"?: boolean }`. Applied at the start of the next tick.
 - `GET /api/events`: SSE. It sends `history` on connect (and after reset), then a `tick` message per tick and a `state` message on play, pause or inject.
 
