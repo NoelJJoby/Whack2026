@@ -2,6 +2,34 @@
 
 From the Simulation Engine lane (`simulation_engine` branch). The engine works today without any of these changes; each one removes an adapter or a local fixture. Each item names the owner, the exact change and the reason.
 
+## Status on 7 November 2026, after the engine (#1) and LLM (#4) merges on `main`
+
+**Engine and LLM handler: aligned.** `server/test/llm-e2e.test.ts` runs the real provider chain (`buildTurnPrompt` → Anthropic client → `parseReply` → adapter → bias → rules) for 16 ticks, using a fake Anthropic transport and no network. It checks the following:
+
+- The prompt advertises exactly `ctx.available`, the colleague ids and the claim ids.
+- Nothing proposed is dropped.
+- LLM targets and claims are honoured.
+- Gossiped and distorted claims reach the hearer's next prompt.
+- Quitters leave the colleague list.
+- Beliefs are stored.
+- The retry recovers a broken reply, and a dead agent runs on rules.
+
+All engine tests (93), all 9 LLM test files and `tsc --noEmit -p tsconfig.json` pass. Note that `pnpm install` is needed once to pull in `@anthropic-ai/sdk`.
+
+**Test simulation with the real LLM:** `pnpm exec tsx server/scripts/run-sim.ts --llm --ticks 16 --out runs/llm-run.json`. This makes at most 8 × 16 × 2 = 256 requests, and about 120 in practice. The runner reads `ANTHROPIC_API_KEY` from `office-sim/.env`, then the repo-root `.env`. It stops if every call fails on tick 1. Add `--cast data` to use the `data.ts` cast.
+
+Done on `main`: 1a, 1c, 1d, 1e, 1f (shared types); 3a, 3b, 3c (data.ts); 2a–2d (llm.ts); 6c (tsconfig). Still open:
+
+| Owner | Item |
+|---|---|
+| Integration | **5a/5b:** `server/index.ts` still runs the placeholder `stepSimulation`, so the web UI shows no real simulation. Also, `setInterval` calls `step()` every 2.5 s without awaiting it. A real LLM tick takes about 3 s (up to 40 s with the timeout and retry), so the interval must not start a new tick while one is still running. |
+| Integration | **6a, 6b:** package scripts; add `runs/` to `.gitignore`. |
+| Everyone | The repo-root `.env` is **not git-ignored**: only `office-sim/.gitignore` lists `.env`. Move the key to `office-sim/.env` or add a root `.gitignore`. |
+| LLM and Data | With the `data.ts` cast, nobody quits in 16 ticks of the shock scenario (stub provider, seeds 1, 2, 3, 42). Its starting burnout (20–35) is well below the fixture's. Raise starting burnout and stress, or lower `quit_threshold`, if the demo uses that cast. |
+| LLM and Data | `reachSummary` in `metrics.ts` counts each claim object once, plus once per agent holding it. So reach is inflated by the number of claims. The engine reports reach through `claimReach()` and doesn't call it. |
+
+Behaviour note, no change needed: `leak` is offered in the prompt based on the previous tick's belief. If the reply lowers the agent's belief in the scandal claim below the leak threshold, the engine masks `leak` in the same tick. The other proposals still count.
+
 ## 1. `office-sim/shared/types.ts` (all four: frozen, needs a team ping)
 
 | # | Change | Why |
