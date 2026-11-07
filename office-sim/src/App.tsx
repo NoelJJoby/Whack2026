@@ -60,10 +60,14 @@ export default function App() {
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
   const running = state?.running ?? false;
-  const canPlay = !disabled && !complete && (state?.started ?? false);
   const dialogue = useDialogue({
     history, paused: menu !== null,
-    setPlaying: play => { if (canPlay && play !== running) void sim.togglePlay(); },
+    // Not gated on `busy`: the first hour can arrive while the Start request is still in flight.
+    setPlaying: play => {
+      if (!live || complete || !state?.started || play === running) return false;
+      void sim.togglePlay();
+      return true;
+    },
     onSpace: () => toggle(),
   });
   function toggle() {

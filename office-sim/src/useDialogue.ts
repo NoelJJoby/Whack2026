@@ -26,8 +26,8 @@ export interface DialogueOptions {
   history: TickFrame[];
   /** A modal menu is open: the bar is hidden, so typing, auto and keys wait. */
   paused: boolean;
-  /** Pause (false) or resume (true) the simulation for Hold for dialogue. */
-  setPlaying: (play: boolean) => void;
+  /** Pause (false) or resume (true) the simulation for Hold for dialogue. Returns whether it acted. */
+  setPlaying: (play: boolean) => boolean;
   /** Space: the existing pause/play toggle. */
   onSpace: () => void;
 }
@@ -56,10 +56,7 @@ export function useDialogue({ history, paused, setPlaying, onSpace }: DialogueOp
     }
     const lines = buildRound(history.at(-1)!, history.at(-2));
     dispatch({ type: 'round', lines });
-    if (lines.length && latest.current.hold && !held.current) {
-      held.current = true;
-      latest.current.setPlaying(false);
-    }
+    if (lines.length && latest.current.hold && !held.current) held.current = latest.current.setPlaying(false);
   }, [history]);
 
   const releaseHold = useCallback(() => { held.current = false; }, []);
