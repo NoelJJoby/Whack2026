@@ -11,6 +11,8 @@ export interface SimResponse {
   mode_reason: ModeReason;
   /** Run length: the run auto-pauses when state.tick reaches it. */
   max_ticks: number;
+  /** Playback multiplier; omitted by older servers. */
+  speed?: number;
   state: SimulationState;
 }
 

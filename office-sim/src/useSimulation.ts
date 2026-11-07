@@ -46,6 +46,8 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   cast: AgentProfile[];
   maxTicks: number;
+  speed: number;
+  setSpeed: (speed: number) => Promise<boolean>;
   mode: SimulationMode | null;
   modeReason: ModeReason | null;
   state: SimulationState | null;
@@ -58,6 +60,7 @@ export interface Simulation {
   togglePlay: () => Promise<boolean>;
   step: () => Promise<boolean>;
   reset: () => Promise<boolean>;
+  newSeed: (seed?: number) => Promise<boolean>;
   setRunLength: (maxTicks: number) => Promise<boolean>;
   inject: (type: EventType, isTrue: boolean) => Promise<boolean>;
 }
@@ -78,7 +81,7 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state });
   }, []);
 
   const replaceHistory = useCallback(
@@ -155,6 +158,8 @@ export function useSimulation(): Simulation {
   const running = snapshot?.state.running ?? false;
   return {
     cast: cast?.agents ?? [],
+    speed: snapshot?.speed ?? 1,
+    setSpeed: (speed) => post('/sim/speed', { speed }),
     maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,
@@ -167,6 +172,7 @@ export function useSimulation(): Simulation {
     togglePlay: () => post(running ? '/sim/pause' : '/sim/play'),
     step: () => post('/sim/step'),
     reset: () => post('/sim/reset'),
+    newSeed: (seed) => post('/sim/new-seed', seed === undefined ? undefined : { seed }),
     setRunLength: (maxTicks) => post('/sim/settings', { max_ticks: maxTicks }),
     inject: (type, isTrue) => post('/sim/inject', { type, is_true: isTrue }),
   };

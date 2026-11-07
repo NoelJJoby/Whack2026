@@ -27,7 +27,7 @@ loadEnv({
   quiet: true,
 });
 
-const SEED = 42;
+const DEFAULT_SEED = 42;
 /** Default run length, and the most ticks a run may be set to. */
 export const DEFAULT_TICKS = 16;
 export const TICK_LIMIT = 128;
@@ -91,7 +91,8 @@ type Listener = (message: StreamMessage) => void;
 
 class OfficeSimManager {
   private readonly listeners = new Set<Listener>();
-  readonly cast: CastMember[] = fixtureCast(SEED);
+  private seed = DEFAULT_SEED;
+  cast: CastMember[] = fixtureCast(this.seed);
   private world!: World;
   private frames: TickFrame[] = [];
   private feed: string[] = [];
@@ -99,6 +100,7 @@ class OfficeSimManager {
   private mode: SimulationMode = 'rules';
   private modeReason: ModeReason = 'no_api_key';
   private maxTicks = DEFAULT_TICKS;
+  private speed = 1;
   private started = false;
   private running = false;
   private timer: NodeJS.Timeout | null = null;
@@ -126,7 +128,7 @@ class OfficeSimManager {
     for (const listener of this.listeners) listener(message);
   }
 
-  private init() {
+  private init(seed = this.seed) {
     if (hasApiKey()) {
       this.provider ??= createTurnProvider();
       this.mode = 'llm_bias';
@@ -136,11 +138,22 @@ class OfficeSimManager {
       this.mode = 'rules';
       this.modeReason = 'no_api_key';
     }
-    this.world = createWorld(this.cast, SEED);
+    this.cast = fixtureCast(seed);
+    this.world = createWorld(this.cast, seed);
     this.frames = [];
     this.feed = ['Simulation ready.'];
     this.started = false;
     this.running = false;
+  }
+
+  reseed(seed?: number) {
+    const next = typeof seed === 'number' && Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1_000_000) + 1;
+    this.clearTimer();
+    this.generation += 1;
+    this.seed = next;
+    this.init(this.seed);
+    this.emit({ type: 'history', ...this.history() });
+    return this.response();
   }
 
   private tickConfig(): TickConfig {
@@ -159,7 +172,7 @@ class OfficeSimManager {
   }
 
   response(): SimResponse {
-    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state() };
+    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state() };
   }
 
   history(): HistoryResponse {
@@ -203,7 +216,7 @@ class OfficeSimManager {
       this.emitState();
       return;
     }
-    this.schedule(TICK_INTERVAL_MS);
+    this.schedule(TICK_INTERVAL_MS / this.speed);
   }
 
   /** At most one tick in flight; concurrent callers share it. */
@@ -276,7 +289,7 @@ class OfficeSimManager {
   reset() {
     this.clearTimer();
     this.generation += 1;
-    this.init();
+    this.init(this.seed);
     this.emit({ type: 'history', ...this.history() });
     return this.response();
   }
@@ -305,6 +318,17 @@ class OfficeSimManager {
       this.running = false;
       this.clearTimer();
     }
+    this.emitState();
+    return this.response();
+  }
+
+  setSpeed(body: unknown) {
+    const parsed = z.object({ speed: z.union([z.literal(0.5), z.literal(1), z.literal(2), z.literal(4)]) }).strict().safeParse(body);
+    if (!parsed.success) throw new ApiFailure(400, 'invalid_speed', 'Choose a speed of 0.5, 1, 2 or 4.');
+    this.speed = parsed.data.speed;
+    this.clearTimer();
+    // The active tick finishes first; its loop schedules the next one at the new rate.
+    if (!this.inFlight) this.schedule(TICK_INTERVAL_MS / this.speed);
     this.emitState();
     return this.response();
   }
@@ -354,8 +378,14 @@ app.post('/api/sim/start', async () => sim.start());
 app.post('/api/sim/play', async () => sim.play());
 app.post('/api/sim/pause', async () => sim.pause());
 app.post('/api/sim/reset', async () => sim.reset());
+app.post('/api/sim/new-seed', async (request) => {
+  const body = request.body as { seed?: number } | undefined;
+  const seed = typeof body?.seed === 'number' ? body.seed : undefined;
+  return sim.reseed(seed);
+});
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/speed', async (request) => sim.setSpeed(request.body));
 app.post('/api/sim/settings', async (request) => sim.settings(request.body));
 
 app.get('/api/events', (request, reply) => {

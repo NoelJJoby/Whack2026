@@ -82,6 +82,28 @@ describe('api routes', () => {
     assert.equal(stateJson.state.tick, 0);
   });
 
+  test('reset keeps the current seed while new-seed changes the company', async () => {
+    const seedA = 91;
+    const seedB = 92;
+
+    const firstSeed = (await post('/api/sim/new-seed', { seed: seedA })).json();
+    const castA = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+    const afterReset = (await post('/api/sim/reset')).json();
+    const castAfterReset = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+
+    assert.equal(firstSeed.state.seed, seedA);
+    assert.equal(afterReset.state.seed, seedA);
+    assert.deepEqual(castA, castAfterReset);
+    assert.equal(castA.filter((agent: { role: string }) => agent.role === 'Manager').length, 2);
+
+    const secondSeed = (await post('/api/sim/new-seed', { seed: seedB })).json();
+    const castB = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+
+    assert.equal(secondSeed.state.seed, seedB);
+    assert.notDeepEqual(castA, castB);
+    assert.ok(castB.some((agent: { name: string }) => agent.name !== castA[0].name));
+  });
+
   test('errors use one shape', async () => {
     await post('/api/sim/reset');
     for (const payload of [{ type: 'bogus' }, { type: 'merger', is_true: 'yes' }, { type: 'merger', extra: 1 }, undefined]) {
@@ -189,5 +211,28 @@ describe('api routes', () => {
     controller.abort();
     for (let i = 0; i < 50 && sim.listenerCount > 0; i++) await new Promise((r) => setTimeout(r, 20));
     assert.equal(sim.listenerCount, 0);
+  });
+});
+
+describe('playback speed', () => {
+  test('accepts supported rates without advancing a paused simulation', async () => {
+    await post('/api/sim/reset');
+    for (const speed of [0.5, 1, 2, 4]) {
+      const response = await post('/api/sim/speed', { speed });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.json().speed, speed);
+      assert.equal(response.json().state.tick, 0);
+      assert.equal(response.json().state.running, false);
+      assert.equal((await app.inject({ method: 'GET', url: '/api/sim/history' })).json().speed, speed);
+    }
+    await post('/api/sim/speed', { speed: 1 });
+  });
+  test('rejects invalid speeds and retains the previous speed', async () => {
+    for (const speed of [0, -1, 3, 100, '2', null]) {
+      const response = await post('/api/sim/speed', { speed });
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().error.code, 'invalid_speed');
+    }
+    assert.equal((await app.inject({ method: 'GET', url: '/api/sim/state' })).json().speed, 1);
   });
 });

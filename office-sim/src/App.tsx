@@ -4,6 +4,8 @@ import './index.css';
 import { BURNOUT_STRESS_THRESHOLD, BURNOUT_RECOVERY_THRESHOLD } from '../shared/stressThresholds';
 import type { TickEvent, TickFrame } from '../shared/api';
 import type { Action, EventType, TickRecord } from '../shared/types';
+import { Workday, workdayTime } from './Workday';
+import { StockPrice } from './StockPrice';
 import { Controls } from './Controls';
 import { EventComposer } from './EventComposer';
 import { RUN_LENGTHS, USE_MOCKS, useSimulation, type Simulation } from './useSimulation';
@@ -21,7 +23,6 @@ const EVENT_SHORT: Record<EventType, string> = {
     merger: 'MERGER', new_management: 'NEW VP', long_hours_policy: 'POLICY', pr_scandal: 'SCANDAL',
     layoffs_rumour: 'RUMOUR', surprise_bonus: 'BONUS', competitor_poaching: 'POACHING',
 };
-const TICKS_PER_DAY = 8;
 const pad = (n: number) => String(n).padStart(2, '0');
 
 function Bar({ value, label, inverse = false, threshold }: {
@@ -89,7 +90,7 @@ export default function App() {
     const latestEvent: (TickEvent & { tick: number }) | undefined = allEvents.at(-1);
     const tick = state?.tick ?? 0;
     const complete = tick >= maxTicks;
-    const active = people.filter(p => !p.quit).length;
+    const clock = workdayTime(tick);
     const quitters = (state?.metrics.crack_order ?? []).map(id => byId[id]).filter((p): p is Person => Boolean(p));
     const firstQuit = state?.metrics.first_quit_tick ?? null;
     const recordCount = history.reduce((n, f) => n + f.records.length + f.events.length, 0);
@@ -113,9 +114,10 @@ export default function App() {
         : `${people.length ? `${people.length} minds` : 'Eight minds'}. One very long workday.`;
 
     return <main className="app-shell">
-    <header className="topbar"><a className="brand" href="#" aria-label="Agentic Chaos home"><span className="brand-icon">▥</span><span>AGENTIC<span className="brand-sim">CHAOS</span><small>A SMALL WORLD. A CORPORATE EXPERIMENT.</small></span></a><div className="run-meta"><span className={`demo-pill ${mode.tone}`}><i /> {mode.label}</span><span>TICK <b>{pad(tick)}</b><em>/ {maxTicks}</em></span><span className="time">DAY {pad(Math.floor(tick / TICKS_PER_DAY) + 1)} <b>{pad(9 + (tick % TICKS_PER_DAY))}:00</b></span></div><div className="team-count"><span>♟</span><b>{active}</b> / {people.length} on payroll</div></header>
+    <header className="topbar"><a className="brand" href="#" aria-label="Agentic Chaos home"><span className="brand-icon">▥</span><span>AGENTIC<span className="brand-sim">CHAOS</span><small>A SMALL WORLD. A CORPORATE EXPERIMENT.</small></span></a><div className="run-meta"><span className={`demo-pill ${mode.tone}`}><i /> {mode.label}</span><span>TICK <b>{pad(tick)}</b><em>/ {maxTicks}</em></span><span className="time">DAY {pad(clock.day)} <b>{pad(clock.hour)}:00</b></span></div><StockPrice history={history}/></header>
+    <Workday tick={tick} speed={sim.speed} running={state?.running ?? false} complete={complete} disabled={!live || sim.busy} onSpeed={speed => void sim.setSpeed(speed)}/>
     <section className="event-bar billboard" aria-label="Company billboard"><span className="event-icon">!</span><div className="billboard-copy"><small>ON THE BILLBOARD · {latestEvent ? `TICK ${pad(latestEvent.tick)}` : 'NOTHING POSTED YET'}</small><strong>{latestEvent?.text ?? 'Business as usual. For now.'}</strong>{truth && latestEvent && <span className={latestEvent.is_true ? "billboard-truth mint" : "billboard-truth coral"}>{latestEvent.is_true ? "TRUE EVENT" : "FALSE RUMOUR"}</span>}</div><label className="truth-toggle"><input type="checkbox" checked={truth} onChange={e => setTruth(e.target.checked)}/><span />Reveal truth</label></section>
-    <div className="workspace"><section className="office-panel"><div className="section-heading"><h1>The daily grind<span>OFFICE CROSS-SECTION</span></h1><span className="weather">☀ {pad(9 + (tick % TICKS_PER_DAY))}:00 · CLEAR SKIES, LOW MORALE</span></div><Office people={people} selected={selected} onSelect={select} highlight={highlight}/><div className="office-footer"><span><i className="live-dot"/> {statusLine}</span><Controls running={state?.running} started={state?.started} complete={complete} disabled={!live || sim.busy} tick={tick} runLength={maxTicks} runLengths={RUN_LENGTHS} onRunLength={n => void sim.setRunLength(n)} onStart={() => void sim.start()} onPlayPause={() => void sim.togglePlay()} onStep={() => void sim.step()} onReset={() => void sim.reset()}/></div></section>
+    <div className="workspace"><section className="office-panel"><div className="section-heading"><h1>The daily grind<span>OFFICE CROSS-SECTION</span></h1><span className="weather">☀ {pad(clock.hour)}:00 · CLEAR SKIES, LOW MORALE</span></div><Office people={people} selected={selected} onSelect={select} highlight={highlight}/><div className="office-footer"><span><i className="live-dot"/> {statusLine}</span><Controls running={state?.running} started={state?.started} complete={complete} disabled={!live || sim.busy} tick={tick} runLength={maxTicks} runLengths={RUN_LENGTHS} onRunLength={n => void sim.setRunLength(n)} onStart={() => void sim.start()} onPlayPause={() => void sim.togglePlay()} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/></div></section>
     <aside className="sidebar"><section className="panel feed-panel"><div className="panel-heading"><h2><span>≡</span> Office wire</h2><span className="badge">{recordCount} UPDATES</span></div><div className="feed-scroll" tabIndex={0} aria-label="Office activity feed">
       {(state?.queue ?? []).map((type, i) => <article className="feed-item posted-event" key={`queued-${i}`}><span className="feed-tick">↗</span><div><small>BILLBOARD · QUEUED FOR TICK {pad(tick + 1)}</small><p>{EVENT_SHORT[type]}</p></div></article>)}
       {[...history].reverse().map(frame => <FeedFrame key={frame.tick} frame={frame} truth={truth} nameOf={nameOf} onHighlight={setHighlight} onSelect={select}/>)}

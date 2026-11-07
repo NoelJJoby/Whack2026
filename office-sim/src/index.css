@@ -1433,3 +1433,41 @@ h2 {
 .burnout-rule { border-left: 2px solid var(--gold); padding: 10px 12px; font-size: 13px; line-height: 1.6; background: #303329; }
 .inspector .stat > span { width: 75px; }
 @media (max-width: 600px) { .brand { font-size: 21px; } }
+
+/* Clock and market HUD */
+.workday-panel { margin-top: 18px; padding: 18px 22px 12px; background: #202f2b; border: 1px solid #60725c; border-top: 3px solid var(--mint); }
+.workday-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.workday-clock { display: flex; align-items: center; gap: 15px; }
+.workday-clock > span { font-size: 11px; letter-spacing: 1px; }
+.workday-clock strong { font: 32px 'Pixelify Sans', monospace; }
+.speed-controls { display: flex; align-items: center; gap: 5px; }
+.speed-controls > span { font-size: 10px; letter-spacing: 1px; color: var(--muted); margin-right: 9px; }
+.speed-controls button { border: 1px solid var(--border); background: #15231f; min-width: 43px; padding: 8px; font-size: 14px; }
+.speed-controls button.chosen { border-color: var(--gold); color: var(--gold); background: #3b3d2c; }
+button:disabled { cursor: not-allowed; opacity: .5; }
+.day-track { height: 18px; position: relative; background: #334b41; border: 1px solid #6c8068; }
+.overtime-zone { position: absolute; left: 56.25%; right: 0; top: 0; bottom: 0; background: #464253; }
+.day-fill { height: 100%; position: relative; background: var(--mint); transition: width .4s ease; }
+.day-cursor { position: absolute; top: -4px; bottom: -4px; width: 4px; background: #f0dfac; transform: translateX(-50%); transition: left .4s ease; }
+.day-checkpoint { position: absolute; top: 0; bottom: 0; width: 1px; background: #c6cdb280; }
+.day-labels { position: relative; height: 48px; margin-top: 9px; }
+.day-labels > span { position: absolute; transform: translateX(-50%); font-size: 13px; text-align: center; color: #e0e5cf; }
+.day-labels > span:first-child { left: 0; transform: none; text-align: left; }
+.day-labels > span:last-child { right: 0; transform: none; text-align: right; }
+.day-labels small { display: block; font-size: 10px; margin-top: 4px; color: var(--muted); }
+.day-note { margin: 0; font-size: 11px; color: var(--muted); }
+.stock-ticker { text-align: left; padding: 9px 12px; border: 1px solid var(--border); background: #24352d; flex-shrink: 0; }
+.stock-ticker:hover { border-color: var(--gold); }
+.stock-ticker > span { display: block; font-size: 11px; color: var(--gold); }
+.stock-ticker small { font-size: 8px; margin-left: 9px; color: var(--muted); }
+.stock-ticker strong { display: block; font: 25px 'Pixelify Sans'; margin-top: 3px; }
+.stock-ticker em { font: normal 12px 'Space Grotesk'; margin-left: 8px; }
+.stock-dialog { color: #e3e5d5; width: min(760px, calc(100% - 32px)); padding: 30px; border: 2px solid #81916f; max-height: 90vh; overflow: auto; }
+.stock-dialog::backdrop { background: #091413d9; }
+.stock-dialog h2 { font: 32px 'Pixelify Sans'; margin-top: 8px; }
+.stock-dialog .stock-value { font: 38px 'Pixelify Sans'; margin: 22px 0 8px; }
+.stock-value span { font: 13px 'Space Grotesk'; margin-left: 12px; }
+.stock-dialog svg { width: 100%; display: block; }
+.stock-dialog p { font-size: 13px; line-height: 1.6; color: var(--muted); }
+@media(max-width: 1100px) { .topbar .time { display: none; } .run-meta { gap: 10px; } .brand { font-size: 27px; } }
+@media(max-width: 760px) { .topbar { flex-wrap: wrap; height: auto; padding: 14px 0; gap: 12px; } .run-meta { order: 3; width: 100%; } .workday-top { flex-wrap: wrap; } .workday-panel { padding: 14px; } .day-labels > span { font-size: 11px; } .day-labels small { font-size: 9px; } .stock-ticker small { display: none; } .stock-ticker strong { font-size: 20px; } .stock-dialog { padding: 22px; } .stock-value span { display: block; margin-left: 0; } }
