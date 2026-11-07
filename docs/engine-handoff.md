@@ -7,8 +7,8 @@ From the Simulation Engine lane (`simulation_engine` branch). The engine works t
 | # | Change | Why |
 |---|---|---|
 | 1a | Add `impulsivity: number` and `recruiter_contact: boolean` to `AgentProfile.traits`. | The bias brief needs both. The engine carries them in `EngineTraits` (`server/engine-types.ts`). |
-| 1b | Decide on `'work'` vs `'work_normally'`. **Proposal: keep `'work'`.** | The brief and Python reference use `work_normally`; shared types and `llm.ts` use `work`. The engine uses `work` and the adapter accepts both spellings. |
-| 1c | Add `Proposal { action; weight; target? }` and `LlmOutput { proposals; public_line; inner_monologue; beliefs }` (copy them from `server/engine-types.ts`). Keep `LlmTurn` until `llm.ts` migrates. | The brief's LLM contract is up to 3 weighted proposals plus belief scores. `server/llm-adapter.ts` accepts both shapes in the meantime. |
+| 1b | **Decided: keep `'work'`.** No change needed. | The brief and Python reference use `work_normally`; shared types and `llm.ts` use `work`. The adapter accepts both spellings. |
+| 1c | Add `Proposal` and `LlmOutput` exactly as in [llm-output-contract.md](llm-output-contract.md). Keep `LlmTurn` until `llm.ts` migrates. | The decided LLM contract: up to 3 weighted proposals (optional `target` and `claim`) plus belief scores. `server/llm-adapter.ts` accepts both shapes in the meantime. |
 | 1d | Add `scandal: boolean` and `parent_id: string \| null` to `Claim`. | `leak` is gated on scandal claims. Distortion creates child claims, and we need the lineage to measure true vs false reach. |
 | 1e | Add optional fields to `TickRecord`: `public_line?`, `inner_monologue?`, `quit?: boolean`, `state?: AgentState`, `decision?: DecisionLog`. | The frozen shape (one action, target and summary per record) can't carry the lines, the quit moment or the bias log. Until then the engine emits a valid `TickRecord[]` and returns everything else in a separate `EngineTickLog`. |
 | 1f | Add per-agent `status: 'active' \| 'quit'` (and `quit_tick`) to `SimulationState.agents`, or a separate `status` map. | The frontend needs to grey out quitters. `toSimulationState()` currently signals a quit only through `metrics.crack_order`. |
@@ -17,10 +17,7 @@ From the Simulation Engine lane (`simulation_engine` branch). The engine works t
 
 | # | Change | Why |
 |---|---|---|
-| 2a | Return `null` (or throw) on failure instead of the canned `work` turn. | The brief says invalid output runs that agent in `rules` mode and logs it. The canned turn hides the failure, so the engine can't fall back. |
-| 2b | Switch the Zod schema to the brief format (`proposals` with weights, plus `beliefs`). | The bias engine blends LLM weights. A single action gives it nothing to blend. |
-| 2c | Expose a function with the `TurnProvider` shape: `(agent: EngineProfile, ctx: TurnContext) => Promise<unknown>`. | The engine injects the provider; it never imports `llm.ts`. `TurnContext` already holds state, colleagues, claims (without truth tags) and the available actions. |
-| 2d | Prompt: describe state as feelings (the brief's band templates), use no archetype labels, include the "not an assistant" framing, and ask for beliefs per claim id. | The brief's prompt rules. `ctx.claims[].id` is the key to use in `beliefs`. |
+| 2a–2d | Implement [llm-output-contract.md](llm-output-contract.md):<br>• return `null` on failure (no canned `work` turn, no schema retry)<br>• emit proposals with weights and beliefs<br>• expose a `TurnProvider`<br>• follow the brief's prompt rules | The bias engine blends LLM weights and needs beliefs to settle claims. The canned fallback hides failures from the engine. |
 | 2e | Optional: cache responses by hash(model + prompt). | Exact replays and shared proposals across `llm_raw` and `llm_bias`. The decision log already has a `cache_hit` field. |
 
 ## 3. `office-sim/server/data.ts` (LLM and Data Lead)
