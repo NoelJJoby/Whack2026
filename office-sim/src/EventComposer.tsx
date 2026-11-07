@@ -1,66 +1,66 @@
 import { useState, type FormEvent } from 'react';
 
-export interface BillboardPost {
-  id: number;
-  title: string;
-  isTrue: boolean;
-}
+import type { EventType } from '../shared/types';
 
-const presets = [
-  { title: 'Customer data breach', isTrue: true, icon: '!' },
-  { title: 'Fake Glassdoor review by CEO', isTrue: true, icon: '★' },
-  { title: 'Fake acquisition rumour', isTrue: false, icon: '?' },
-  { title: 'Surprise bonus', isTrue: true, icon: '+' },
+// The engine's event types. `isTrue` is the engine's default truth for each.
+export const presets: Array<{ type: EventType; title: string; isTrue: boolean; icon: string }> = [
+  { type: 'merger', title: 'Merger with a competitor', isTrue: true, icon: '&' },
+  { type: 'new_management', title: 'New VP takes over', isTrue: true, icon: '↑' },
+  { type: 'long_hours_policy', title: '20-hour workday policy', isTrue: true, icon: '!' },
+  { type: 'pr_scandal', title: 'Customer data breach', isTrue: true, icon: '★' },
+  { type: 'layoffs_rumour', title: 'Layoffs rumour', isTrue: false, icon: '?' },
+  { type: 'surprise_bonus', title: 'Surprise bonus', isTrue: true, icon: '+' },
+  { type: 'competitor_poaching', title: 'Competitor poaching staff', isTrue: true, icon: '$' },
 ];
 
-export function EventComposer({ onPost }: { onPost: (post: Omit<BillboardPost, 'id'>) => void }) {
-  const [preset, setPreset] = useState<number | null>(0);
-  const [title, setTitle] = useState(presets[0].title);
-  const [isTrue, setIsTrue] = useState(true);
+export function EventComposer({ onInject, label, error, disabled = false, nextTick }: {
+  onInject: (type: EventType, isTrue: boolean) => Promise<boolean>;
+  label: string;
+  /** The last request error, shown if this composer's last post failed. */
+  error: string | null;
+  disabled?: boolean;
+  nextTick: number;
+}) {
+  const [preset, setPreset] = useState(0);
+  const [isTrue, setIsTrue] = useState(presets[0].isTrue);
   const [message, setMessage] = useState('');
-  const [editing, setEditing] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const chosen = presets[preset];
 
-  function choose(index: number | null) {
+  function choose(index: number) {
     setPreset(index);
-    setEditing(index === null);
-    setTitle(index === null ? '' : presets[index].title);
-    setIsTrue(index === null ? true : presets[index].isTrue);
+    setIsTrue(presets[index].isTrue);
     setMessage('');
+    setFailed(false);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!title.trim()) {
-      setEditing(true);
-      setMessage('Add a headline before posting.');
-      return;
-    }
-    onPost({ title: title.trim(), isTrue });
-    setMessage('Posted to the preview billboard and office wire. Employee reactions are not simulated in this preview.');
+    setSending(true);
+    const ok = await onInject(chosen.type, isTrue);
+    setSending(false);
+    setFailed(!ok);
+    setMessage(ok ? `Queued. “${chosen.title}” hits the office at tick ${String(nextTick).padStart(2, '0')}.` : '');
   }
 
   return <section className="panel event-composer" aria-labelledby="event-composer-title">
     <div className="event-composer-heading">
       <div><span className="event-eyebrow">YOU MAKE THE NEWS</span><h2 id="event-composer-title">Shake up the office.</h2><p>Pick an event to shake things up.</p></div>
-      <span className="event-preview-label">MOCK PREVIEW</span>
+      <span className="event-preview-label">{label}</span>
     </div>
     <div className="event-presets" aria-label="Event presets">
-      {presets.map((item, index) => <button type="button" key={item.title} aria-pressed={preset === index} className={preset === index ? 'event-preset chosen' : 'event-preset'} onClick={() => choose(index)}><span aria-hidden="true">{item.icon}</span>{item.title}</button>)}
+      {presets.map((item, index) => <button type="button" key={item.type} aria-pressed={preset === index} className={preset === index ? 'event-preset chosen' : 'event-preset'} onClick={() => choose(index)}><span aria-hidden="true">{item.icon}</span>{item.title}</button>)}
     </div>
     <form onSubmit={submit} className="event-form">
       <div className="event-selection">
-        <div className="event-selection-copy"><span className="event-eyebrow">READY TO POST</span><strong>{title.trim() || 'Your next office headline'}</strong></div>
-        <button type="button" className="edit-headline" aria-expanded={editing} aria-controls="headline-editor" onClick={() => setEditing(!editing)}>{editing ? 'Close editor −' : 'Edit headline ✎'}</button>
+        <div className="event-selection-copy"><span className="event-eyebrow">READY TO POST</span><strong>{chosen.title}</strong></div>
       </div>
-      {editing && <div className="event-fields" id="headline-editor">
-        <label htmlFor="event-title">Headline <span>{title.length}/100</span></label>
-        <input id="event-title" autoFocus value={title} maxLength={100} required placeholder="What just happened?" onChange={e => { setTitle(e.target.value); setPreset(null); setMessage(''); }} />
-      </div>}
       <div className="event-action-row">
         <fieldset className="event-truth-options"><legend>Behind the headline</legend><label className={isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={isTrue} onChange={() => setIsTrue(true)} /> True event</label><label className={!isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={!isTrue} onChange={() => setIsTrue(false)} /> False rumour</label></fieldset>
-        <button className="post-event" type="submit">Post to billboard <span aria-hidden="true">↗</span></button>
+        <button className="post-event" type="submit" disabled={disabled || sending}>{sending ? 'Posting…' : 'Post to billboard'} <span aria-hidden="true">↗</span></button>
       </div>
-      <div className="event-form-note"><span>Truth stays hidden from employees.</span><p className="event-feedback" role="status">{message || 'Preview only · no live simulation changes.'}</p></div>
+      <div className="event-form-note"><span>Truth stays hidden from employees.</span><p className="event-feedback" role="status">{failed && error ? <span className="coral">{error}</span> : message || 'Posted events land at the start of the next tick.'}</p></div>
     </form>
   </section>;
 }

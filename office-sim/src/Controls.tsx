@@ -1,6 +1,8 @@
 interface ControlsProps {
   running?: boolean;
   started?: boolean;
+  complete?: boolean;
+  disabled?: boolean;
   onStart?: () => void;
   onPlayPause?: () => void;
   onStep?: () => void;
@@ -10,17 +12,22 @@ interface ControlsProps {
 export function Controls({
   running = false,
   started = false,
+  complete = false,
+  disabled = false,
   onStart,
   onPlayPause,
   onStep,
   onReset,
 }: ControlsProps) {
   return (
-    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-      <button type="button" onClick={onStart}>Start</button>
-      <button type="button" onClick={onPlayPause}>{running ? 'Pause' : started ? 'Play' : 'Play'}</button>
-      <button type="button" onClick={onStep}>Step</button>
-      <button type="button" onClick={onReset}>Reset</button>
+    <div className="chart-tabs" role="group" aria-label="Simulation controls">
+      {started ? (
+        <button type="button" className={running ? 'chosen' : ''} aria-pressed={running} disabled={disabled || complete} onClick={onPlayPause}>{running ? '❚❚ Pause' : '▶ Play'}</button>
+      ) : (
+        <button type="button" disabled={disabled || complete} onClick={onStart}>▶ Start</button>
+      )}
+      <button type="button" disabled={disabled || running || complete} onClick={onStep}>Step →</button>
+      <button type="button" disabled={disabled} onClick={onReset}>↺ Reset</button>
     </div>
   );
 }

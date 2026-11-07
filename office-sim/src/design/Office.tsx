@@ -1,12 +1,30 @@
-export interface Employee {
-    id: string;
-    name: string;
-    role: string;
+/** How each archetype looks and where they sit. Joined to the live cast on `archetype`. */
+export interface Look {
+    archetype: string;
     floor: number;
     x: number;
     color: string;
     hair: string;
     skin: string;
+}
+export const looks: Look[] = [
+    { archetype: 'CEO', floor: 0, x: 52, color: '#a383b7', hair: '#463137', skin: '#e5af82' },
+    { archetype: 'Ops manager', floor: 1, x: 22, color: '#e2ad58', hair: '#33272f', skin: '#ba805c' },
+    { archetype: 'Breadwinner', floor: 1, x: 40, color: '#82ab86', hair: '#5a3c32', skin: '#d6a07b' },
+    { archetype: 'Gossip hub', floor: 1, x: 63, color: '#db8867', hair: '#914d31', skin: '#e5b88d' },
+    { archetype: 'Climber', floor: 1, x: 79, color: '#b68ac7', hair: '#56364c', skin: '#e7b893' },
+    { archetype: 'Loyalist', floor: 2, x: 23, color: '#669fc6', hair: '#654737', skin: '#e5b38c' },
+    { archetype: 'Skeptic', floor: 2, x: 48, color: '#d0b56c', hair: '#302b32', skin: '#b87953' },
+    { archetype: 'Flight risk', floor: 2, x: 77, color: '#69b9ad', hair: '#b66b3e', skin: '#e9bd96' },
+];
+export function lookFor(archetype: string, index: number): Look {
+    return looks.find(l => l.archetype === archetype) ?? looks[index % looks.length];
+}
+/** One employee as the UI shows them: a look plus live state. */
+export interface Person extends Look {
+    id: string;
+    name: string;
+    role: string;
     stress: number;
     workload: number;
     burnout: number;
@@ -14,19 +32,10 @@ export interface Employee {
     action: string;
     says: string;
     thinks: string;
+    quit: boolean;
 }
-export const employees: Employee[] = [
-    { id: 'marcus', name: 'Marcus', role: 'CEO', floor: 0, x: 52, color: '#a383b7', hair: '#463137', skin: '#e5af82', stress: 34, workload: 48, burnout: 20, trust: 82, action: 'Working', says: 'An exciting new chapter for all of us.', thinks: 'The board needs to see results. Whatever it takes.' },
-    { id: 'priya', name: 'Priya', role: 'Ops manager', floor: 1, x: 22, color: '#e2ad58', hair: '#33272f', skin: '#ba805c', stress: 76, workload: 94, burnout: 62, trust: 39, action: 'Overworking', says: 'Let’s just get through this week.', thinks: 'I’m enforcing a policy I wouldn’t survive myself.' },
-    { id: 'sam', name: 'Sam', role: 'Breadwinner', floor: 1, x: 40, color: '#82ab86', hair: '#5a3c32', skin: '#d6a07b', stress: 81, workload: 91, burnout: 68, trust: 32, action: 'Working', says: 'I can pick up the extra shift.', thinks: 'Rent is due Friday. Quitting isn’t an option.' },
-    { id: 'dan', name: 'Dan', role: 'Gossip hub', floor: 1, x: 63, color: '#db8867', hair: '#914d31', skin: '#e5b88d', stress: 58, workload: 62, burnout: 37, trust: 46, action: 'Spreading gossip', says: 'Apparently, Sales is next…', thinks: 'Jess needs to hear this. Well, my version of it.' },
-    { id: 'jess', name: 'Jess', role: 'Climber', floor: 1, x: 79, color: '#b68ac7', hair: '#56364c', skin: '#e7b893', stress: 61, workload: 70, burnout: 42, trust: 51, action: 'Listening', says: 'I’m sure leadership has a plan.', thinks: 'If Dan leaves, that senior role opens up.' },
-    { id: 'tom', name: 'Tom', role: 'Loyalist', floor: 2, x: 23, color: '#669fc6', hair: '#654737', skin: '#e5b38c', stress: 72, workload: 88, burnout: 58, trust: 55, action: 'Overworking', says: 'They’ve always looked after us.', thinks: 'Twenty hours? This isn’t the company I joined.' },
-    { id: 'ravi', name: 'Ravi', role: 'Skeptic', floor: 2, x: 48, color: '#d0b56c', hair: '#302b32', skin: '#b87953', stress: 65, workload: 75, burnout: 49, trust: 24, action: 'Verifying rumour', says: 'Where did that number come from?', thinks: 'Nobody has checked a single word of this.' },
-    { id: 'lena', name: 'Lena', role: 'Flight risk', floor: 2, x: 77, color: '#69b9ad', hair: '#b66b3e', skin: '#e9bd96', stress: 92, workload: 83, burnout: 87, trust: 12, action: 'Slacking off', says: 'Just taking a quick break.', thinks: 'I’m done. There has to be more to life than this.' },
-];
 export function Sprite({ person, small = false, quit = false }: {
-    person: Employee;
+    person: Pick<Look, 'color' | 'hair' | 'skin'>;
     small?: boolean;
     quit?: boolean;
 }) {
@@ -48,22 +57,26 @@ function Landscape() {
   {Array.from({ length: 70 }, (_, i) => <rect key={i} x={i * 17} y={507 + (i % 3) * 9} width="5" height="4" fill="#46513e"/>)}
     </svg>;
 }
-export function Office({ selected, onSelect, highlight, departed }: {
-    selected: string;
+export function Office({ people, selected, onSelect, highlight }: {
+    people: Person[];
+    selected: string | null;
     onSelect: (id: string) => void;
     highlight: string[];
-    departed: boolean;
 }) {
-    return <div className="office-scene"><Landscape /><div className="scene-caption"><span className="live-dot"/> THE OFFICE <span>•</span> 3 FLOORS / 8 PERSONALITIES</div><div className="building"><div className="roof"><span>ORDINARY COMPANY, EXTRAORDINARY DRAMA.</span></div>
+    return <div className="office-scene"><Landscape /><div className="scene-caption"><span className="live-dot"/> THE OFFICE <span>•</span> 3 FLOORS / {people.length} PERSONALITIES</div><div className="building"><div className="roof"><span>ORDINARY COMPANY, EXTRAORDINARY DRAMA.</span></div>
     {['EXECUTIVE', 'SALES & OPERATIONS', 'ENGINEERING'].map((floor, index) => <div className={`floor floor-${index}`} key={floor}>
       <span className="floor-label">0{3 - index} / {floor}</span><div className="window window-left"/><div className="window window-right"/><div className="wall-light left"/><div className="wall-light right"/>
       {index === 0 && <><div className="wall-picture">↗<small>GROWTH</small></div><div className="bookcase"><i /><i /><i /></div><div className="plant">♠<b /></div></>}
       {index === 1 && <div className="cooler"><i /><b /></div>}
       {index === 2 && <div className="exit"><span>EXIT →</span><i /></div>}
-      {employees.filter(p => p.floor === index).map(p => <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${departed && p.id === 'lena' ? 'departed' : ''}`} style={{ left: `${p.x}%` }}>
-        <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" aria-label={`Inspect ${p.name}`} onClick={() => onSelect(p.id)}><Sprite person={p} quit={departed && p.id === 'lena'}/><span className="name-label">{p.name}{p.stress > 75 && <b>!</b>}</span></button>
-        {((index === 0) || (p.id === 'dan') || (p.id === 'lena')) && <button onClick={() => onSelect(p.id)} className={`bubble ${p.id === 'lena' ? 'thought' : ''}`}><small>{p.id === 'lena' ? '••• THINKING' : 'SAYING'}</small>{departed && p.id === 'lena' ? '“I choose me.”' : p.id === 'lena' ? 'There has to be more to life.' : p.says}</button>}
-      </div>)}
+      {people.filter(p => p.floor === index).map(p => {
+        const thought = p.archetype === 'Flight risk';
+        const bubble = thought ? p.thinks : p.says;
+        return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : ''}`} style={{ left: `${p.x}%` }}>
+        <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" aria-label={`Inspect ${p.name}`} onClick={() => onSelect(p.id)}><Sprite person={p} quit={p.quit}/><span className="name-label">{p.name}{p.stress > 75 && <b>!</b>}</span></button>
+        {((index === 0) || (p.archetype === 'Gossip hub') || thought) && bubble && <button onClick={() => onSelect(p.id)} className={`bubble ${thought ? 'thought' : ''}`}><small>{thought ? '••• THINKING' : 'SAYING'}</small>{bubble}</button>}
+      </div>;
+      })}
     </div>)}
   </div><div className="scene-legend"><span>▰ Public voice</span><span className="thought-key">☁ Private thoughts</span><span>Click an employee to look closer ↗</span></div></div>;
 }
