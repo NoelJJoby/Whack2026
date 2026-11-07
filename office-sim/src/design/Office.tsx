@@ -1,4 +1,3 @@
-import { playerText } from '../hudModel';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../../shared/stressThresholds';
 
 /** How each archetype looks and where they sit. Joined to the live cast on `archetype`. */
@@ -86,11 +85,8 @@ export function Office({ people, selected, onSelect, highlight, speaking = null 
       {index === 1 && <div className="cooler"><i /><b /></div>}
       {index === 2 && <div className="exit"><span>EXIT →</span><i /></div>}
       {people.filter(p => p.floor === index).map(p => {
-        const thought = p.archetype === 'Flight risk';
-        const bubble = thought ? p.thinks : p.says;
         return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : ''} ${speaking === p.id ? 'speaking' : ''}`} style={{ left: `${p.x}%` }}>
         <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" data-employee={p.id} aria-label={`Inspect ${p.name}`} aria-haspopup="dialog" aria-expanded={selected === p.id} onClick={() => onSelect(p.id)}><Sprite person={p} quit={p.quit}/><span className="name-label">{p.name}{p.stress > BURNOUT_STRESS_THRESHOLD && <b>!</b>}</span></button>
-        {((index === 0) || (p.archetype === 'Gossip hub') || thought) && bubble && <button onClick={() => onSelect(p.id)} className={`bubble ${thought ? 'thought' : ''}`}><small>{thought ? 'Thinking' : 'Saying'}</small><span>{playerText(bubble)}</span></button>}
       </div>;
       })}
     </div>)}
