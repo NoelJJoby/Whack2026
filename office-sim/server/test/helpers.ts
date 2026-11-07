@@ -1,6 +1,15 @@
 import type { EngineAgent, EngineClaim, EngineTraits, World } from '../engine-types';
 import { createPriceState } from '../price';
-import { DEFAULT_PARAMS } from '../params';
+import { DEFAULT_PARAMS, type Params } from '../params';
+
+/**
+ * Default params with the speech post-check's regeneration off: for tests that
+ * count provider calls exactly, where a fake model gives every agent one line.
+ */
+export const NO_REGEN_PARAMS: Params = {
+  ...DEFAULT_PARAMS,
+  voice: { ...DEFAULT_PARAMS.voice, speech: { ...DEFAULT_PARAMS.voice.speech, regenerate: false } },
+};
 import type { AgentState } from '../../shared/types';
 
 export function makeAgent(

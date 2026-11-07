@@ -12,6 +12,7 @@ import { DEFAULT_PARAMS as P } from '../params';
 import { buildTurnPrompt } from '../llm/prompt';
 import { buildScenario, fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
+import { NO_REGEN_PARAMS } from './helpers';
 
 const USAGE = { input_tokens: 900, output_tokens: 150 };
 const FLIGHT_PERSONA = fixtureCast(7).find((member) => member.profile.id === 'flight')!.profile.persona!;
@@ -127,7 +128,8 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';
   console.info = () => {}; // the client logs one metrics line per request
   try {
-    const result = await runSimulation(fixtureCast(seed), config, provider);
+    // Exact call counts below: the fake model gives every agent the same line, so no regenerations.
+    const result = await runSimulation(fixtureCast(seed), config, provider, NO_REGEN_PARAMS);
     return { result, fake, captured };
   } finally {
     console.info = originalInfo;

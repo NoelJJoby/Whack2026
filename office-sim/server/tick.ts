@@ -23,6 +23,7 @@ import { DEFAULT_PARAMS, type Params } from './params';
 import { applyPriceFeedback, createPriceState, updatePrice, workforceReport } from './price';
 import { rngFactory, stream } from './rng';
 import { applyEvent, checkQuit, passiveUpdate, resolveAction, type ResolveResult } from './rules';
+import { ensureExamples, initSpeech, planRound, recordRound, reviewRound, speechContext } from './speech';
 
 export function createInitialSimulation(seed = 42): SimulationState {
   return {
@@ -88,7 +89,9 @@ export function createWorld(cast: CastMember[], seed: number, params: Params = D
       claims: [],
     };
   }
-  return { seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
+  const world: World = { seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
+  if (params.voice) world.speech = initSpeech(world, params);
+  return world;
 }
 
 /** Judge injection: the event applies at the start of the next tick. Returns a new world. */
@@ -239,11 +242,22 @@ export async function runTick(
   const order = stream(w.seed, t, '*', 'order').shuffle(activeIds);
 
   const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
+  // Voice: manners are drawn in turn order before the calls (server/speech.ts).
+  const speaking = LLM_MODES.includes(config.mode) && Boolean(w.speech && params.voice);
+  const styles = speaking ? planRound(w, order, params) : {};
+  let speechLogs: Awaited<ReturnType<typeof reviewRound>> | null = null;
+  let examples: Awaited<ReturnType<typeof ensureExamples>> = { added: {}, requests: 0 };
   if (LLM_MODES.includes(config.mode)) {
+    if (speaking && provider) examples = await ensureExamples(w, activeIds, provider, params);
+    const contexts: Record<string, TurnContext> = {};
+    for (const id of activeIds) {
+      contexts[id] = buildContext(w, w.agents[id], config, events, params);
+      if (styles[id]) contexts[id].speech = speechContext(w, id, styles[id], params);
+    }
     const results = await Promise.all(
       activeIds.map((id) =>
         provider
-          ? callProvider(provider, w.agents[id], buildContext(w, w.agents[id], config, events, params), params.bias.llmRetries)
+          ? callProvider(provider, w.agents[id], contexts[id], params.bias.llmRetries)
           : Promise.resolve({ output: null, reason: 'no_provider' }),
       ),
     );
@@ -254,6 +268,12 @@ export async function runTick(
       for (const h of w.agents[id].claims) {
         if (!h.verified && beliefs[h.claimId] !== undefined) h.belief = beliefs[h.claimId];
       }
+    }
+    if (speaking && provider) {
+      speechLogs = await reviewRound({
+        world: w, order, llm, contexts, provider, styles, params,
+        events: events.map((e) => ({ type: e.type, text: w.claims[e.claim].text, custom: w.claims[e.claim].custom === true })),
+      });
     }
   }
 
@@ -273,7 +293,9 @@ export async function runTick(
       decisions[id].log.provider = llm[id].providerLog;
       if (decisions[id].log.llm) decisions[id].log.llm!.cache_hit = llm[id].providerLog!.cache_hit;
     }
+    if (speechLogs?.logs[id]) decisions[id].log.speech = speechLogs.logs[id];
   }
+  if (speaking) recordRound(w, styles, order.map((id) => ({ agent: id, public_line: decisions[id].public_line })), params);
 
   const seats = w.ids.map(id => ({ id, action: decisions[id]?.action ?? null, burnout: w.agents[id].state.burnout }));
 
@@ -334,6 +356,9 @@ export async function runTick(
     states,
     reach: claimReach(w),
   };
+  if (t === 1 && w.speech) log.voices = structuredClone(w.speech.voices);
+  if (Object.keys(examples.added).length) log.examples = examples.added;
+  if (speechLogs) log.speech = { ...speechLogs.summary, example_requests: examples.requests };
 
   return { world: w, records, log };
 }

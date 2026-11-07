@@ -3,6 +3,7 @@
 import type { Action, AgentProfile, AgentState, Claim, EventType, TickRecord } from '../shared/types';
 import type { PriceState, PriceRecord } from './price';
 import type { ClaimImpact, Params } from './params';
+import type { FeelingVariants, Manner, TurnStyle, VoiceCard } from './llm/voice';
 
 export type { Action, AgentState, EventType, TickRecord, Params };
 
@@ -148,6 +149,52 @@ export interface World {
   queue: QueuedEvent[];
   quits: Array<{ agent: string; tick: number }>;
   leaks: Array<{ agent: string; claim: string; tick: number }>;
+  /** Voice cards and speech history (server/speech.ts). Absent on worlds built before the voice system. */
+  speech?: SpeechState;
+}
+
+// --- Voice and speech (server/llm/voice.ts, server/speech.ts) ---------------
+
+export interface SpeechState {
+  voices: Record<string, VoiceCard>;
+  lastManner: Record<string, Manner>;
+  /** Public lines of the last few rounds, for the prompt and the repetition check. */
+  recent: Array<{ tick: number; agent: string; line: string }>;
+  /** Example small-talk lines per agent; [] once tried and failed. Acts as the run's cache. */
+  examples: Record<string, string[]>;
+}
+
+/** The style brief the prompt builder renders. */
+export interface SpeechContext {
+  /** "How you talk" brief, without the label. */
+  voice: string;
+  /** "This time" instruction, without the label. */
+  manner: string;
+  minimal: boolean;
+  feelings: FeelingVariants;
+  examples: string[];
+  /** Colleagues' recent public lines, by name. */
+  recent: Array<{ name: string; line: string }>;
+  /** Set only on a regeneration. */
+  nudge: { line: string; against: string | null } | null;
+}
+
+export interface SpeechLog extends TurnStyle {
+  /** Why the first line was flagged; empty if it passed. */
+  flags: string[];
+  regenerated: boolean;
+  /** Flags on the regenerated line; null when there was no regeneration. */
+  regen_flags: string[] | null;
+  regen_request: { latencyMs: number; outcome: 'success' | 'error'; usage: { promptTokens: number; completionTokens: number } | null } | null;
+}
+
+export interface SpeechTickLog {
+  flagged: number;
+  regenerated: number;
+  still_flagged: number;
+  /** Requests left in the tick's budget after regenerations. */
+  budget_left: number;
+  example_requests: number;
 }
 
 export interface RunConfig {
@@ -173,10 +220,17 @@ export interface TurnContext {
   colleagues: Array<{ id: string; name: string; affinity: number; source_trust: number }>;
   claims: Array<{ id: string; text: string; from: string; tick_heard: number; scandal: boolean }>;
   events: Array<{ type: EventType; text: string }>;
+  /** Voice brief, set in LLM modes by server/speech.ts. */
+  speech?: SpeechContext;
 }
 
+/** Example small-talk lines for a voice, or null if the call failed. */
+export type StyleExamplesProvider = (agent: EngineProfile, voice: string) => Promise<string[] | null>;
+
 /** Returns raw LLM output (either format), or null if the call failed. */
-export type TurnProvider = (agent: EngineProfile, ctx: TurnContext) => Promise<unknown>;
+export type TurnProvider = ((agent: EngineProfile, ctx: TurnContext) => Promise<unknown>) & {
+  styleExamples?: StyleExamplesProvider;
+};
 
 // --- Decisions and logs -----------------------------------------------------
 
@@ -219,6 +273,8 @@ export interface DecisionLog {
   draw: number;
   chosen: { action: Action; target: string | null; claim: string | null };
   explain: string;
+  /** Manner, stance and repetition check for this turn's line (LLM modes). */
+  speech?: SpeechLog;
 }
 
 export interface Decision {
@@ -253,4 +309,9 @@ export interface EngineTickLog {
   quits: string[];
   states: Record<string, AgentState & { status: AgentStatus }>;
   reach: { true_holders: number; false_holders: number };
+  /** Voice cards created this tick (tick 1, or a newcomer's). */
+  voices?: Record<string, VoiceCard>;
+  /** Example lines fetched this tick. */
+  examples?: Record<string, string[]>;
+  speech?: SpeechTickLog;
 }

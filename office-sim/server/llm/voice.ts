@@ -303,8 +303,8 @@ function lengthText(card: VoiceCard, p: VoiceParams): string {
   return card.fragments ? `${base} You often talk in fragments.` : base;
 }
 
-/** The "How you talk" brief. A believer's sarcasm reads as dry: cynicism needs fallen trust. */
-export function describeVoice(card: VoiceCard, stance: Stance, habitsShown: boolean, p: VoiceParams): string {
+/** The "How you talk" brief (no stance line when stance is null). A believer's sarcasm reads as dry: cynicism needs fallen trust. */
+export function describeVoice(card: VoiceCard, stance: Stance | null, habitsShown: boolean, p: VoiceParams): string {
   const humour = stance === 'believer' && card.humour === 'sarcastic' ? 'dry' : card.humour;
   const habits = habitsShown
     ? card.habits.map((id) => p.card.habits.find((h) => h.id === id)?.text).filter(Boolean).join(' ')
@@ -315,7 +315,7 @@ export function describeVoice(card: VoiceCard, stance: Stance, habitsShown: bool
     `When you're unhappy you ${TELL_TEXT[card.tell]}.`,
     habits,
     b ? `You like to talk about ${a}, and ${b}.` : a ? `You like to talk about ${a}.` : '',
-    STANCE_TEXT[stance],
+    stance ? STANCE_TEXT[stance] : '',
   ].filter(Boolean).join(' ');
 }
 
