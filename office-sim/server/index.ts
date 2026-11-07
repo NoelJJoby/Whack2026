@@ -99,6 +99,7 @@ class OfficeSimManager {
   private mode: SimulationMode = 'rules';
   private modeReason: ModeReason = 'no_api_key';
   private maxTicks = DEFAULT_TICKS;
+  private speed = 1;
   private started = false;
   private running = false;
   private timer: NodeJS.Timeout | null = null;
@@ -159,7 +160,7 @@ class OfficeSimManager {
   }
 
   response(): SimResponse {
-    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state() };
+    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state() };
   }
 
   history(): HistoryResponse {
@@ -203,7 +204,7 @@ class OfficeSimManager {
       this.emitState();
       return;
     }
-    this.schedule(TICK_INTERVAL_MS);
+    this.schedule(TICK_INTERVAL_MS / this.speed);
   }
 
   /** At most one tick in flight; concurrent callers share it. */
@@ -309,6 +310,17 @@ class OfficeSimManager {
     return this.response();
   }
 
+  setSpeed(body: unknown) {
+    const parsed = z.object({ speed: z.union([z.literal(0.5), z.literal(1), z.literal(2), z.literal(4)]) }).strict().safeParse(body);
+    if (!parsed.success) throw new ApiFailure(400, 'invalid_speed', 'Choose a speed of 0.5, 1, 2 or 4.');
+    this.speed = parsed.data.speed;
+    this.clearTimer();
+    // The active tick finishes first; its loop schedules the next one at the new rate.
+    if (!this.inFlight) this.schedule(TICK_INTERVAL_MS / this.speed);
+    this.emitState();
+    return this.response();
+  }
+
   inject(body: unknown) {
     const parsed = injectSchema.safeParse(body);
     if (!parsed.success) {
@@ -356,6 +368,7 @@ app.post('/api/sim/pause', async () => sim.pause());
 app.post('/api/sim/reset', async () => sim.reset());
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/speed', async (request) => sim.setSpeed(request.body));
 app.post('/api/sim/settings', async (request) => sim.settings(request.body));
 
 app.get('/api/events', (request, reply) => {

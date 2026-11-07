@@ -46,6 +46,8 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   cast: AgentProfile[];
   maxTicks: number;
+  speed: number;
+  setSpeed: (speed: number) => Promise<boolean>;
   mode: SimulationMode | null;
   modeReason: ModeReason | null;
   state: SimulationState | null;
@@ -78,7 +80,7 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state });
   }, []);
 
   const replaceHistory = useCallback(
@@ -155,6 +157,8 @@ export function useSimulation(): Simulation {
   const running = snapshot?.state.running ?? false;
   return {
     cast: cast?.agents ?? [],
+    speed: snapshot?.speed ?? 1,
+    setSpeed: (speed) => post('/sim/speed', { speed }),
     maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,

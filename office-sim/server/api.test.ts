@@ -191,3 +191,26 @@ describe('api routes', () => {
     assert.equal(sim.listenerCount, 0);
   });
 });
+
+describe('playback speed', () => {
+  test('accepts supported rates without advancing a paused simulation', async () => {
+    await post('/api/sim/reset');
+    for (const speed of [0.5, 1, 2, 4]) {
+      const response = await post('/api/sim/speed', { speed });
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.json().speed, speed);
+      assert.equal(response.json().state.tick, 0);
+      assert.equal(response.json().state.running, false);
+      assert.equal((await app.inject({ method: 'GET', url: '/api/sim/history' })).json().speed, speed);
+    }
+    await post('/api/sim/speed', { speed: 1 });
+  });
+  test('rejects invalid speeds and retains the previous speed', async () => {
+    for (const speed of [0, -1, 3, 100, '2', null]) {
+      const response = await post('/api/sim/speed', { speed });
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().error.code, 'invalid_speed');
+    }
+    assert.equal((await app.inject({ method: 'GET', url: '/api/sim/state' })).json().speed, 1);
+  });
+});
