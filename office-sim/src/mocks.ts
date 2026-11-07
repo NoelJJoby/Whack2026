@@ -92,11 +92,11 @@ function recordsAt(t: number): TickRecord[] {
   }));
 }
 
-export const mockCast: CastResponse = { agents: profiles, max_ticks: 16 };
+export const mockCast: CastResponse = { agents: profiles };
 
 export const mockHistory: TickFrame[] = Array.from({ length: TICKS }, (_, i) => {
   const t = i + 1;
   return { tick: t, records: recordsAt(t), events: events[t] ? [events[t]] : [], state: stateAt(t) };
 });
 
-export const mockResponse: SimResponse = { mode: 'rules', mode_reason: 'configured', state: stateAt(TICKS) };
+export const mockResponse: SimResponse = { mode: 'rules', mode_reason: 'configured', max_ticks: 16, state: stateAt(TICKS) };

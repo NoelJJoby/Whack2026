@@ -6,6 +6,9 @@ import type { ApiError, CastResponse, HistoryResponse, ModeReason, SimResponse, 
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 
+/** Run lengths offered in the UI. The server accepts any integer from 1 to 128. */
+export const RUN_LENGTHS = [16, 32, 64, 128];
+
 /** Dev only: `VITE_USE_MOCKS=true` renders the design mock data instead of the server. */
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 
@@ -55,6 +58,7 @@ export interface Simulation {
   togglePlay: () => Promise<boolean>;
   step: () => Promise<boolean>;
   reset: () => Promise<boolean>;
+  setRunLength: (maxTicks: number) => Promise<boolean>;
   inject: (type: EventType, isTrue: boolean) => Promise<boolean>;
 }
 
@@ -74,7 +78,7 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, state: next.state });
   }, []);
 
   const replaceHistory = useCallback(
@@ -151,7 +155,7 @@ export function useSimulation(): Simulation {
   const running = snapshot?.state.running ?? false;
   return {
     cast: cast?.agents ?? [],
-    maxTicks: cast?.max_ticks ?? 16,
+    maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,
     state: snapshot?.state ?? null,
@@ -163,6 +167,7 @@ export function useSimulation(): Simulation {
     togglePlay: () => post(running ? '/sim/pause' : '/sim/play'),
     step: () => post('/sim/step'),
     reset: () => post('/sim/reset'),
+    setRunLength: (maxTicks) => post('/sim/settings', { max_ticks: maxTicks }),
     inject: (type, isTrue) => post('/sim/inject', { type, is_true: isTrue }),
   };
 }

@@ -8,6 +8,7 @@ import type {
   CastResponse,
   HistoryResponse,
   ModeReason,
+  SettingsRequest,
   SimResponse,
   StreamMessage,
   TickFrame,
@@ -19,7 +20,6 @@ import { eventParams } from './params';
 import { SHOCK_SCENARIO, fixtureCast } from './scripts/fixture';
 import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
 
-const SEED = 42;
 // Load the key from office-sim/.env (then the repo-root .env) wherever the server is started from.
 // A variable already set in the environment wins, so `ANTHROPIC_API_KEY= ...` forces rules mode.
 loadEnv({
@@ -27,7 +27,10 @@ loadEnv({
   quiet: true,
 });
 
-export const MAX_TICKS = 16;
+const SEED = 42;
+/** Default run length, and the most ticks a run may be set to. */
+export const DEFAULT_TICKS = 16;
+export const TICK_LIMIT = 128;
 const TICK_INTERVAL_MS = 2500;
 const HEARTBEAT_MS = 15_000;
 const MAX_HISTORY = 200;
@@ -35,6 +38,7 @@ const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 
 const injectSchema = z.object({ type: z.enum(EVENT_TYPES), is_true: z.boolean().optional() }).strict();
+const settingsSchema = z.object({ max_ticks: z.number().int().min(1).max(TICK_LIMIT) }).strict() satisfies z.ZodType<SettingsRequest>;
 
 class ApiFailure extends Error {
   constructor(
@@ -94,6 +98,7 @@ class OfficeSimManager {
   private provider: TurnProvider | null = null;
   private mode: SimulationMode = 'rules';
   private modeReason: ModeReason = 'no_api_key';
+  private maxTicks = DEFAULT_TICKS;
   private started = false;
   private running = false;
   private timer: NodeJS.Timeout | null = null;
@@ -154,7 +159,7 @@ class OfficeSimManager {
   }
 
   response(): SimResponse {
-    return { mode: this.mode, mode_reason: this.modeReason, state: this.state() };
+    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state() };
   }
 
   history(): HistoryResponse {
@@ -162,7 +167,7 @@ class OfficeSimManager {
   }
 
   castResponse(): CastResponse {
-    return { agents: this.cast.map((c) => c.profile), max_ticks: MAX_TICKS };
+    return { agents: this.cast.map((c) => c.profile) };
   }
 
   private emitState() {
@@ -170,8 +175,8 @@ class OfficeSimManager {
   }
 
   private assertNotComplete() {
-    if (this.world.tick >= MAX_TICKS) {
-      throw new ApiFailure(409, 'run_complete', `The run has finished (${MAX_TICKS} ticks). Reset to start again.`);
+    if (this.world.tick >= this.maxTicks) {
+      throw new ApiFailure(409, 'run_complete', `The run has finished (${this.maxTicks} ticks). Reset, or raise the run length.`);
     }
   }
 
@@ -235,7 +240,7 @@ class OfficeSimManager {
       console.warn(`LLM unavailable on tick ${result.world.tick}; continuing in rules mode.`);
     }
 
-    if (this.world.tick >= MAX_TICKS) {
+    if (this.world.tick >= this.maxTicks) {
       this.running = false;
       this.clearTimer();
     }
@@ -282,6 +287,25 @@ class OfficeSimManager {
     this.assertNotComplete();
     this.started = true;
     await this.runOne();
+    return this.response();
+  }
+
+  /** Run length. Can change mid-run, but not below the current tick; kept across reset. */
+  settings(body: unknown) {
+    const parsed = settingsSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ApiFailure(400, 'invalid_settings', `Expected { max_ticks: an integer from 1 to ${TICK_LIMIT} }.`, parsed.error.issues);
+    }
+    const { max_ticks } = parsed.data;
+    if (max_ticks < this.world.tick) {
+      throw new ApiFailure(409, 'below_current_tick', `The run is already at tick ${this.world.tick}; the run length can't go below that.`);
+    }
+    this.maxTicks = max_ticks;
+    if (this.world.tick >= this.maxTicks && this.running) {
+      this.running = false;
+      this.clearTimer();
+    }
+    this.emitState();
     return this.response();
   }
 
@@ -332,6 +356,7 @@ app.post('/api/sim/pause', async () => sim.pause());
 app.post('/api/sim/reset', async () => sim.reset());
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/settings', async (request) => sim.settings(request.body));
 
 app.get('/api/events', (request, reply) => {
   reply.hijack();

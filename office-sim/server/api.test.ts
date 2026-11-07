@@ -7,7 +7,8 @@ import type { StreamMessage } from '../shared/api';
 // No key: the server must run in rules mode and never call the LLM.
 // dotenv (loaded by index.ts) does not override a variable that is already set.
 process.env.ANTHROPIC_API_KEY = '';
-const { app, sim, MAX_TICKS } = await import('./index');
+const { app, sim, DEFAULT_TICKS, TICK_LIMIT } = await import('./index');
+const MAX_TICKS = DEFAULT_TICKS;
 
 const post = (url: string, payload?: unknown) =>
   app.inject({
@@ -31,7 +32,6 @@ describe('api routes', () => {
   test('GET /api/sim/cast returns the engine cast', async () => {
     const json = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json();
     assert.equal(json.agents.length, 8);
-    assert.equal(json.max_ticks, MAX_TICKS);
     assert.ok(json.agents.every((a: { id: string; name: string; archetype: string }) => a.id && a.name && a.archetype));
   });
 
@@ -118,6 +118,37 @@ describe('api routes', () => {
       assert.equal(response.statusCode, 409);
       assert.equal(response.json().error.code, 'run_complete');
     }
+  });
+
+  test('run length is adjustable from 1 to 128 and kept across reset', async () => {
+    let json = (await post('/api/sim/reset')).json();
+    assert.equal(json.max_ticks, DEFAULT_TICKS);
+
+    for (const payload of [{ max_ticks: 0 }, { max_ticks: TICK_LIMIT + 1 }, { max_ticks: 2.5 }, { max_ticks: '32' }, { max_ticks: 32, x: 1 }, undefined]) {
+      const response = await post('/api/sim/settings', payload);
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().error.code, 'invalid_settings');
+    }
+
+    json = (await post('/api/sim/settings', { max_ticks: 3 })).json();
+    assert.equal(json.max_ticks, 3);
+    for (let i = 0; i < 3; i++) assert.equal((await post('/api/sim/step')).statusCode, 200);
+    assert.equal((await post('/api/sim/step')).json().error.code, 'run_complete');
+
+    const below = await post('/api/sim/settings', { max_ticks: 2 });
+    assert.equal(below.statusCode, 409);
+    assert.equal(below.json().error.code, 'below_current_tick');
+
+    // Raising the limit after the run ended lets it continue.
+    assert.equal((await post('/api/sim/settings', { max_ticks: 4 })).statusCode, 200);
+    assert.equal((await post('/api/sim/step')).json().state.tick, 4);
+
+    json = (await post('/api/sim/settings', { max_ticks: TICK_LIMIT })).json();
+    assert.equal(json.max_ticks, TICK_LIMIT);
+    json = (await post('/api/sim/reset')).json();
+    assert.equal(json.max_ticks, TICK_LIMIT);
+    assert.equal(json.state.tick, 0);
+    await post('/api/sim/settings', { max_ticks: DEFAULT_TICKS });
   });
 
   test('SSE sends history on connect, then ticks, and cleans up on disconnect', async () => {
