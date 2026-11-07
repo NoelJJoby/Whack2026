@@ -1,9 +1,9 @@
 import { useRef } from 'react';
-import { Sprite, type Look } from './design/Office';
+import { Sprite, moodFor, type Look, type Mood } from './design/Office';
 import type { DialogueLine, PlayerState } from './dialogueQueue';
 
-export function Portrait({ look }: { look: Pick<Look, 'color' | 'hair' | 'skin'> }) {
-  return <div className="dialogue-portrait" style={{ borderColor: look.color }}><Sprite person={look} crop/></div>;
+export function Portrait({ look, mood }: { look: Pick<Look, 'color' | 'hair' | 'skin'>; mood?: Mood }) {
+  return <div className="dialogue-portrait" style={{ borderColor: look.color }}><Sprite person={look} crop mood={mood}/></div>;
 }
 
 /** Typed text plus the untyped rest held invisibly, so wrapping never shifts while typing. */
@@ -42,7 +42,7 @@ export function DialogueBar({ state, line, speaker, auto, showThoughts, hidden, 
   return <section className={`dialogue-bar ${open ? 'open' : ''}`} aria-label="Dialogue">
     <div className="dialogue-plate"><strong>{shown.speaker.name}</strong>{shown.speaker.team && <small>· {shown.speaker.team}</small>}{shown.line.quit && <span className="dialogue-tag">Left the company</span>}</div>
     <div className="dialogue-box">
-      <Portrait look={shown.speaker.look}/>
+      <Portrait look={shown.speaker.look} mood={moodFor(shown.line.stress)}/>
       <div className="dialogue-text" onClick={onNext} aria-hidden="true">
         <p className="dialogue-public">“<Typed text={shown.line.publicLine} shown={publicShown} typing={active && phase === 'public'}/>”</p>
         {thoughts && <p className={`dialogue-inner ${innerStarted ? '' : 'waiting'}`}><span>thinks:</span> <Typed text={shown.line.inner} shown={innerShown} typing={active && phase === 'inner'}/></p>}
