@@ -102,6 +102,9 @@ function desk(seat: Seat, wide = 1.9) {
   S(seat.x - 0.3, F + 0.8, z - 0.15, 0.16, 0.18, 0.16, '#efe9dc');
   S(seat.x - 0.75, F + 0.8, z + 0.25, 0.22, 0.2, 0.22, '#c26a43');
   S(seat.x - 0.75, F + 1.0, z + 0.25, 0.28, 0.25, 0.28, '#5f9e45');
+  // Desk lamp (the bulb lights up per agent when they overwork).
+  S(seat.x + 0.85, F + 0.8, z + 0.3, 0.06, 0.45, 0.06, TRIM);
+  S(seat.x + 0.85, F + 1.24, z + 0.3, 0.24, 0.1, 0.24, '#2f5a46');
 }
 function tree(x: number, z: number, s = 1) {
   S(x, 0, z, 0.5 * s, 1.4 * s, 0.5 * s, '#6b4a2e');

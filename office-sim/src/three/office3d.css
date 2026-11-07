@@ -13,3 +13,13 @@
 .o3-bubble.thought::before { width: 8px; height: 8px; bottom: -11px; margin-left: -6px; }
 .o3-bubble.thought::after { width: 4px; height: 4px; bottom: -17px; margin-left: -1px; }
 .o3-stats { top: auto !important; bottom: 8px; left: auto !important; right: 8px; }
+/* Action tags over heads (hidden while that agent is speaking). */
+.o3-tag { transform: translate(-50%, -100%); width: max-content; padding: 2px 6px; font: 10px/1.3 "VCR OSD Mono", monospace; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
+.o3-tag.complain { background: #e8947f; }
+.o3-tag.gossip { background: #c9a6e0; }
+.o3-tag.verify { background: #8fd3f5; font-weight: 700; }
+.o3-tag.leak { background: #f04a3a; color: #fff; animation: o3-blink .6s steps(2) infinite; }
+.o3-tag.quit { background: #7a2b26; color: #ffd8cf; }
+.o3-tag.sofa, .o3-tag.idle { background: #b5bfb0; }
+.o3-tag.overwork { background: #e05b3b; color: #fff; }
+@keyframes o3-blink { 50% { opacity: .25; } }

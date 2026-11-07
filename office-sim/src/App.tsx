@@ -100,7 +100,7 @@ export default function App() {
   const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
   return <main className="game-window" aria-label="The Daily Grind">
     {VIEW_3D
-      ? <Suspense fallback={<div className="office-scene"/>}><Office3D people={people} selected={selected} onSelect={select} highlight={highlight} line={menu === null ? dialogue.line : null} showThoughts={dialogue.showThoughts}/></Suspense>
+      ? <Suspense fallback={<div className="office-scene"/>}><Office3D people={people} selected={selected} onSelect={select} highlight={highlight} line={menu === null ? dialogue.line : null} showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed}/></Suspense>
       : <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>}
     <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>

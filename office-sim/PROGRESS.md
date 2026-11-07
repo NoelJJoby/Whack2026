@@ -9,15 +9,20 @@
   by archetype), Agent3D.tsx (seated voxel figure, typing/breathing, bubbles), office3d.css.
 - Bubbles (user decision): only the dialogue bar's current speaker gets one (App passes
   `dialogue.line` + `showThoughts`). Speech = white box w/ tail; thought cloud above it when thoughts on.
-- Quit agents are hidden and their monitor goes dark (walk-out is Pass 2).
+
+- Pass 2: nav.ts waypoint graph (aisles auto-chained by z, Dijkstra, no lib). Office3D maps each
+  agent's latest TickRecord (App passes `records={latest}`, `speed={sim.speed}`) to a Behaviour:
+  work=desk typing; overwork=red shirt+sweat+desk lamp; slack_off=sofa or cooler; complain/gossip/
+  verify=walk behind target's chair (grr/psst/? tag, else coffee/meeting); leak=window+phone+blinking
+  tag; interview=front path; quit=box, out the door, off along the pavement, monitor dark.
+  Agents finish a walk and dwell 2 s before taking their newest behaviour (ticks outpace walking).
 
 ## Next
-- Pass 2: waypoint graph in layout.ts + walk/target behaviours, quit walk-out.
-  Needs the raw action per agent: pass `latest` records from App as an extra prop.
-- Pass 3: restyle HUD for 3D (gold borders, sparkline, icon rail drawers, zoom buttons).
+- Pass 3: restyle HUD for 3D (gold borders, sparkline, icon rail drawers, zoom buttons, compass?).
 - Pass 4: perf at 1366×768, ASSETS_TODO.md / Higgsfield.
 
 ## Gotchas
+- Test: VITE_VIEW=3d npm run dev. A stale 2D vite may own 127.0.0.1:5173; use the LAN IP if so.
 - Real contract actions: work, overwork, slack_off, complain, gossip, verify, interview, leak
   (8, incl. interview). The brief's names differ; use shared/types.ts.
 - Mock data flag is `VITE_USE_MOCKS=true` (no VITE_DATA). No Injector.tsx: inject UI is EventComposer.tsx.
