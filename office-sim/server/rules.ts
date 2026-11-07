@@ -57,6 +57,29 @@ export function applyEvent(
   const isTrue = ev.isTrue ?? e.isTrue;
   const ids = active(world);
 
+  if (ev.customEffects) {
+    const strength = ev.customMeta?.severity ?? 3;
+    const scale = 1 + (strength - 3) * 0.2;
+    const productivityShift = ev.customEffects.productivity ?? 0;
+    for (const id of ids) {
+      const agent = world.agents[id];
+      applyDelta(agent, {
+        stress: (ev.customEffects.stress ?? 0) * scale,
+        loyalty: (ev.customEffects.morale ?? 0) * scale,
+        trust_mgmt: (ev.customEffects.trust ?? 0) * scale,
+        burnout: (ev.customEffects.burnout ?? 0) * scale,
+        workload: productivityShift > 0 ? -Math.abs(productivityShift) * 0.3 : Math.abs(productivityShift) * 0.25,
+      }, p);
+      if (ev.customEffects.churnRisk) {
+        agent.state.stress = clamp(agent.state.stress + (ev.customEffects.churnRisk ?? 0) * 0.25 * scale);
+      }
+    }
+    if (typeof ev.customEffects.priceImpact === 'number' && Number.isFinite(ev.customEffects.priceImpact)) {
+      const next = world.price.price * (1 + ev.customEffects.priceImpact * 0.5);
+      world.price.price = clamp(next, p.price.minPrice, p.price.maxPrice);
+    }
+  }
+
   for (const id of ids) {
     const agent = world.agents[id];
     if (e.groups !== 'all' && !e.groups.includes(agent.profile.functionGroup)) continue;

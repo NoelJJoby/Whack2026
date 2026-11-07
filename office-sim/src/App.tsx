@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { Office, lookFor, type Person } from './design/Office';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
-import { EventComposer, presets } from './EventComposer';
+import { EventComposer } from './EventComposer';
 import { Company } from './Company';
 import { StockPrice, StockChart } from './StockPrice';
 import { EmployeePanel, MenuPanel } from './GamePanel';
@@ -51,7 +51,7 @@ export default function App() {
   const entries = useMemo(() => feedEntries(history), [history]);
   const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
     key: `queued-${index}`, label: 'Queued', time: timeLabel((state?.tick ?? 0) + 1),
-    text: state?.queue_text?.[index] ?? presets.find(p => p.type === type)?.title ?? type, ids: [],
+    text: state?.queue_text?.[index] ?? type, ids: [],
   })).reverse();
   const wireEntries = [...queued, ...entries];
   const person = people.find(p => p.id === selected);

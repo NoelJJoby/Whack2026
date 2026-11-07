@@ -1,6 +1,7 @@
 // Engine-local types: anything the engine needs that shared/types.ts does not
 // (yet) define. Proposed shared-type changes are in docs/engine-handoff.md.
 import type { Action, AgentProfile, AgentState, Claim, EventType, TickRecord } from '../shared/types';
+import type { CustomEventEffectProfile } from '../shared/customEvent';
 import type { PriceState, PriceRecord } from './price';
 import type { ClaimImpact, Params } from './params';
 
@@ -132,6 +133,10 @@ export interface ScenarioEvent {
   text?: string;
   /** Written by the player rather than the scheduler or a preset. */
   custom?: boolean;
+  /** Numeric deltas for AI-generated player events. */
+  customEffects?: Partial<CustomEventEffectProfile>;
+  /** Extra metadata for the custom event summary. */
+  customMeta?: { severity: number; durationTicks: number; summary: string };
 }
 
 export type QueuedEvent = Omit<ScenarioEvent, 'tick'>;
