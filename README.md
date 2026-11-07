@@ -25,32 +25,34 @@ This project provides the integration shell for an office simulation backend and
 
 ## API surface
 
-The Fastify server exposes:
+The Fastify server runs the real simulation engine. Types for every request, response and stream message are in `office-sim/shared/api.ts`.
 
-- GET /api/health
-- GET /api/sim/state
-- POST /api/sim/start
-- POST /api/sim/play
-- POST /api/sim/pause
-- POST /api/sim/reset
-- POST /api/sim/step
-- POST /api/sim/inject
-- GET /api/events
+- `GET /api/health`: `{ ok, mode, mode_reason }`
+- `GET /api/sim/cast`: the agent profiles and `max_ticks` (16)
+- `GET /api/sim/state`: `{ mode, mode_reason, state }`
+- `GET /api/sim/history`: the same, plus `history` (one frame per tick)
+- `POST /api/sim/start`, `/play`, `/pause`, `/reset`, `/step`
+- `POST /api/sim/inject` with `{ "type": EventType, "is_true"?: boolean }`. Applied at the start of the next tick.
+- `GET /api/events`: SSE. It sends `history` on connect (and after reset), then a `tick` message per tick and a `state` message on play, pause or inject.
 
-`/api/events` is a plain SSE connection; it sends the current state and recent history on connect, and emits later updates as the sim changes.
+Errors always look like `{ "error": { "code", "message" } }`, with status 400 (invalid input), 404 or 409 (`sim_running`, `tick_in_progress`, `run_complete`).
 
-## Known limitations
+## Modes
 
-- This is an integration scaffold, not a complete simulation engine.
-- The server currently owns lifecycle and event queue state, but the underlying office logic is intentionally minimal.
-- Without an API key, the app falls back to a placeholder response path rather than a real model call.
-- The app is best used to validate wiring, state flow, and control integration rather than to assert final simulation realism.
-- The project expects a stable state contract across the backend and UI layers.
+- With `ANTHROPIC_API_KEY` set, the sim runs in `llm_bias` mode.
+- Without a key, it runs in `rules` mode and reports `mode_reason: "no_api_key"`.
+- If every LLM call in a tick fails, it switches to `rules` for the rest of the run (`mode_reason: "llm_failed"`). Reset tries the LLM again.
+
+The UI shows the active mode in the top bar.
+
+## Dev flag
+
+`VITE_USE_MOCKS=true ./node_modules/.bin/vite` renders the design-preview mock data without a server. It's off by default.
 
 ## Integration checklist
 
 - Confirm the server starts cleanly on port 3010.
 - Confirm the client can connect to `/api/events`.
 - Confirm start/play/pause/reset/step routes mutate the singleton state.
-- Confirm inject accepts a valid event type and truth flag.
+- Confirm inject accepts a valid event type and truth flag, and rejects anything else with a 400.
 - Confirm state payloads and feed history remain consistent across updates.
