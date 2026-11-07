@@ -337,7 +337,7 @@ h3 { font-size: 14px; font-weight: 500; }
 .wall-picture { transform: scale(1.4); transform-origin: top; top: 36px; }
 .bookcase, .plant, .cooler, .exit { transform: scale(1.4); transform-origin: bottom; }
 .clock-hud { position: absolute; top: 17px; left: 50%; transform: translateX(-50%); width: max-content; padding: 0 12px 10px; background: #243b4499; text-shadow: 1px 1px #20313a; }
-.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 14px; }
+.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 14px; font-variant-numeric: tabular-nums; }
 .clock-readout strong { font: 32px 'VCR OSD Mono', monospace; color: #f2e6bf; font-variant-numeric: tabular-nums; }
 .playback-status { color: #d2d9c6; font-size: 12px; min-width: 48px; }
 .playback { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 6px; }
@@ -464,3 +464,36 @@ button.feed-entry:hover, button.feed-entry:focus-visible { background: #40504488
 @media (max-height: 740px) and (min-width: 701px) { .game-window { --dialogue-reserve: 206px; --dialogue-text-max: 124px; }.dialogue-text { font-size: 13px; line-height: 1.35; }.dialogue-box { min-height: 104px; padding: 10px 14px 22px 10px; }.dialogue-plate { font-size: 12px; }.dialogue-bar { bottom: 16px; } }
 @media (max-width: 700px) { .game-window { --dialogue-reserve: 214px; --dialogue-text-max: 120px; --portrait: 56px; }.dialogue-bar { width: calc(100% - 28px); bottom: 16px; }.dialogue-text { font-size: 13px; }.dialogue-box { gap: 10px; min-height: 0; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Business records use the office's existing ledger palette and type. */
+.business-events, .business-report { display: grid; gap: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+.business-events h4, .business-report h4 { margin: 14px 0 8px; color: var(--gold); font-size: 15px; }
+.business-numbers { display: grid; grid-template-columns: repeat(auto-fit,minmax(120px,1fr)); gap: 12px; margin: 0; }
+.business-numbers dt { color: var(--muted); font-size: 12px; }
+.business-numbers dd { margin: 4px 0 0; font-size: 19px; }
+.business-note, .case-card small, .event-story small { color: var(--muted); font-size: 12px; }
+.case-list { display: grid; gap: 8px; }
+.case-card { display: grid; gap: 6px; text-align: left; padding: 14px; border: 1px solid var(--border); border-left: 4px solid var(--mint); background: #243331; }
+.case-card.negative { border-left-color: var(--coral); }
+.case-card span { color: var(--muted); font-size: 12px; }
+.case-card strong { font-size: 15px; font-weight: 400; }
+.event-story { border-top: 2px solid var(--gold); padding-top: 18px; display: grid; gap: 12px; }
+.event-story section > p, .story-task, .report-observation { margin-bottom: 12px; }
+.event-story small { display: block; }
+.event-story ol { padding-left: 20px; }
+.event-story time { color: var(--gold); }
+.contract-position { padding: 12px; border: 1px solid var(--border); }
+.story-task { border-left: 2px solid var(--border); padding-left: 12px; }
+.business-report { border-top: 2px solid var(--border); margin-top: 24px; padding-top: 20px; }
+.business-report select, .structured-injection select { display: block; width: 100%; max-width: 100%; margin: 6px 0 12px; background: var(--panel); color: inherit; font: inherit; padding: 8px; border: 1px solid var(--border); }
+.report-action, .structured-injection button { border: 1px solid var(--gold); padding: 9px 12px; justify-self: start; }
+.evidence-links, .report-downloads { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.evidence-links button, .report-downloads a { color: var(--mint); font-size: 12px; text-decoration: underline; text-align: left; }
+.report-source { border: 1px solid var(--gold); padding: 12px; }
+.report-entry { display: block; width: 100%; padding: 10px; text-align: left; color: var(--gold); border-top: 1px solid var(--border); }
+.management-phase, .storage-error { position: absolute; top: 92px; left: 50%; transform: translateX(-50%); z-index: 8; padding: 8px 12px; background: var(--panel); border: 1px solid var(--border); font-size: 13px; }
+.storage-error { top: 130px; color: var(--coral); max-width: 80%; }
+.employee-assignment { padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.structured-injection { display: grid; gap: 10px; padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+a:focus-visible, select:focus-visible { outline: 2px solid #ffe2a2; outline-offset: 3px; }
+@media (max-width: 600px) { .business-numbers { grid-template-columns: repeat(2,minmax(0,1fr)); } .wire-heading { flex-wrap: wrap; gap: 8px; } .event-story { font-size: 13px; } }

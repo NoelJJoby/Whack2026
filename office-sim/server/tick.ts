@@ -1,3 +1,10 @@
+import { CATALOG, eligible } from './events/catalog';
+import { initialiseBusiness, openBusinessTick } from './business';
+import { initialEvents, openEvent, updateLifecycle } from './events/lifecycle';
+import { scheduleEvents } from './events/scheduler';
+import { managementPhase } from './management';
+import { detectIncidents } from './incidents';
+import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isOvertime } from '../shared/workday';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import { availableActions, decide } from './bias';
@@ -90,7 +97,7 @@ export function createWorld(cast: CastMember[], seed: number, params: Params = D
       claims: [],
     };
   }
-  const world: World = { seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
+  const world: World = { business: initialiseBusiness(agents), eventState: initialEvents(seed), seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
   if (params.voice) world.speech = initSpeech(world, params);
   return world;
 }
@@ -114,6 +121,7 @@ export function buildContext(
     tick: world.tick,
     mode: config.mode,
     state: structuredClone(agent.state),
+    ...((world as World & { businessEnabled?: boolean }).businessEnabled ? { work: workContext(world,agent) } : {}),
     available: availableActions(agent, world, beliefs, params, { gossip: config.gossip }).available,
     colleagues: world.ids
       .filter((id) => id !== agent.id && world.agents[id].status === 'active')
@@ -131,7 +139,7 @@ export function buildContext(
       tick_heard: h.tickHeard,
       scandal: world.claims[h.claimId].scandal,
     })),
-    events: events.map((e) => ({ type: e.type, text: world.claims[e.claim].text })),
+    events: events.filter(e => agent.claims.some(h => h.claimId === e.claim)).map((e) => ({ type: e.type, text: world.claims[e.claim].text })),
   };
 }
 
@@ -150,7 +158,7 @@ async function callProvider(
     providerLog.attempts++;
     providerLog.retry_count = attempt;
     try {
-      const r = toLlmOutput(await withRequestMetrics(metrics, () => provider(agent.profile, ctx)));
+      const r = toLlmOutput(validEmployeeOutput(await withRequestMetrics(metrics, () => provider(agent.profile, ctx)),ctx));
       reason = r.reason;
       if (r.output) return { output: r.output, reason: null, providerLog };
     } catch {
@@ -177,6 +185,9 @@ function summarise(world: World, d: Decision, agentId: string, r: ResolveResult,
   const claim = d.claim ? world.claims[r.hop?.delivered ?? d.claim]?.text : null;
   let s: string;
   switch (d.action) {
+    case 'review_work': s = `${me} reviews assigned work.`; break;
+    case 'report_issue': s = `${me} reports known evidence.`; break;
+    case 'support_colleague': s = `${me} supports ${name(d.target)}.`; break;
     case 'work':
       s = `${me} works normally.`;
       break;
@@ -211,7 +222,7 @@ export interface TickResult {
   log: EngineTickLog;
 }
 
-export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>>;
+export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>> & { business?: boolean; onPhase?: (phase: string) => void; isCurrent?: () => boolean };
 
 /**
  * One tick: previous-return feedback -> apply event -> agent turns (LLM, all on the start-of-tick
@@ -227,6 +238,9 @@ export async function runTick(
   const w = structuredClone(world);
   w.tick += 1;
   const t = w.tick;
+  (w as World & { businessEnabled?: boolean }).businessEnabled = config.business ?? false;
+  const assertCurrent = () => { if (config.isCurrent && !config.isCurrent()) throw new Error('run_changed'); };
+  assertCurrent();
   const feedbackDeltas = config.priceFeedback ? applyPriceFeedback(world.price, w.ids.map(id => w.agents[id]), params) : [];
 
   // 1. Apply events: scripted for this tick, then anything the judges queued.
@@ -236,11 +250,33 @@ export async function runTick(
   ];
   w.queue = [];
   const events = config.billboard
-    ? pending.map((ev, i) => applyEvent(w, ev, params, stream(w.seed, t, `event-${i}`, 'event')))
+    ? pending.filter(ev => !ev.templateId).map((ev, i) => applyEvent(w, ev, params, stream(w.seed, t, `event-${i}`, 'event')))
     : [];
 
+  if (config.business) {
+    openBusinessTick(w);
+    // Legacy scenario injections are informational overrides. Structured business injections
+    // use the same authoritative case/management path as scheduled arrivals.
+    for (const ev of pending) {
+      const template = (ev as QueuedEvent & { templateId?: string }).templateId;
+      if (template) {
+        const definition = CATALOG.find(d => d.id === template);
+        if (definition && eligible(w,definition)) openEvent(w,definition,'injection',ev.isTrue ?? true,ev.text);
+        else w.eventState.diagnostics.push({ tick: t, phase: 'injection', reason: 'Queued situation no longer eligible', intent: { templateId: template } });
+      }
+      else if (ev.type === 'layoffs_rumour') {
+        // A rumour is already routed via held claims; it never creates a true cost review.
+      } else if (ev.custom) {
+        // Plain text has knowledge effects only; no unrelated preset business effects.
+      }
+    }
+    detectIncidents(w);
+    if (config.billboard) scheduleEvents(w);
+    await managementPhase(w,provider,config.mode,phase => { assertCurrent(); config.onPhase?.(phase); });
+    assertCurrent(); config.onPhase?.('Employees working');
+  }
   // 2. Agent turns in seeded random order.
-  const activeIds = w.ids.filter((id) => w.agents[id].status === 'active');
+  const activeIds = w.ids.filter((id) => w.agents[id].status === 'active' && (!config.business || w.business.positions[id].role === 'employee'));
   const order = stream(w.seed, t, '*', 'order').shuffle(activeIds);
 
   const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
@@ -279,6 +315,7 @@ export async function runTick(
     }
   }
 
+  assertCurrent();
   // 3. Bias engine: every agent decides on the same snapshot.
   const decisions: Record<string, Decision> = {};
   for (const id of order) {
@@ -307,7 +344,21 @@ export async function runTick(
 
   // 4. Resolve in order.
   const results: Record<string, ResolveResult> = {};
-  for (const id of order) results[id] = resolveAction(w, id, decisions[id], params, rngFactory(w.seed, t, id));
+  for (const id of order) {
+    results[id] = resolveAction(w, id, decisions[id], params, rngFactory(w.seed, t, id));
+    if (config.business) executeWork(w,w.agents[id],decisions[id]);
+  }
+  if (config.business) {
+    for (const id of activeIds) {
+      const a = w.agents[id];
+      // Finite assigned capacity sets load; normal off-shift recovery makes healthy operation sustainable.
+      const allocation = w.business.tasks.filter(task => task.owner === id && task.status === 'active').reduce((n,task) => n+task.allocated,0);
+      a.baselineWorkload = Math.min(100,35+allocation*20);
+      if (t % 5 === 0) applyDelta(a,{ stress: -8, burnout: -4, trust_mgmt: 1 },params);
+    }
+    w.business.idle += Math.max(0,w.business.available-w.business.used);
+    updateLifecycle(w);
+  }
 
   // 5. Overtime affects everyone still on shift, regardless of their chosen action.
   // Apply it before passive updates and the quit check so both can react this tick.
@@ -328,6 +379,12 @@ export async function runTick(
 
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
   const valuation = updatePrice(world.price, {
+    ...(config.business ? { operating: {
+      productiveUnits: w.business.work.filter(r => r.tick === t).reduce((n,r) => n + Math.min(1,r.progress),0) + w.eventState.decisions.filter(d => d.tick === t).length*0.5,
+      capacity: w.business.available,
+      fundamentals: Math.max(-0.5,Math.min(0.5,(w.business.cash-w.business.startingCash)/w.business.startingCash*0.08)),
+      news: w.eventState.cases.filter(e => e.publicTick === t).map(e => ({ id: `public-${e.id}`, kind: (e.domain === 'security' ? 'security' : e.domain === 'sales' ? 'contract' : e.domain === 'people' ? 'operating_review' : 'delivery') as import('../shared/events').BusinessNewsKind, isTrue: e.truth })),
+    } } : {}),
     tick: t, events, leaks, claims: w.claims, seats,
     postQuit: w.ids.map(id => ({ id, active: w.agents[id].status === 'active', state: w.agents[id].state })),
     feedback: config.priceFeedback ?? false, feedbackDeltas,
@@ -343,13 +400,14 @@ export async function runTick(
     action: decisions[id].action,
     agent: id,
     target: decisions[id].target,
-    summary: summarise(w, decisions[id], id, results[id], quits.includes(id)),
+    summary: config.business ? `${w.agents[id].profile.name}: ${w.business.work.find(r => r.id === `work-${t}-${id}`)?.outcome ?? 'No assigned work'}.` : summarise(w, decisions[id], id, results[id], quits.includes(id)),
   }));
 
   const states: EngineTickLog['states'] = {};
   for (const id of w.ids) states[id] = { ...structuredClone(w.agents[id].state), status: w.agents[id].status };
 
   const log: EngineTickLog = {
+    ...(config.business ? { business: { decisions: w.eventState.decisions.filter(d => d.tick === t).map(d => d.id), work: w.business.work.filter(r => r.tick === t).map(r => r.id), events: w.eventState.cases.filter(e => e.openedTick === t).map(e => e.id), ledger: w.business.ledger.filter(e => e.tick === t).map(e => e.id) } } : {}),
     price: valuation.record,
     tick: t,
     events,
@@ -457,6 +515,8 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
   }
   const reach = claimReach(world);
   return {
+    business: structuredClone(world.business),
+    eventState: structuredClone(world.eventState),
     tick: world.tick,
     seed: world.seed,
     started: world.tick > 0,

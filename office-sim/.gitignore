@@ -3,3 +3,5 @@ dist
 .vite
 .env
 npm-debug.log*
+
+.runtime/

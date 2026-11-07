@@ -9,7 +9,7 @@ import { buildTurnPrompt } from '../prompt';
 
 // Desired output schema is a test oracle only; the provider has no schema gate.
 const ProposalSchema = z.object({
-  action: z.enum(['work', 'overwork', 'slack_off', 'complain', 'gossip', 'verify', 'interview', 'leak']),
+  action: z.enum(['work', 'overwork', 'slack_off', 'complain', 'gossip', 'verify', 'interview', 'leak', 'review_work', 'report_issue', 'support_colleague']),
   weight: z.number().min(0), target: z.string().nullable().optional(), claim: z.string().nullable().optional(),
 });
 const LlmOutputSchema = z.object({
@@ -30,7 +30,7 @@ const ctx: TurnContext = {
 };
 const prompt = buildTurnPrompt(agent, ctx, 'You remember favours and broken promises.');
 const sections = [
-  "You're not an assistant, and you're not here to give good advice. You're a person at work, reacting in the moment the way you really would.",
+  'You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.',
   'Who you are:', 'It is day 2, 13:00.', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.",
   "What you've heard:", 'Just announced:', 'Colleagues still here:', 'What you can do:', 'What you say out loud ("public_line"):',
   'Respond with JSON only, in this shape:',

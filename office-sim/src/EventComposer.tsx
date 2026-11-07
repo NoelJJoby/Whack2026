@@ -8,14 +8,15 @@ import type { EventType } from '../shared/types';
 export const presets: Array<{ type: EventType; title: string; isTrue: boolean; icon: string }> = [
   { type: 'merger', title: 'Merger with a competitor', isTrue: true, icon: '&' },
   { type: 'new_management', title: 'New VP takes over', isTrue: true, icon: '↑' },
-  { type: 'long_hours_policy', title: '20-hour workday policy', isTrue: true, icon: '!' },
-  { type: 'pr_scandal', title: 'Customer data breach', isTrue: true, icon: '★' },
+  { type: 'long_hours_policy', title: 'Working-hours announcement', isTrue: true, icon: '!' },
+  { type: 'pr_scandal', title: 'Unverified press allegation', isTrue: true, icon: '★' },
   { type: 'layoffs_rumour', title: 'Layoffs rumour', isTrue: false, icon: '?' },
   { type: 'surprise_bonus', title: 'Surprise bonus', isTrue: true, icon: '+' },
   { type: 'competitor_poaching', title: 'Competitor poaching staff', isTrue: true, icon: '$' },
 ];
 
-export function EventComposer({ onInject, onInjectCustom, label, error, disabled = false, nextTick }: {
+export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, label, error, disabled = false, nextTick }: {
+  onInjectBusiness?: (id: string, isTrue: boolean) => Promise<boolean>;
   onInject: (type: EventType, isTrue: boolean) => Promise<boolean>;
   onInjectCustom: (text: string, isTrue: boolean) => Promise<boolean>;
   label: string;
@@ -23,6 +24,10 @@ export function EventComposer({ onInject, onInjectCustom, label, error, disabled
   disabled?: boolean;
   nextTick: number;
 }) {
+  const [businessTemplate,setBusinessTemplate] = useState('client_win');
+  const [businessSending, setBusinessSending] = useState(false);
+  const [businessMessage, setBusinessMessage] = useState('');
+  const [businessFailed, setBusinessFailed] = useState(false);
   const [activePanel, setActivePanel] = useState<'preset' | 'custom'>('preset');
   const [preset, setPreset] = useState(0);
   const [presetTruth, setPresetTruth] = useState(presets[0].isTrue);
@@ -66,6 +71,7 @@ export function EventComposer({ onInject, onInjectCustom, label, error, disabled
       <h3 id="event-composer-title">Announcement board</h3>
       <span className="event-preview-label">{label}</span>
     </div>
+    {onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || businessSending} onClick={async () => { setBusinessSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setBusinessFailed(!ok); setBusinessMessage(ok ? 'Business situation queued for the next tick.' : ''); } finally { setBusinessSending(false); } }}>Queue business situation</button><p role="status">{businessFailed ? error : businessMessage}</p></section>}
 
     <div className="event-panel-tabs" role="tablist" aria-label="Event type selector">
       <button type="button" role="tab" aria-selected={activePanel === 'preset'} className={activePanel === 'preset' ? 'event-panel-tab active' : 'event-panel-tab'} onClick={() => setActivePanel('preset')}>Preset events</button>

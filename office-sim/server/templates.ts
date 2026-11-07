@@ -4,6 +4,9 @@ import type { Action } from './engine-types';
 import type { Rng } from './rng';
 
 export const ACTION_TEMPLATES: Record<Action, { public: string[]; inner: string[] }> = {
+  review_work: { public: ['I can check the acceptance criteria.'], inner: ['An independent review will help.'] },
+  report_issue: { public: ['I should report the evidence.'], inner: ['Management needs the known facts.'] },
+  support_colleague: { public: ['I can help with the assigned work.'], inner: ['Collaboration takes time but improves controls.'] },
   work: {
     public: ['On it.', "I'll have it done by end of day.", 'Heads down today.'],
     inner: ['Just keep going.', 'Another normal day, I hope.', "Don't think, just ship."],

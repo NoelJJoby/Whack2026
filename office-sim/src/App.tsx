@@ -1,3 +1,5 @@
+import { Events } from './Events';
+import { BusinessReport } from './BusinessReport';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Office, lookFor, type Person } from './design/Office';
 import { Workday } from './Workday';
@@ -14,8 +16,8 @@ import { DialogueBar, type Speaker } from './DialogueBar';
 import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company';
-type Menu = Tool | 'stock';
-const MENU_LABEL: Record<Menu, string> = { shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock' };
+type Menu = Tool | 'stock' | 'events';
+const MENU_LABEL: Record<Menu, string> = { events: 'Business events', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock' };
 
 function ToolIcon({ tool }: { tool: Tool }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -44,8 +46,8 @@ export default function App() {
     const record = latest[profile.id];
     return { ...lookFor(profile.archetype, index), id: profile.id, name: profile.name, role: profile.archetype,
       stress: (s?.stress ?? 0), workload: (s?.workload ?? 0), burnout: (s?.burnout ?? 0), trust: (s?.trust_mgmt ?? 0),
-      action: s?.status === 'quit' ? 'Resigned' : record ? ACTION_LABEL[record.action] : 'Waiting',
-      says: record?.public_line ?? '', thinks: record?.inner_monologue ?? '', quit: s?.status === 'quit',
+      action: s?.status === 'laid_off' ? 'Laid off' : s?.status === 'quit' ? 'Resigned' : record ? ACTION_LABEL[record.action] : 'Waiting',
+      says: record?.public_line ?? '', thinks: record?.inner_monologue ?? '', quit: s?.status === 'quit' || s?.status === 'laid_off',
     };
   }), [cast, latest, state]);
   const entries = useMemo(() => feedEntries(history), [history]);
@@ -97,9 +99,12 @@ export default function App() {
     <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
+    {sim.phase && <div className="management-phase" role="status">{sim.phase}…</div>}
+    {sim.storageError && <div className="storage-error" role="alert">{sim.storageError}</div>}
     {sim.announcement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(sim.announcement.event.text)}</p></div><button className="close" onClick={sim.dismissAnnouncement} aria-label="Dismiss announcement">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
-      <div className="wire-heading"><h2>Office wire</h2><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
+      <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business events</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
+      {(complete || sim.reportStatus === 'pending') && <button className="report-entry" onClick={() => openMenu('events')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
       <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
         {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
           const content = <><div className="feed-meta"><span className={entry.label === 'Resignation' ? 'coral' : ''}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
@@ -110,17 +115,17 @@ export default function App() {
     </aside>
     <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null}
       onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onVoices={() => dialogue.setVoices(!dialogue.voices)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
-    {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
+    {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
           <label><input type="checkbox" checked={dialogue.voices} onChange={e => dialogue.setVoices(e.target.checked)}/> Voices</label>
           <label><input type="checkbox" checked={dialogue.showThoughts} onChange={e => dialogue.setShowThoughts(e.target.checked)}/> Show inner thoughts</label>
-          <label><input type="checkbox" checked={dialogue.hold} onChange={e => dialogue.setHold(e.target.checked)}/> Hold for dialogue <small>Pauses each hour until its lines finish</small></label>
+          <label><input type="checkbox" checked={dialogue.hold} onChange={e => dialogue.setHold(e.target.checked)}/> Hold for dialogue <small>Pauses each tick until its lines finish</small></label>
         </fieldset>
         <div className="diagnostics"><h3>Connection & engine</h3><dl><div><dt>Connection</dt><dd>{live ? 'Connected' : connectionText}</dd></div><div><dt>Engine</dt><dd>{diagnostic}</dd></div><div><dt>Seed</dt><dd>{state?.seed ?? '—'}</dd></div></dl>{sim.error && <p role="status" className="coral">{playerText(sim.error)}</p>}</div>
       </>}

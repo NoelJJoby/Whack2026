@@ -26,6 +26,7 @@ const BriefSchema = z.object({
       z.object({
         action: z.string(),
         weight: z.number().optional(),
+        task_id: z.string().optional(), assignment_version: z.number().int().optional(), evidence_id: z.string().optional(),
         target: z.string().nullable().optional(),
         claim: z.string().nullable().optional(),
       }),
@@ -75,7 +76,7 @@ export function toLlmOutput(raw: unknown): AdaptResult {
     }
   }
 
-  let rawProposals: Array<{ action: string; weight?: number; target?: string | null; claim?: string | null }>;
+  let rawProposals: Array<{ action: string; weight?: number; target?: string | null; claim?: string | null; task_id?: string; assignment_version?: number; evidence_id?: string }>;
   let public_line: string;
   let inner_monologue: string;
   let beliefs: Record<string, number> = {};
@@ -97,7 +98,7 @@ export function toLlmOutput(raw: unknown): AdaptResult {
   }
 
   const dropped: string[] = [];
-  const merged = new Map<Action, Proposal>();
+  const merged = new Map<string, Proposal>();
   for (const p of rawProposals) {
     const action = toAction(p.action);
     if (!action) {
@@ -109,9 +110,10 @@ export function toLlmOutput(raw: unknown): AdaptResult {
       dropped.push(p.action);
       continue;
     }
-    const prev = merged.get(action);
+    const identity = JSON.stringify([action,p.task_id ?? null,p.target ?? null,p.claim ?? null,p.evidence_id ?? null,p.assignment_version ?? null]);
+    const prev = merged.get(identity);
     if (prev) prev.weight += weight;
-    else merged.set(action, { action, weight, ...(p.target ? { target: p.target } : {}), ...(p.claim ? { claim: p.claim } : {}) });
+    else merged.set(identity, { action, weight, ...(p.task_id ? { task_id: p.task_id, assignment_version: p.assignment_version } : {}), ...(p.evidence_id ? { evidence_id: p.evidence_id } : {}), ...(p.target ? { target: p.target } : {}), ...(p.claim ? { claim: p.claim } : {}) });
   }
 
   const proposals = [...merged.values()]

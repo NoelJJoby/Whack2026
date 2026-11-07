@@ -106,9 +106,10 @@ export function configFromArgs(args: Record<string, string | boolean>): RunConfi
     seed,
     mode,
     ticks,
-    scenario: args.calm ? CALM_SCENARIO : buildScenario(seed, ticks),
+    scenario: [],
+    business: true,
     gossip: !args['no-gossip'],
-    billboard: !args['no-billboard'],
+    billboard: !args['no-billboard'] && !args.calm,
     priceFeedback: args['price-feedback'] === true,
   };
 }

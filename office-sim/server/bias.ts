@@ -1,3 +1,4 @@
+import { fallbackWork, workContext } from './tasks';
 // Bias engine (docs/bias-engine-brief.md). One pure decide(): same inputs and
 // seed give the same decision. It never mutates state.
 import { claimValidFor, heardFresh, pickGossipClaim, pickLeakClaim, pickVerifyClaim, hasBelievedScandal } from './claims';
@@ -63,6 +64,7 @@ export function rawModifiers(s: Scaled, fresh: boolean, p: Params): ActionMap {
   const P = pressure(s, p);
   const D = 1 - s.trust_mgmt;
   return {
+    review_work: 1 + s.ethics, report_issue: 1 + s.ethics, support_colleague: 1 + s.sociability,
     work: (1 - m.work.pressure * P) * (1 + m.work.loyalty * s.loyalty),
     overwork:
       (1 + m.overwork.ambition * s.ambition) *
@@ -115,6 +117,7 @@ export function availableActions(
   const hasColleague = activeColleagues(agent, world).length > 0;
   const hasClaim = agent.claims.length > 0;
   const ok: Record<Action, boolean> = {
+    review_work: false, report_issue: false, support_colleague: false,
     work: true,
     overwork: true,
     slack_off: true,
@@ -124,6 +127,12 @@ export function availableActions(
     verify: hasColleague && hasClaim,
     leak: hasBelievedScandal(agent, world, beliefs, p),
   };
+  if ((world as World & { businessEnabled?: boolean }).businessEnabled) {
+    const ctx = workContext(world,agent);
+    ok.work = ctx.assignments.length > 0; ok.overwork = ctx.assignments.length > 0;
+    ok.review_work = ctx.reviewable.length > 0; ok.report_issue = ctx.evidence.length > 0 && hasColleague;
+    ok.support_colleague = ctx.supportable.length > 0;
+  }
   return { available: ACTIONS.filter((a) => ok[a]), masked: ACTIONS.filter((a) => !ok[a]) };
 }
 
@@ -140,8 +149,8 @@ export function llmWeights(
   const w: PartialActionMap = {};
   const total = llm ? llm.proposals.reduce((s, q) => s + q.weight, 0) : 0;
   for (const a of available) {
-    const prop = llm?.proposals.find((q) => q.action === a);
-    raw[a] = prop && total > 0 ? prop.weight / total : 0;
+    const weight = llm?.proposals.filter(q => q.action === a).reduce((n,q) => n + q.weight,0) ?? 0;
+    raw[a] = total > 0 ? weight / total : 0;
     w[a] = Math.max(raw[a] ?? 0, p.bias.floorWeight);
   }
   return { raw, w };
@@ -250,6 +259,7 @@ export function settleTarget(
 // --- Explain line ------------------------------------------------------------
 
 const GERUND: Record<Action, string> = {
+  review_work: 'reviewing work', report_issue: 'reporting an issue', support_colleague: 'supporting a colleague',
   work: 'working',
   overwork: 'overworking',
   slack_off: 'slacking off',
@@ -278,6 +288,7 @@ const D = {
 };
 
 const DRIVERS: Record<Action, Driver[]> = {
+  review_work: [D.ethics], report_issue: [D.ethics], support_colleague: [D.social],
   work: [D.loyalty, D.calm],
   overwork: [D.ambition, D.need, D.loyalty],
   slack_off: [D.stress, D.burnout, D.lowLoyalty],
@@ -395,14 +406,26 @@ export function decide(input: DecideInput): Decision {
   // 3-7. Weights, modifiers, gain, blend, sample.
   const m = modifiers(s, fresh, p);
   const g = gain(s, p);
-  const probs = normalise(scoreActions(effective, available, weights, m, g, p));
+  const scores = scoreActions(effective, available, weights, m, g, p);
+  if ((world as World & { businessEnabled?: boolean }).businessEnabled && effective === 'rules') for (const a of available) {
+    if (a === 'work' || a === 'review_work') scores[a] = (scores[a] ?? 0)*6;
+    else if (['interview','leak','overwork'].includes(a)) scores[a] = (scores[a] ?? 0)*0.2;
+  }
+  const probs = normalise(scores);
   const { value: action, draw } = rngs('action').pick(probs, ACTIONS);
 
   // 8. Settle claim and target (separate streams).
   const settleLlm = effective === 'rules' ? null : llm;
-  const claim = settleClaim(action, settleLlm, agent, world, beliefs, rngs('claim'), p);
-  const target = settleTarget(action, claim, settleLlm, agent, world, rngs('target'), p);
-
+  const candidates = settleLlm?.proposals.filter(q => q.action === action) ?? [];
+  const proposal = candidates.length ? rngs('target').weighted(candidates,candidates.map(q => q.weight)) : null;
+  const selectedLlm = proposal && settleLlm ? { ...settleLlm, proposals: [proposal] } : settleLlm;
+  const claim = settleClaim(action, selectedLlm, agent, world, beliefs, rngs('claim'), p);
+  let target = settleTarget(action, claim, selectedLlm, agent, world, rngs('target'), p);
+  const fallbackTask = fallbackWork(world,agent);
+  const taskProposal = proposal ?? (fallbackTask?.action === action || ['work','overwork'].includes(action) ? fallbackTask : null);
+  if (action === 'support_colleague') target = proposal?.target ?? null;
+  if (action === 'report_issue') target = proposal?.target ?? world.business.positions[agent.id]?.supervisor ?? null;
+  const evidenceId = proposal?.evidence_id ?? (action === 'report_issue' ? workContext(world,agent).evidence[0]?.id : undefined);
   const useLlmText = !fallback && llm && (llm.public_line || llm.inner_monologue);
   const lines = useLlmText
     ? { public_line: llm!.public_line, inner_monologue: llm!.inner_monologue }
@@ -415,6 +438,7 @@ export function decide(input: DecideInput): Decision {
     action,
     target,
     claim,
+    task_id: taskProposal?.task_id, assignment_version: taskProposal?.assignment_version, evidence_id: evidenceId,
     probs,
     ...lines,
     log: {
@@ -438,7 +462,7 @@ export function decide(input: DecideInput): Decision {
       gain: round(g),
       probs: roundMap(probs),
       draw: round(draw),
-      chosen: { action, target, claim },
+      chosen: { action, target, claim, ...(taskProposal?.task_id ? { task_id: taskProposal.task_id, assignment_version: taskProposal.assignment_version } : {}), ...(evidenceId ? { evidence_id: evidenceId } : {}) },
       explain: explain(effective, fallback, weights.raw, probs, s, fresh, p),
     },
   };

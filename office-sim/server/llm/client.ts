@@ -6,6 +6,7 @@ import { recordRequestMetrics } from './telemetry';
 export interface CallMetrics {
   latencyMs: number;
   outcome: 'success' | 'error';
+  purpose?: string;
   usage: { promptTokens: number; completionTokens: number } | null;
 }
 
@@ -48,15 +49,18 @@ export function createMessageClient(options: ClientOptions = {}) {
     }
   }
 
-  return async function requestMessage(prompt: string): Promise<MessageResult | null> {
+  return async function requestMessage(prompt: string, requestOptions: { purpose?: string; maxTokens?: number } = {}): Promise<MessageResult | null> {
     const started = performance.now();
     try {
       const message = await client.messages.create({
         model: llmConfig.model,
-        max_tokens: llmConfig.maxOutputTokens,
+        max_tokens: requestOptions.maxTokens ?? llmConfig.maxOutputTokens,
+        thinking: { type: llmConfig.thinking },
+        output_config: { effort: llmConfig.effort },
         messages: [{ role: 'user', content: prompt }],
       });
       const metrics: CallMetrics = {
+        purpose: requestOptions.purpose,
         latencyMs: performance.now() - started,
         outcome: 'success',
         usage: {

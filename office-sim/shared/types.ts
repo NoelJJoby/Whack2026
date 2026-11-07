@@ -15,9 +15,12 @@ export type Action =
   | 'gossip'
   | 'verify'
   | 'interview'
-  | 'leak';
+  | 'leak'
+  | 'review_work'
+  | 'report_issue'
+  | 'support_colleague';
 
-export type AgentStatus = 'active' | 'quit';
+export type AgentStatus = 'active' | 'quit' | 'laid_off';
 export type SimulationMode = 'llm_bias' | 'rules';
 
 export interface Proposal {
@@ -110,6 +113,8 @@ export interface LlmOutput {
 }
 
 export interface SimulationState {
+  business?: import('./business').Business;
+  eventState?: import('./events').EventState;
   tick: number;
   seed: number;
   started: boolean;

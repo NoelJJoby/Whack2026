@@ -8,6 +8,7 @@ export type ModeReason = 'configured' | 'no_api_key' | 'llm_failed';
 
 /** Public price decomposition. No truth, lineage, claim details or future corrections. */
 export interface PriceDTO {
+  operating?: { fundamentals: number; productiveUnits: number; capacity: number };
   tick: number;
   price: number;
   ret: number;
@@ -21,10 +22,16 @@ export interface PriceDTO {
   morale: number | null;
   feedback: boolean;
   guards: { outputFloor: boolean; priceBound: 'min' | 'max' | null; rawLogPrice: number; logPrice: number };
-  markers: Array<{ id: string; kind: EventType | 'leak'; event: 'headline' | 'correction' }>;
+  markers: Array<{ id: string; kind: EventType | 'leak' | import('./events').BusinessNewsKind; event: 'headline' | 'correction' }>;
 }
 
 export interface SimResponse {
+  run_id?: string;
+  revision?: number;
+  phase?: string | null;
+  storage_error?: string | null;
+  report_status?: 'pending' | 'ready' | 'factual_fallback' | 'none';
+  report_id?: string | null;
   price: PriceDTO;
   initial_price: number;
   price_feedback: boolean;
@@ -59,6 +66,7 @@ export interface CustomInjectRequest {
 
 /** An event the engine applied this tick. */
 export interface TickEvent {
+  business_id?: string;
   type: EventType;
   is_true: boolean;
   text: string;

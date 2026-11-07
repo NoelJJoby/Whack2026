@@ -1,3 +1,11 @@
+import { readFile } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
+import { RunStore } from './run-store';
+import { Reporting, reportMarkdown } from './reporting';
+import { CATALOG, eligible } from './events/catalog';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
 import Fastify from 'fastify';
@@ -111,7 +119,12 @@ function enrichRecords(r: TickResult): TickRecord[] {
 
 type Listener = (message: StreamMessage) => void;
 
-class OfficeSimManager {
+export class OfficeSimManager {
+  readonly store: RunStore;
+  readonly reporting: Reporting;
+  private runId = '';
+  private phase: string | null = null;
+  private storageError: string | null = null;
   private readonly listeners = new Set<Listener>();
   private seed = DEFAULT_SEED;
   cast: CastMember[] = fixtureCast(this.seed);
@@ -137,8 +150,16 @@ class OfficeSimManager {
   /** Bumped on reset so a tick that was in flight is discarded. */
   private generation = 0;
 
-  constructor() {
-    this.init();
+  constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider } = {}) {
+    this.store = new RunStore(directory);
+    this.reporting = new Reporting(this.store,this.overrides.reportProvider);
+    const latest = this.store.list().find(r => r.status === 'active' || r.status === 'complete');
+    this.init(latest?.seed ?? this.seed,latest?.id);
+    if (latest) {
+      const audit = this.store.read(latest.id).at(-1)?.audit as { settings?: { maxTicks: number; priceFeedback: boolean; speed: number } } | null;
+      if (audit?.settings) { this.maxTicks = audit.settings.maxTicks; this.priceFeedback = audit.settings.priceFeedback; this.speed = audit.settings.speed; }
+      else if (latest.status === 'complete') this.maxTicks = latest.tick;
+    }
   }
 
   get listenerCount() {
@@ -157,8 +178,10 @@ class OfficeSimManager {
     for (const listener of this.listeners) listener(message);
   }
 
-  private init(seed = this.seed) {
-    if (hasApiKey()) {
+  private init(seed = this.seed, recoverId?: string) {
+    if (this.overrides.provider) {
+      this.provider = this.overrides.provider; this.reviewer = null; this.mode = 'llm_bias'; this.modeReason = 'configured';
+    } else if (hasApiKey()) {
       this.provider ??= createTurnProvider();
       this.reviewer ??= createHeadlineReviewer();
       this.customEventGenerator ??= createCustomEventGenerator();
@@ -172,11 +195,14 @@ class OfficeSimManager {
       this.modeReason = 'no_api_key';
     }
     this.cast = fixtureCast(seed);
-    this.world = createWorld(this.cast, seed);
+    this.world = recoverId ? this.store.recover(recoverId) : createWorld(this.cast, seed);
+    this.seed = seed;
+    this.runId = recoverId ?? this.store.create(this.world).id;
+    this.phase = null; this.storageError = null;
     this.frames = [];
-    this.feed = ['Simulation ready.'];
-    this.customHeadlines = new Set();
-    this.started = false;
+    this.feed = [recoverId ? 'Recovered committed run. Playback is paused.' : 'Simulation ready.'];
+    this.customHeadlines = new Set([...Object.values(this.world.claims).filter(c => c.custom).map(c => headlineKey(c.text)),...this.world.queue.filter(e => e.custom && e.text).map(e => headlineKey(e.text!))]);
+    this.started = this.world.tick > 0;
     this.running = false;
   }
 
@@ -184,6 +210,7 @@ class OfficeSimManager {
     const next = typeof seed === 'number' && Number.isInteger(seed) ? seed : randomSeed();
     this.clearTimer();
     this.generation += 1;
+    this.archive();
     this.seed = next;
     this.init(this.seed);
     this.emit({ type: 'history', ...this.history() });
@@ -202,7 +229,7 @@ class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback };
+    return { mode: this.mode, scenario: [], gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
   }
 
   state(): SimulationState {
@@ -224,7 +251,10 @@ class OfficeSimManager {
       ...workforceReport(this.world.ids.map(id => ({ id, active: this.world.agents[id].status === 'active', state: this.world.agents[id].state }))),
       feedback: this.priceFeedback, markers: [], guards: { outputFloor: false, priceBound: null, rawLogPrice: Math.log(current.price), logPrice: Math.log(current.price) },
     };
-    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
+    const report = this.store.reports(this.runId).at(-1);
+    return { run_id: this.runId, revision: this.world.tick, phase: this.phase, storage_error: this.storageError,
+      report_status: this.reporting.pending(this.runId) ? 'pending' : report?.status ?? 'none', report_id: report?.id ?? null,
+      mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
   }
 
   history(): HistoryResponse {
@@ -260,6 +290,7 @@ class OfficeSimManager {
 
   private async loop() {
     if (!this.running) return;
+    const started = performance.now();
     try {
       await this.runOne();
     } catch (error) {
@@ -268,7 +299,8 @@ class OfficeSimManager {
       this.emitState();
       return;
     }
-    this.schedule(TICK_INTERVAL_MS / this.speed);
+    // Playback sets the interval between tick starts, not extra idle time after AI finishes.
+    this.schedule(Math.max(0,TICK_INTERVAL_MS / this.speed - (performance.now()-started)));
   }
 
   /** At most one tick in flight; concurrent callers share it. */
@@ -281,10 +313,21 @@ class OfficeSimManager {
 
   private async advance() {
     const generation = this.generation;
-    const result = await runTick(this.world, this.provider, this.tickConfig());
-    if (generation !== this.generation) return;
+    const queueLength = this.world.queue.length;
+    const result = await runTick(this.world, this.provider, { ...this.tickConfig(),
+      isCurrent: () => generation === this.generation,
+      onPhase: phase => { if (generation === this.generation) { this.phase = phase; this.emitState(); } },
+    }).catch(error => { if (generation !== this.generation) return null; throw error; });
+    if (!result || generation !== this.generation) return;
 
-    this.world = result.world;
+    // Injections accepted during a phase belong to the next tick, never disappear on commit.
+    result.world.queue.push(...this.world.queue.slice(queueLength));
+    try { this.store.commit(this.runId,result.world,'tick',{ log: result.log, settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } }); }
+    catch (error) {
+      this.storageError = 'History storage failed. The previous tick is retained; retry after restoring storage.';
+      this.running = false; this.phase = null; this.clearTimer(); this.emitState(); throw error;
+    }
+    this.world = result.world; this.phase = null; this.storageError = null;
     const records = enrichRecords(result);
     const events = result.log.events.map((e) => ({
       type: e.type,
@@ -292,6 +335,7 @@ class OfficeSimManager {
       text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
       ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
     }));
+    events.push(...result.world.eventState.cases.filter(e => e.openedTick === result.world.tick).map(e => ({ type: 'new_management' as const, is_true: e.truth, text: e.headline, business_id: e.id, custom: e.origin === 'injection' })));
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
 
     // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.
@@ -299,7 +343,8 @@ class OfficeSimManager {
     if (
       this.mode !== 'rules' &&
       decisions.length > 0 &&
-      decisions.every((d) => d.fallback !== null && d.fallback !== 'llm_proposed_only_masked_actions')
+      decisions.every((d) => d.fallback !== null && d.fallback !== 'llm_proposed_only_masked_actions') &&
+      !result.world.eventState.decisions.some(d => d.tick === result.world.tick && d.fallback === null)
     ) {
       this.mode = 'rules';
       this.modeReason = 'llm_failed';
@@ -315,8 +360,21 @@ class OfficeSimManager {
     this.frames.push(frame);
     if (this.frames.length > MAX_HISTORY) this.frames.shift();
     this.emit({ type: 'tick', frame, ...this.response() });
+    if (this.world.tick >= this.maxTicks) this.complete();
   }
 
+  private archive() {
+    const status = this.store.metadata(this.runId).status;
+    if (status !== 'complete') this.store.commit(this.runId,this.world,'archive',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
+  }
+  private complete() {
+    const id = this.runId;
+    this.store.commit(id,this.world,'complete',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
+    void this.reporting.generate(id).then(() => { if (this.runId === id) this.emitState(); }).catch(() => {
+      if (this.runId === id) { this.storageError = 'Report could not be saved. Committed run evidence remains available for retry.'; this.emitState(); }
+    });
+    this.emitState();
+  }
   start() {
     return this.play();
   }
@@ -342,6 +400,7 @@ class OfficeSimManager {
   reset() {
     this.clearTimer();
     this.generation += 1;
+    this.archive();
     this.init(this.seed);
     this.emit({ type: 'history', ...this.history() });
     return this.response();
@@ -376,6 +435,7 @@ class OfficeSimManager {
       this.running = false;
       this.clearTimer();
     }
+    if (this.world.tick >= this.maxTicks) this.complete();
     this.emitState();
     return this.response();
   }
@@ -391,6 +451,11 @@ class OfficeSimManager {
     return this.response();
   }
 
+  private persistInput(next: World, audit: unknown) {
+    try { this.store.commit(this.runId,next,'input',{ input: audit, settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } }); }
+    catch (error) { this.storageError = 'History storage failed. Input was not accepted; restore storage and retry.'; this.running = false; this.clearTimer(); this.emitState(); throw error; }
+    this.world = next;
+  }
   inject(body: unknown) {
     const parsed = injectSchema.safeParse(body);
     if (!parsed.success) {
@@ -399,15 +464,25 @@ class OfficeSimManager {
     this.assertNotComplete();
     this.assertQueueRoom();
     const { type, is_true } = parsed.data;
-    this.world = queueEvent(this.world, is_true === undefined ? { type } : { type, isTrue: is_true });
+    this.persistInput(queueEvent(this.world, is_true === undefined ? { type } : { type, isTrue: is_true }),parsed.data);
     this.feed.push(`Queued event: ${type}`);
     this.emitState();
     return this.response();
   }
 
+  injectBusiness(body: unknown) {
+    const parsed = z.object({ template_id: z.string(), is_true: z.boolean().optional() }).strict().safeParse(body);
+    if (!parsed.success || !CATALOG.some(d => d.id === parsed.data.template_id)) throw new ApiFailure(400,'invalid_event','Choose a known structured business template.');
+    this.assertNotComplete(); this.assertQueueRoom();
+    const template = CATALOG.find(d => d.id === parsed.data.template_id)!;
+    if (!eligible(this.world,template)) throw new ApiFailure(422,'ineligible_event','This situation needs eligible clients, work or capacity and cannot duplicate an open case.');
+    if (this.world.queue.some(e => e.templateId === template.id)) throw new ApiFailure(409,'duplicate_event','That situation is already queued.');
+    this.persistInput(queueEvent(this.world,{ type: 'new_management', templateId: template.id, text: template.headline, isTrue: parsed.data.is_true ?? true }),parsed.data);
+    this.emitState(); return this.response();
+  }
   private assertQueueRoom() {
     if (this.world.queue.length + this.reviewing >= MAX_QUEUED) {
-      throw new ApiFailure(429, 'queue_full', `${MAX_QUEUED} announcements are already waiting. Let the next hour run first.`);
+      throw new ApiFailure(429, 'queue_full', `${MAX_QUEUED} announcements are already waiting. Let the next tick run first.`);
     }
   }
 
@@ -415,7 +490,7 @@ class OfficeSimManager {
     this.assertQueueRoom();
     const pending = this.world.queue.filter((e) => e.custom).length + this.reviewing;
     if (pending >= CUSTOM_EVENT_LIMITS.maxPending) {
-      throw new ApiFailure(429, 'custom_pending', `${CUSTOM_EVENT_LIMITS.maxPending} of your announcements are already waiting for the next hour.`);
+      throw new ApiFailure(429, 'custom_pending', `${CUSTOM_EVENT_LIMITS.maxPending} of your announcements are already waiting for the next tick.`);
     }
     if (this.customHeadlines.size >= CUSTOM_EVENT_LIMITS.maxPerRun) {
       throw new ApiFailure(429, 'custom_limit', `You can post ${CUSTOM_EVENT_LIMITS.maxPerRun} of your own announcements per run. Reset for more.`);
@@ -474,14 +549,14 @@ class OfficeSimManager {
     }
 
     const generated = await this.generateCustomEvent(inferredKind, check.text, is_true);
-    this.world = queueEvent(this.world, {
+    try { this.persistInput(queueEvent(this.world, {
       type: CUSTOM_EVENT_KINDS[inferredKind].base,
       isTrue: is_true,
       text: generated.headline,
       custom: true,
       customEffects: generated.effects,
       customMeta: { severity: generated.severity, durationTicks: generated.durationTicks, summary: generated.summary },
-    });
+    }), { kind: inferredKind, text: check.text, is_true }); } catch (error) { this.customHeadlines.delete(key); throw error; }
     this.feed.push(`Queued custom event: ${generated.headline}`);
     this.emitState();
     return this.response();
@@ -526,9 +601,36 @@ app.post('/api/sim/new-seed', async (request) => {
 });
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/inject-business', async request => sim.injectBusiness(request.body));
+app.get('/api/event-catalog', async () => CATALOG);
 app.post('/api/sim/inject-custom', { bodyLimit: 4_096 }, async (request) => sim.injectCustom(request.body));
 app.post('/api/sim/speed', async (request) => sim.setSpeed(request.body));
 app.post('/api/sim/settings', async (request) => sim.settings(request.body));
+
+app.get('/api/runs', async () => sim.store.list());
+app.get<{ Params: { id: string }; Querystring: { cutoff?: string } }>('/api/runs/:id', async (request,reply) => {
+  try {
+    const txs = sim.store.read(request.params.id);
+    const cutoff = request.query.cutoff === undefined ? txs.length : Number(request.query.cutoff);
+    if (!Number.isSafeInteger(cutoff) || cutoff < 1 || cutoff > txs.length) throw new Error('Invalid cutoff');
+    return { metadata: sim.store.metadata(request.params.id), world: txs[cutoff-1].world, reports: sim.store.reports(request.params.id), pending: sim.reporting.pending(request.params.id) }; }
+  catch { return reply.status(404).send(errorBody('run_not_found','Run is unavailable.')); }
+});
+app.get<{ Params: { id: string } }>('/api/runs/:id/history', async (request,reply) => {
+  try { return sim.store.read(request.params.id); } catch { return reply.status(404).send(errorBody('run_not_found','Run history is unavailable.')); }
+});
+app.post<{ Params: { id: string } }>('/api/runs/:id/report', async (request,reply) => {
+  try { sim.store.metadata(request.params.id); } catch { return reply.status(404).send(errorBody('run_not_found','Run is unavailable.')); }
+  const input = z.object({ regenerate: z.boolean().optional() }).strict().safeParse(request.body ?? {});
+  if (!input.success) throw new ApiFailure(400,'invalid_report_request','Expected an optional regenerate boolean.');
+  return sim.reporting.generate(request.params.id,input.data.regenerate ?? false);
+});
+app.get<{ Params: { id: string; reportId: string }; Querystring: { format?: string } }>('/api/runs/:id/reports/:reportId', async (request,reply) => {
+  const report = sim.store.reports(request.params.id).find(r => r.id === request.params.reportId);
+  if (!report) return reply.status(404).send(errorBody('report_not_found','Report is unavailable.'));
+  if (request.query.format === 'markdown') return reply.type('text/markdown').header('Content-Disposition',`attachment; filename="business-report-${report.version}.md"`).send(reportMarkdown(report));
+  return reply.header('Content-Disposition',`attachment; filename="business-report-${report.version}.json"`).send(report);
+});
 
 app.get('/api/events', (request, reply) => {
   reply.hijack();
@@ -554,6 +656,20 @@ app.get('/api/events', (request, reply) => {
     sim.unsubscribe(send);
   });
   request.raw.on('error', () => res.destroy());
+});
+
+// Serve the built demo and its API from one Node process in production.
+const clientDirectory = fileURLToPath(new URL('../dist/',import.meta.url));
+app.get('/*',async (request,reply) => {
+  const pathname = new URL(request.url,'http://localhost').pathname;
+  const allowed = pathname === '/' || pathname === '/index.html' || pathname.startsWith('/assets/') || pathname.startsWith('/fonts/');
+  if (!allowed) return reply.status(404).send(errorBody('not_found',`No route for ${request.method} ${pathname}`));
+  const file = resolve(clientDirectory,pathname === '/' ? 'index.html' : decodeURIComponent(pathname).slice(1));
+  if (!file.startsWith(resolve(clientDirectory)+sep)) return reply.status(404).send(errorBody('not_found','Asset unavailable.'));
+  const extension = file.split('.').at(-1)!;
+  const types: Record<string,string> = { html:'text/html; charset=utf-8', js:'text/javascript; charset=utf-8', css:'text/css; charset=utf-8', woff:'font/woff', woff2:'font/woff2', svg:'image/svg+xml', png:'image/png', ico:'image/x-icon' };
+  try { return reply.type(types[extension] ?? 'application/octet-stream').send(await readFile(file)); }
+  catch { return reply.status(404).send(errorBody('not_found','Build the client with pnpm build before starting the production demo.')); }
 });
 
 const port = Number(process.env.PORT ?? '3010');

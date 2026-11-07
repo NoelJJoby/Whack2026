@@ -1,3 +1,5 @@
+import type { Business } from '../shared/business';
+import type { EventState, ManagementContext, EmployeeWorkContext } from '../shared/events';
 // Engine-local types: anything the engine needs that shared/types.ts does not
 // (yet) define. Proposed shared-type changes are in docs/engine-handoff.md.
 import type { Action, AgentProfile, AgentState, Claim, EventType, TickRecord } from '../shared/types';
@@ -18,6 +20,9 @@ export const ACTIONS: readonly Action[] = [
   'verify',
   'interview',
   'leak',
+  'review_work',
+  'report_issue',
+  'support_colleague',
 ];
 
 export const ACTIONS_WITH_TARGET: readonly Action[] = ['complain', 'gossip', 'verify'];
@@ -32,6 +37,9 @@ export const LLM_MODES: readonly Mode[] = ['llm_bias', 'llm_raw'];
 export interface Proposal {
   action: Action;
   weight: number;
+  task_id?: string;
+  evidence_id?: string;
+  assignment_version?: number;
   /** Colleague id; used if valid for the sampled action, otherwise drawn by affinity / source trust. */
   target?: string | null;
   /** Held claim id for gossip / verify / leak; used if valid, otherwise picked by effective belief. */
@@ -91,7 +99,7 @@ export interface HeldClaim {
   verified: 'confirmed' | 'refuted' | null;
 }
 
-export type AgentStatus = 'active' | 'quit';
+export type AgentStatus = 'active' | 'quit' | 'laid_off';
 
 export interface EngineAgent {
   id: string;
@@ -122,6 +130,7 @@ export interface EngineClaim extends Claim {
 }
 
 export interface ScenarioEvent {
+  templateId?: string;
   tick: number;
   type: EventType;
   /** Hidden truth tag; defaults to params.events[type].isTrue. */
@@ -143,6 +152,8 @@ export interface ScenarioEvent {
 export type QueuedEvent = Omit<ScenarioEvent, 'tick'>;
 
 export interface World {
+  business: Business;
+  eventState: EventState;
   price: PriceState;
   priceRecord: PriceRecord | null;
   seed: number;
@@ -203,6 +214,7 @@ export interface SpeechTickLog {
 }
 
 export interface RunConfig {
+  business?: boolean;
   seed: number;
   mode: Mode;
   ticks: number;
@@ -218,6 +230,8 @@ export interface RunConfig {
 
 /** What an agent is told. Never includes truth tags. */
 export interface TurnContext {
+  management?: ManagementContext;
+  work?: EmployeeWorkContext;
   tick: number;
   mode: Mode;
   state: AgentState;
@@ -277,7 +291,7 @@ export interface DecisionLog {
   gain: number;
   probs: Partial<Record<Action, number>>;
   draw: number;
-  chosen: { action: Action; target: string | null; claim: string | null };
+  chosen: { action: Action; target: string | null; claim: string | null; task_id?: string; assignment_version?: number; evidence_id?: string };
   explain: string;
   /** Manner, stance and repetition check for this turn's line (LLM modes). */
   speech?: SpeechLog;
@@ -287,6 +301,9 @@ export interface Decision {
   action: Action;
   target: string | null;
   claim: string | null;
+  task_id?: string;
+  evidence_id?: string;
+  assignment_version?: number;
   probs: Partial<Record<Action, number>>;
   public_line: string;
   inner_monologue: string;
@@ -303,6 +320,7 @@ export interface HopLog {
 }
 
 export interface EngineTickLog {
+  business?: { decisions: string[]; work: string[]; events: string[]; ledger: string[] };
   price: PriceRecord;
   tick: number;
   events: Array<{ type: EventType; is_true: boolean; claim: string }>;

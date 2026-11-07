@@ -129,17 +129,19 @@ describe('api routes', () => {
     assert.equal(missing.json().error.code, 'not_found');
   });
 
-  test('a full run ends at the tick limit with a quit recorded', async () => {
-    // Seed 4: someone quits within the default run in rules mode.
+  test('a full run ends at the tick limit with durable business evidence', async () => {
+    // Healthy operation need not force an employee exit.
     await post('/api/sim/new-seed', { seed: 4 });
     for (let i = 0; i < MAX_TICKS; i++) assert.equal((await post('/api/sim/step')).statusCode, 200);
     const json = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json();
     assert.equal(json.state.tick, MAX_TICKS);
     assert.equal(json.history.length, MAX_TICKS);
-    assert.ok(json.state.metrics.crack_order.length > 0);
-    const quitter = json.state.metrics.crack_order[0];
-    assert.equal(json.state.agents[quitter].status, 'quit');
-    assert.ok(json.history.some((f: { records: Array<{ agent: string; quit?: boolean }> }) => f.records.some((r) => r.agent === quitter && r.quit)));
+    assert.ok(json.state.business.ledger.length > 0);
+    assert.ok(json.state.eventState.cases.length > 0);
+    assert.equal(typeof json.run_id,'string');
+    const run = (await app.inject({ method: 'GET',url: `/api/runs/${json.run_id}` })).json();
+    assert.equal(run.world.tick,MAX_TICKS);
+    assert.equal(run.metadata.status,'complete');
 
     for (const url of ['/api/sim/step', '/api/sim/play']) {
       const response = await post(url);

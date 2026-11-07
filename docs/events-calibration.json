@@ -1,0 +1,5331 @@
+{
+  "configuration": {
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100
+    ],
+    "ticks": 600,
+    "months": 12,
+    "mode": "rules",
+    "personality": "seeded fixture cast",
+    "scheduler": "stateful common/rare; causal replacements enabled"
+  },
+  "nominal": {
+    "common": {
+      "min": 10,
+      "max": 20,
+      "mean": 15.038
+    },
+    "rare": {
+      "min": 40,
+      "max": 60,
+      "mean": 49.75666666666667
+    }
+  },
+  "totalRoots": 5340,
+  "positiveFraction": 0.6037453183520599,
+  "totalCostReviews": 117,
+  "totalLayoffs": 0,
+  "totalAvoidedLayoffs": 107,
+  "averageHeadcount": 8,
+  "averageCash": 73734890,
+  "elapsedMs": 207986.90645799998,
+  "results": [
+    {
+      "seed": 1,
+      "roots": 53,
+      "positive": 35,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 17
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 13
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 86911000,
+      "revenue": 142000000,
+      "costs": 108089000,
+      "headcount": 8,
+      "trust": 99.97404284075763,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2703.8,
+      "work": 898,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 2,
+      "roots": 50,
+      "positive": 31,
+      "common": 38,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 45,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 73602000,
+      "revenue": 134000000,
+      "costs": 113398000,
+      "headcount": 8,
+      "trust": 99.99992562032266,
+      "burnout": 8.875,
+      "exits": 0,
+      "idleTime": 2728,
+      "work": 873,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 33,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 3,
+      "roots": 54,
+      "positive": 34,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 11
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 4,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 67220000,
+      "revenue": 130000000,
+      "costs": 111780000,
+      "headcount": 8,
+      "trust": 99.99971706389503,
+      "burnout": 5.625,
+      "exits": 0,
+      "idleTime": 2697.4,
+      "work": 905,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 10
+      }
+    },
+    {
+      "seed": 4,
+      "roots": 52,
+      "positive": 38,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 34,
+          "negative": 14
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 83766000,
+      "revenue": 138000000,
+      "costs": 107234000,
+      "headcount": 8,
+      "trust": 99.9133558298215,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2712.2,
+      "work": 889,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 5,
+      "roots": 54,
+      "positive": 36,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 33,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 3,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 3,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 93424000,
+      "revenue": 150000000,
+      "costs": 109576000,
+      "headcount": 8,
+      "trust": 99.98558290080673,
+      "burnout": 6.5,
+      "exits": 0,
+      "idleTime": 2696.6000000000004,
+      "work": 905,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 40,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 6,
+      "roots": 55,
+      "positive": 33,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 4,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [
+        11
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 84991000,
+      "revenue": 134000000,
+      "costs": 102009000,
+      "headcount": 8,
+      "trust": 99.99992312071767,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2720.8,
+      "work": 880,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 7,
+      "roots": 54,
+      "positive": 30,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 3,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 73633000,
+      "revenue": 122000000,
+      "costs": 101367000,
+      "headcount": 8,
+      "trust": 99.9999966558193,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2717.8,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 8,
+      "roots": 52,
+      "positive": 34,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 19
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 3,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 93369000,
+      "revenue": 146000000,
+      "costs": 105631000,
+      "headcount": 8,
+      "trust": 99.99929989289313,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2714.6,
+      "work": 887,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 9,
+      "roots": 56,
+      "positive": 34,
+      "common": 45,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 52,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 74240000,
+      "revenue": 134000000,
+      "costs": 112760000,
+      "headcount": 8,
+      "trust": 99.97621298499935,
+      "burnout": 9.125,
+      "exits": 0,
+      "idleTime": 2706.8,
+      "work": 894,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 41,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 10,
+      "roots": 52,
+      "positive": 31,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 65830000,
+      "revenue": 118000000,
+      "costs": 105170000,
+      "headcount": 8,
+      "trust": 99.99689282264006,
+      "burnout": 5.5,
+      "exits": 0,
+      "idleTime": 2737.8,
+      "work": 863,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 11,
+      "roots": 54,
+      "positive": 31,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 63823000,
+      "revenue": 114000000,
+      "costs": 103177000,
+      "headcount": 8,
+      "trust": 99.99999705723641,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2739.2,
+      "work": 862,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 12,
+      "roots": 54,
+      "positive": 32,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 0,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 37,
+      "lateDeliveries": 0,
+      "cash": 59850000,
+      "revenue": 122000000,
+      "costs": 115150000,
+      "headcount": 8,
+      "trust": 99.84595234885661,
+      "burnout": 8,
+      "exits": 0,
+      "idleTime": 2726.8,
+      "work": 874,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 13,
+      "roots": 53,
+      "positive": 31,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 13
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        4
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 68342000,
+      "revenue": 130000000,
+      "costs": 114658000,
+      "headcount": 8,
+      "trust": 99.9994321233901,
+      "burnout": 7.375,
+      "exits": 0,
+      "idleTime": 2716.8,
+      "work": 884,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 14,
+      "roots": 55,
+      "positive": 36,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 4,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 68868000,
+      "revenue": 122000000,
+      "costs": 106132000,
+      "headcount": 8,
+      "trust": 99.99881918200043,
+      "burnout": 9.125,
+      "exits": 0,
+      "idleTime": 2718.2,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 15,
+      "roots": 54,
+      "positive": 29,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 25,
+          "negative": 25
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 17
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 3,
+      "breaches": 0,
+      "openCaseAge": [
+        9,
+        4
+      ],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 80642000,
+      "revenue": 126000000,
+      "costs": 98358000,
+      "headcount": 8,
+      "trust": 99.9811579567011,
+      "burnout": 4.375,
+      "exits": 0,
+      "idleTime": 2735,
+      "work": 866,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 16,
+      "roots": 51,
+      "positive": 27,
+      "common": 39,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 23,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 45,
+      "replacements": 8,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 4,
+      "openCaseAge": [
+        4
+      ],
+      "repeatFamilies": 30,
+      "lateDeliveries": 0,
+      "cash": 76275000,
+      "revenue": 134000000,
+      "costs": 110725000,
+      "headcount": 8,
+      "trust": 99.89724957085642,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2711,
+      "work": 890,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 10
+      }
+    },
+    {
+      "seed": 17,
+      "roots": 52,
+      "positive": 30,
+      "common": 39,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 8,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        4
+      ],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 51045000,
+      "revenue": 106000000,
+      "costs": 107955000,
+      "headcount": 8,
+      "trust": 99.9884894113153,
+      "burnout": 6.875,
+      "exits": 0,
+      "idleTime": 2744.3999999999996,
+      "work": 858,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 18,
+      "roots": 54,
+      "positive": 34,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 74297000,
+      "revenue": 130000000,
+      "costs": 108703000,
+      "headcount": 8,
+      "trust": 99.90137235313573,
+      "burnout": 6.125,
+      "exits": 0,
+      "idleTime": 2713.8,
+      "work": 888,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 19,
+      "roots": 56,
+      "positive": 31,
+      "common": 44,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 72542000,
+      "revenue": 130000000,
+      "costs": 106458000,
+      "headcount": 8,
+      "trust": 99.94727913095005,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2701.8000000000006,
+      "work": 901,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 20,
+      "roots": 53,
+      "positive": 31,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 3
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 75766000,
+      "revenue": 130000000,
+      "costs": 107234000,
+      "headcount": 8,
+      "trust": 99.99958786281931,
+      "burnout": 7.625,
+      "exits": 0,
+      "idleTime": 2721,
+      "work": 880,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 21,
+      "roots": 53,
+      "positive": 34,
+      "common": 42,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 14
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 70400000,
+      "revenue": 130000000,
+      "costs": 112600000,
+      "headcount": 8,
+      "trust": 99.99190597070721,
+      "burnout": 5,
+      "exits": 0,
+      "idleTime": 2714.3999999999996,
+      "work": 887,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 22,
+      "roots": 51,
+      "positive": 27,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 23,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 56324000,
+      "revenue": 118000000,
+      "costs": 114676000,
+      "headcount": 8,
+      "trust": 99.99561569616186,
+      "burnout": 7.875,
+      "exits": 0,
+      "idleTime": 2711.4,
+      "work": 889,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 23,
+      "roots": 51,
+      "positive": 33,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 93744000,
+      "revenue": 146000000,
+      "costs": 105256000,
+      "headcount": 8,
+      "trust": 99.99946106187392,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2698.7999999999997,
+      "work": 903,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 24,
+      "roots": 54,
+      "positive": 31,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 3,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 14
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 80176000,
+      "revenue": 142000000,
+      "costs": 114824000,
+      "headcount": 8,
+      "trust": 99.88977653276588,
+      "burnout": 8.5,
+      "exits": 0,
+      "idleTime": 2694,
+      "work": 907,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 25,
+      "roots": 55,
+      "positive": 31,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 11
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        7,
+        4
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 73841000,
+      "revenue": 134000000,
+      "costs": 113159000,
+      "headcount": 8,
+      "trust": 99.99828918884667,
+      "burnout": 7.375,
+      "exits": 0,
+      "idleTime": 2707.2,
+      "work": 893,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 26,
+      "roots": 53,
+      "positive": 37,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 34,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 3,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 3,
+      "deferrals": {
+        "active_day_limit": 2
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [
+        3
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 82380000,
+      "revenue": 138000000,
+      "costs": 108620000,
+      "headcount": 8,
+      "trust": 99.9860562449377,
+      "burnout": 8,
+      "exits": 0,
+      "idleTime": 2705.4,
+      "work": 895,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 27,
+      "roots": 55,
+      "positive": 32,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 71593000,
+      "revenue": 130000000,
+      "costs": 107407000,
+      "headcount": 8,
+      "trust": 99.96199356626406,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2689.2,
+      "work": 912,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 28,
+      "roots": 53,
+      "positive": 30,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [
+        5
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 63712000,
+      "revenue": 126000000,
+      "costs": 115288000,
+      "headcount": 8,
+      "trust": 99.9743185510038,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2732.2,
+      "work": 869,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 29,
+      "roots": 52,
+      "positive": 36,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [
+        5
+      ],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 82420000,
+      "revenue": 142000000,
+      "costs": 108580000,
+      "headcount": 8,
+      "trust": 99.9922942869774,
+      "burnout": 6.5,
+      "exits": 0,
+      "idleTime": 2717.2000000000003,
+      "work": 884,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 30,
+      "roots": 55,
+      "positive": 32,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 2,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 70503000,
+      "revenue": 126000000,
+      "costs": 108497000,
+      "headcount": 8,
+      "trust": 99.95979556203943,
+      "burnout": 5.5,
+      "exits": 0,
+      "idleTime": 2702.6,
+      "work": 899,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 31,
+      "roots": 55,
+      "positive": 33,
+      "common": 42,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 7,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 71733000,
+      "revenue": 134000000,
+      "costs": 115267000,
+      "headcount": 8,
+      "trust": 99.98425299080259,
+      "burnout": 8.625,
+      "exits": 0,
+      "idleTime": 2727.8,
+      "work": 873,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 32,
+      "roots": 53,
+      "positive": 33,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 73210000,
+      "revenue": 134000000,
+      "costs": 113790000,
+      "headcount": 8,
+      "trust": 99.97616798930008,
+      "burnout": 5.25,
+      "exits": 0,
+      "idleTime": 2719.9999999999995,
+      "work": 881,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 33,
+      "roots": 54,
+      "positive": 38,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 34,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 87788000,
+      "revenue": 146000000,
+      "costs": 111212000,
+      "headcount": 8,
+      "trust": 99.99302083166342,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2688.3999999999996,
+      "work": 912,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 34,
+      "roots": 50,
+      "positive": 31,
+      "common": 39,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 64428000,
+      "revenue": 126000000,
+      "costs": 114572000,
+      "headcount": 8,
+      "trust": 99.93920649750791,
+      "burnout": 6.5,
+      "exits": 0,
+      "idleTime": 2740.3999999999996,
+      "work": 860,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 35,
+      "roots": 53,
+      "positive": 34,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [
+        4
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 68348000,
+      "revenue": 130000000,
+      "costs": 114652000,
+      "headcount": 8,
+      "trust": 99.97313072417424,
+      "burnout": 6.875,
+      "exits": 0,
+      "idleTime": 2725.2000000000003,
+      "work": 877,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 36,
+      "roots": 52,
+      "positive": 30,
+      "common": 39,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 3
+      },
+      "costReviews": 5,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        17,
+        2
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 85843000,
+      "revenue": 134000000,
+      "costs": 101157000,
+      "headcount": 8,
+      "trust": 99.7998923826954,
+      "burnout": 7.875,
+      "exits": 0,
+      "idleTime": 2740,
+      "work": 861,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 37,
+      "roots": 50,
+      "positive": 36,
+      "common": 38,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 14
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        5
+      ],
+      "repeatFamilies": 30,
+      "lateDeliveries": 0,
+      "cash": 75403000,
+      "revenue": 130000000,
+      "costs": 107597000,
+      "headcount": 8,
+      "trust": 99.99607720785284,
+      "burnout": 9.625,
+      "exits": 0,
+      "idleTime": 2733,
+      "work": 868,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 38,
+      "roots": 52,
+      "positive": 35,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 17
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 89140000,
+      "revenue": 142000000,
+      "costs": 105860000,
+      "headcount": 8,
+      "trust": 99.73455179597968,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2718,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 39,
+      "roots": 54,
+      "positive": 33,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 7,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 79960000,
+      "revenue": 142000000,
+      "costs": 115040000,
+      "headcount": 8,
+      "trust": 99.99116139082855,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2695.7999999999993,
+      "work": 906,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 40,
+      "roots": 53,
+      "positive": 32,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 66325000,
+      "revenue": 118000000,
+      "costs": 104675000,
+      "headcount": 8,
+      "trust": 99.99813040171261,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2724,
+      "work": 877,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 41,
+      "roots": 53,
+      "positive": 26,
+      "common": 42,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 22,
+          "negative": 27
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 13
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 48956000,
+      "revenue": 102000000,
+      "costs": 106044000,
+      "headcount": 8,
+      "trust": 99.97636904234363,
+      "burnout": 6.25,
+      "exits": 0,
+      "idleTime": 2736.4,
+      "work": 865,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 42,
+      "roots": 52,
+      "positive": 31,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 13
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 29,
+      "lateDeliveries": 0,
+      "cash": 73582000,
+      "revenue": 126000000,
+      "costs": 105418000,
+      "headcount": 8,
+      "trust": 99.53520891387595,
+      "burnout": 9.125,
+      "exits": 0,
+      "idleTime": 2728.2000000000003,
+      "work": 873,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 43,
+      "roots": 54,
+      "positive": 27,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 23,
+          "negative": 27
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 2
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 73478000,
+      "revenue": 134000000,
+      "costs": 113522000,
+      "headcount": 8,
+      "trust": 99.9995621215326,
+      "burnout": 5.125,
+      "exits": 0,
+      "idleTime": 2698.4000000000005,
+      "work": 903,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 44,
+      "roots": 52,
+      "positive": 27,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 23,
+          "negative": 25
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 56220000,
+      "revenue": 118000000,
+      "costs": 114780000,
+      "headcount": 8,
+      "trust": 99.90603765209292,
+      "burnout": 5.25,
+      "exits": 0,
+      "idleTime": 2743.6,
+      "work": 858,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 45,
+      "roots": 54,
+      "positive": 31,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 11
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 66688000,
+      "revenue": 126000000,
+      "costs": 112312000,
+      "headcount": 8,
+      "trust": 99.85052946988182,
+      "burnout": 6.875,
+      "exits": 0,
+      "idleTime": 2736.3999999999996,
+      "work": 865,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 46,
+      "roots": 52,
+      "positive": 28,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 24,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 60264000,
+      "revenue": 126000000,
+      "costs": 118736000,
+      "headcount": 8,
+      "trust": 99.99665515684481,
+      "burnout": 5.625,
+      "exits": 0,
+      "idleTime": 2736.5999999999995,
+      "work": 865,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 47,
+      "roots": 52,
+      "positive": 26,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 22,
+          "negative": 25
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [
+        8,
+        4
+      ],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 51382000,
+      "revenue": 118000000,
+      "costs": 119618000,
+      "headcount": 8,
+      "trust": 99.98981466997958,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2744.7999999999993,
+      "work": 857,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 48,
+      "roots": 55,
+      "positive": 33,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 84293000,
+      "revenue": 142000000,
+      "costs": 110707000,
+      "headcount": 8,
+      "trust": 99.98307732104777,
+      "burnout": 7.625,
+      "exits": 0,
+      "idleTime": 2704.6000000000004,
+      "work": 896,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 49,
+      "roots": 56,
+      "positive": 33,
+      "common": 44,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 52,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 3
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 81504000,
+      "revenue": 134000000,
+      "costs": 105496000,
+      "headcount": 8,
+      "trust": 99.96727899494485,
+      "burnout": 5.125,
+      "exits": 0,
+      "idleTime": 2708.2,
+      "work": 893,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 41,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 50,
+      "roots": 55,
+      "positive": 40,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 36,
+          "negative": 14
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 87635000,
+      "revenue": 142000000,
+      "costs": 107365000,
+      "headcount": 8,
+      "trust": 99.99319801615691,
+      "burnout": 5.375,
+      "exits": 0,
+      "idleTime": 2699.6,
+      "work": 902,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 51,
+      "roots": 56,
+      "positive": 35,
+      "common": 44,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 52,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 11
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [
+        7
+      ],
+      "repeatFamilies": 37,
+      "lateDeliveries": 0,
+      "cash": 86462000,
+      "revenue": 138000000,
+      "costs": 104538000,
+      "headcount": 8,
+      "trust": 99.98141254742697,
+      "burnout": 7,
+      "exits": 0,
+      "idleTime": 2729.2,
+      "work": 872,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 40,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 52,
+      "roots": 56,
+      "positive": 32,
+      "common": 44,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 11
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 57277000,
+      "revenue": 114000000,
+      "costs": 109723000,
+      "headcount": 8,
+      "trust": 99.9125266671477,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2727.7999999999997,
+      "work": 873,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 53,
+      "roots": 53,
+      "positive": 31,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 14
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        9
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 66924000,
+      "revenue": 118000000,
+      "costs": 104076000,
+      "headcount": 8,
+      "trust": 99.83987919987237,
+      "burnout": 6.375,
+      "exits": 0,
+      "idleTime": 2722.2,
+      "work": 879,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 54,
+      "roots": 54,
+      "positive": 30,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 15
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 64859000,
+      "revenue": 122000000,
+      "costs": 110141000,
+      "headcount": 8,
+      "trust": 99.97407592087148,
+      "burnout": 6.25,
+      "exits": 0,
+      "idleTime": 2736,
+      "work": 865,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 55,
+      "roots": 53,
+      "positive": 34,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 79573000,
+      "revenue": 142000000,
+      "costs": 111427000,
+      "headcount": 8,
+      "trust": 99.99554901326563,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2695.2,
+      "work": 906,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 56,
+      "roots": 57,
+      "positive": 36,
+      "common": 46,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 52,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 38,
+      "lateDeliveries": 0,
+      "cash": 81185000,
+      "revenue": 138000000,
+      "costs": 109815000,
+      "headcount": 8,
+      "trust": 99.9393182160272,
+      "burnout": 6.875,
+      "exits": 0,
+      "idleTime": 2689.2000000000003,
+      "work": 912,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 41,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 57,
+      "roots": 55,
+      "positive": 29,
+      "common": 42,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 25,
+          "negative": 25
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 58530000,
+      "revenue": 114000000,
+      "costs": 108470000,
+      "headcount": 8,
+      "trust": 99.97149879217716,
+      "burnout": 8.375,
+      "exits": 0,
+      "idleTime": 2724.8,
+      "work": 877,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 58,
+      "roots": 55,
+      "positive": 31,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 75350000,
+      "revenue": 130000000,
+      "costs": 107650000,
+      "headcount": 8,
+      "trust": 99.9964802890556,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2713.6000000000004,
+      "work": 888,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 59,
+      "roots": 55,
+      "positive": 33,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 1
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 69632000,
+      "revenue": 122000000,
+      "costs": 105368000,
+      "headcount": 8,
+      "trust": 99.97960403200229,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2729.3999999999996,
+      "work": 872,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 60,
+      "roots": 54,
+      "positive": 31,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 2
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 66336000,
+      "revenue": 118000000,
+      "costs": 104664000,
+      "headcount": 8,
+      "trust": 99.99991036466017,
+      "burnout": 7.25,
+      "exits": 0,
+      "idleTime": 2731.6,
+      "work": 869,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 40,
+        "rare": 10
+      }
+    },
+    {
+      "seed": 61,
+      "roots": 52,
+      "positive": 35,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 70084000,
+      "revenue": 126000000,
+      "costs": 108916000,
+      "headcount": 8,
+      "trust": 99.98084562562391,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2717.4,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 62,
+      "roots": 53,
+      "positive": 35,
+      "common": 42,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 86030000,
+      "revenue": 146000000,
+      "costs": 108970000,
+      "headcount": 8,
+      "trust": 99.99853812425573,
+      "burnout": 4.5,
+      "exits": 0,
+      "idleTime": 2706,
+      "work": 895,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 63,
+      "roots": 58,
+      "positive": 36,
+      "common": 46,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 53,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [
+        3
+      ],
+      "repeatFamilies": 37,
+      "lateDeliveries": 0,
+      "cash": 72210000,
+      "revenue": 134000000,
+      "costs": 110790000,
+      "headcount": 8,
+      "trust": 99.99732181806343,
+      "burnout": 5.25,
+      "exits": 0,
+      "idleTime": 2709.2,
+      "work": 892,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 41,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 64,
+      "roots": 56,
+      "positive": 37,
+      "common": 44,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 33,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 78402000,
+      "revenue": 134000000,
+      "costs": 108598000,
+      "headcount": 8,
+      "trust": 99.99910864047291,
+      "burnout": 4.5,
+      "exits": 0,
+      "idleTime": 2711.2,
+      "work": 890,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 65,
+      "roots": 51,
+      "positive": 31,
+      "common": 39,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 69655000,
+      "revenue": 126000000,
+      "costs": 109345000,
+      "headcount": 8,
+      "trust": 99.45899809460481,
+      "burnout": 5,
+      "exits": 0,
+      "idleTime": 2740.8,
+      "work": 860,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 66,
+      "roots": 51,
+      "positive": 31,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 78120000,
+      "revenue": 142000000,
+      "costs": 116880000,
+      "headcount": 8,
+      "trust": 99.99997171423915,
+      "burnout": 6.75,
+      "exits": 0,
+      "idleTime": 2718.4000000000005,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 67,
+      "roots": 51,
+      "positive": 29,
+      "common": 39,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 25,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 60973000,
+      "revenue": 118000000,
+      "costs": 106027000,
+      "headcount": 8,
+      "trust": 99.99857699044695,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2750.7999999999993,
+      "work": 850,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 34,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 68,
+      "roots": 55,
+      "positive": 32,
+      "common": 42,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 80956000,
+      "revenue": 134000000,
+      "costs": 106044000,
+      "headcount": 8,
+      "trust": 99.99992200141374,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2710.3999999999996,
+      "work": 892,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 69,
+      "roots": 57,
+      "positive": 34,
+      "common": 44,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 52,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        7,
+        6
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 80347000,
+      "revenue": 134000000,
+      "costs": 102653000,
+      "headcount": 8,
+      "trust": 99.99176944457801,
+      "burnout": 7.625,
+      "exits": 0,
+      "idleTime": 2689,
+      "work": 914,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 40,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 70,
+      "roots": 52,
+      "positive": 31,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 5
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 72803000,
+      "revenue": 122000000,
+      "costs": 102197000,
+      "headcount": 8,
+      "trust": 99.97488518603801,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2739.6,
+      "work": 861,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 71,
+      "roots": 56,
+      "positive": 32,
+      "common": 43,
+      "rare": 13,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 7,
+      "deferrals": {
+        "active_day_limit": 1
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 3,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 88254000,
+      "revenue": 142000000,
+      "costs": 106746000,
+      "headcount": 8,
+      "trust": 99.99324242734153,
+      "burnout": 9.125,
+      "exits": 0,
+      "idleTime": 2685,
+      "work": 916,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 72,
+      "roots": 54,
+      "positive": 32,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 7
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 2,
+      "openCaseAge": [
+        9
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 84276000,
+      "revenue": 138000000,
+      "costs": 106724000,
+      "headcount": 8,
+      "trust": 99.99685658578935,
+      "burnout": 7,
+      "exits": 0,
+      "idleTime": 2711.8,
+      "work": 889,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 73,
+      "roots": 53,
+      "positive": 32,
+      "common": 42,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 82479000,
+      "revenue": 142000000,
+      "costs": 112521000,
+      "headcount": 8,
+      "trust": 99.88771196466705,
+      "burnout": 6.5,
+      "exits": 0,
+      "idleTime": 2725.2000000000003,
+      "work": 876,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 74,
+      "roots": 54,
+      "positive": 24,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 20,
+          "negative": 30
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 60338000,
+      "revenue": 122000000,
+      "costs": 114662000,
+      "headcount": 8,
+      "trust": 99.99898701773633,
+      "burnout": 7,
+      "exits": 0,
+      "idleTime": 2718,
+      "work": 883,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 75,
+      "roots": 51,
+      "positive": 35,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 93218000,
+      "revenue": 146000000,
+      "costs": 105782000,
+      "headcount": 8,
+      "trust": 99.9999510231878,
+      "burnout": 6.375,
+      "exits": 0,
+      "idleTime": 2717.5999999999995,
+      "work": 884,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 76,
+      "roots": 52,
+      "positive": 26,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 22,
+          "negative": 26
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 3
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 47272000,
+      "revenue": 106000000,
+      "costs": 111728000,
+      "headcount": 8,
+      "trust": 99.9999729796834,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2754,
+      "work": 847,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 77,
+      "roots": 51,
+      "positive": 31,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 17
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 72684000,
+      "revenue": 118000000,
+      "costs": 98316000,
+      "headcount": 8,
+      "trust": 99.99406561476415,
+      "burnout": 5.25,
+      "exits": 0,
+      "idleTime": 2757.2,
+      "work": 844,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 78,
+      "roots": 51,
+      "positive": 33,
+      "common": 40,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 94330000,
+      "revenue": 150000000,
+      "costs": 108670000,
+      "headcount": 8,
+      "trust": 99.91372668496925,
+      "burnout": 8.25,
+      "exits": 0,
+      "idleTime": 2727.3999999999996,
+      "work": 874,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 79,
+      "roots": 53,
+      "positive": 33,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 4
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [
+        8
+      ],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 61266000,
+      "revenue": 114000000,
+      "costs": 105734000,
+      "headcount": 8,
+      "trust": 99.99613402681854,
+      "burnout": 4.625,
+      "exits": 0,
+      "idleTime": 2731.9999999999995,
+      "work": 870,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 80,
+      "roots": 52,
+      "positive": 32,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 97794000,
+      "revenue": 146000000,
+      "costs": 101206000,
+      "headcount": 8,
+      "trust": 99.99993141402874,
+      "burnout": 7.125,
+      "exits": 0,
+      "idleTime": 2731.6,
+      "work": 869,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 81,
+      "roots": 54,
+      "positive": 28,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 24,
+          "negative": 25
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 3,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 69706000,
+      "revenue": 118000000,
+      "costs": 101294000,
+      "headcount": 8,
+      "trust": 99.9237218765627,
+      "burnout": 4.625,
+      "exits": 0,
+      "idleTime": 2724.9999999999995,
+      "work": 877,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 82,
+      "roots": 53,
+      "positive": 34,
+      "common": 42,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 30,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 64015000,
+      "revenue": 118000000,
+      "costs": 106985000,
+      "headcount": 8,
+      "trust": 99.98837397165312,
+      "burnout": 8.75,
+      "exits": 0,
+      "idleTime": 2731.7999999999997,
+      "work": 869,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 83,
+      "roots": 55,
+      "positive": 30,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 24
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 16
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        7
+      ],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 67661000,
+      "revenue": 122000000,
+      "costs": 107339000,
+      "headcount": 8,
+      "trust": 99.99869812532334,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2712.8,
+      "work": 889,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 84,
+      "roots": 54,
+      "positive": 35,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 2
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 76243000,
+      "revenue": 130000000,
+      "costs": 106757000,
+      "headcount": 8,
+      "trust": 99.9671536063838,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2726.8,
+      "work": 874,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 85,
+      "roots": 55,
+      "positive": 36,
+      "common": 43,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 18
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 1
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 0,
+      "openCaseAge": [
+        3
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 68608000,
+      "revenue": 130000000,
+      "costs": 114392000,
+      "headcount": 8,
+      "trust": 99.79813287482372,
+      "burnout": 7.75,
+      "exits": 0,
+      "idleTime": 2713.2,
+      "work": 888,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 86,
+      "roots": 52,
+      "positive": 29,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 25,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 16
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 63242000,
+      "revenue": 126000000,
+      "costs": 115758000,
+      "headcount": 8,
+      "trust": 99.99340879785036,
+      "burnout": 4.625,
+      "exits": 0,
+      "idleTime": 2733,
+      "work": 868,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 87,
+      "roots": 55,
+      "positive": 28,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 24,
+          "negative": 26
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 18
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 3,
+      "openCaseAge": [
+        3
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 74732000,
+      "revenue": 138000000,
+      "costs": 116268000,
+      "headcount": 8,
+      "trust": 99.88565114667838,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2689.7999999999997,
+      "work": 911,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 88,
+      "roots": 54,
+      "positive": 33,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 71544000,
+      "revenue": 130000000,
+      "costs": 111456000,
+      "headcount": 8,
+      "trust": 99.99934355985764,
+      "burnout": 7.5,
+      "exits": 0,
+      "idleTime": 2735.4,
+      "work": 865,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 89,
+      "roots": 53,
+      "positive": 33,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [
+        4
+      ],
+      "repeatFamilies": 30,
+      "lateDeliveries": 0,
+      "cash": 62948000,
+      "revenue": 122000000,
+      "costs": 112052000,
+      "headcount": 8,
+      "trust": 99.96779046169289,
+      "burnout": 7.875,
+      "exits": 0,
+      "idleTime": 2746.2000000000003,
+      "work": 855,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 90,
+      "roots": 54,
+      "positive": 33,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 29,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 9
+      },
+      "costReviews": 2,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        0
+      ],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 77099000,
+      "revenue": 130000000,
+      "costs": 101901000,
+      "headcount": 8,
+      "trust": 99.99431262340615,
+      "burnout": 6,
+      "exits": 0,
+      "idleTime": 2726.8,
+      "work": 874,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 91,
+      "roots": 52,
+      "positive": 35,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 2
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 87850000,
+      "revenue": 138000000,
+      "costs": 103150000,
+      "headcount": 8,
+      "trust": 99.9531255751539,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2710,
+      "work": 891,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 92,
+      "roots": 53,
+      "positive": 31,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 22
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 5,
+      "deferrals": {
+        "active_day_limit": 12
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 66133000,
+      "revenue": 126000000,
+      "costs": 108867000,
+      "headcount": 8,
+      "trust": 99.99918190805624,
+      "burnout": 7,
+      "exits": 0,
+      "idleTime": 2727.2,
+      "work": 874,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 93,
+      "roots": 53,
+      "positive": 35,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 47,
+      "replacements": 7,
+      "deferrals": {
+        "active_day_limit": 17
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 80704000,
+      "revenue": 134000000,
+      "costs": 106296000,
+      "headcount": 8,
+      "trust": 99.97142759128064,
+      "burnout": 7.875,
+      "exits": 0,
+      "idleTime": 2708.6000000000004,
+      "work": 893,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 94,
+      "roots": 52,
+      "positive": 31,
+      "common": 41,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 34,
+      "lateDeliveries": 0,
+      "cash": 78792000,
+      "revenue": 130000000,
+      "costs": 104208000,
+      "headcount": 8,
+      "trust": 99.72361938010953,
+      "burnout": 7.375,
+      "exits": 0,
+      "idleTime": 2726,
+      "work": 875,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 95,
+      "roots": 54,
+      "positive": 39,
+      "common": 43,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 35,
+          "negative": 15
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 50,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 19
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 1,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 90930000,
+      "revenue": 146000000,
+      "costs": 108070000,
+      "headcount": 8,
+      "trust": 99.97266726693451,
+      "burnout": 7.375,
+      "exits": 0,
+      "idleTime": 2715.7999999999993,
+      "work": 886,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 39,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 96,
+      "roots": 52,
+      "positive": 36,
+      "common": 40,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 32,
+          "negative": 16
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 48,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 14
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 3,
+      "openCaseAge": [],
+      "repeatFamilies": 31,
+      "lateDeliveries": 0,
+      "cash": 76626000,
+      "revenue": 130000000,
+      "costs": 106374000,
+      "headcount": 8,
+      "trust": 99.9614338486501,
+      "burnout": 5.625,
+      "exits": 0,
+      "idleTime": 2703.8,
+      "work": 897,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 36,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 97,
+      "roots": 51,
+      "positive": 31,
+      "common": 39,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 27,
+          "negative": 19
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 1
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 46,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 10
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 2,
+      "breaches": 1,
+      "openCaseAge": [
+        1
+      ],
+      "repeatFamilies": 33,
+      "lateDeliveries": 0,
+      "cash": 62010000,
+      "revenue": 114000000,
+      "costs": 104990000,
+      "headcount": 8,
+      "trust": 99.9911604886591,
+      "burnout": 6.625,
+      "exits": 0,
+      "idleTime": 2739.2,
+      "work": 862,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 35,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 98,
+      "roots": 54,
+      "positive": 31,
+      "common": 42,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 28,
+          "negative": 21
+        },
+        "employee": {
+          "positive": 3,
+          "negative": 2
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 6,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 3,
+      "layoffs": 0,
+      "avoidedLayoffs": 3,
+      "breaches": 3,
+      "openCaseAge": [
+        2
+      ],
+      "repeatFamilies": 36,
+      "lateDeliveries": 0,
+      "cash": 88379000,
+      "revenue": 138000000,
+      "costs": 102621000,
+      "headcount": 8,
+      "trust": 99.99832130247452,
+      "burnout": 6.5,
+      "exits": 0,
+      "idleTime": 2705,
+      "work": 896,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 38,
+        "rare": 11
+      }
+    },
+    {
+      "seed": 99,
+      "roots": 53,
+      "positive": 30,
+      "common": 41,
+      "rare": 12,
+      "sourceCounts": {
+        "external": {
+          "positive": 26,
+          "negative": 23
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 49,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 8
+      },
+      "costReviews": 1,
+      "layoffs": 0,
+      "avoidedLayoffs": 1,
+      "breaches": 0,
+      "openCaseAge": [],
+      "repeatFamilies": 32,
+      "lateDeliveries": 0,
+      "cash": 70758000,
+      "revenue": 130000000,
+      "costs": 112242000,
+      "headcount": 8,
+      "trust": 99.92716097622818,
+      "burnout": 6.375,
+      "exits": 0,
+      "idleTime": 2724.7999999999997,
+      "work": 876,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 37,
+        "rare": 12
+      }
+    },
+    {
+      "seed": 100,
+      "roots": 55,
+      "positive": 35,
+      "common": 44,
+      "rare": 11,
+      "sourceCounts": {
+        "external": {
+          "positive": 31,
+          "negative": 20
+        },
+        "employee": {
+          "positive": 4,
+          "negative": 0
+        },
+        "management": {
+          "positive": 0,
+          "negative": 0
+        },
+        "injection": {
+          "positive": 0,
+          "negative": 0
+        }
+      },
+      "scheduled": 51,
+      "replacements": 4,
+      "deferrals": {
+        "active_day_limit": 6
+      },
+      "costReviews": 0,
+      "layoffs": 0,
+      "avoidedLayoffs": 0,
+      "breaches": 2,
+      "openCaseAge": [],
+      "repeatFamilies": 35,
+      "lateDeliveries": 0,
+      "cash": 58181000,
+      "revenue": 118000000,
+      "costs": 112819000,
+      "headcount": 8,
+      "trust": 99.99994981456109,
+      "burnout": 7,
+      "exits": 0,
+      "idleTime": 2729.4,
+      "work": 872,
+      "fallbackCount": 0,
+      "scheduledByRarity": {
+        "common": 40,
+        "rare": 11
+      }
+    }
+  ],
+  "note": "Development rules baseline; further testing was curtailed for the local hackathon delivery."
+}

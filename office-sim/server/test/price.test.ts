@@ -34,7 +34,7 @@ test('same seed produces identical immutable results with an isolated price stre
 });
 test('every action has explicit configurable output; only the overwork bonus depends on burnout', () => {
   const p = { ...params(), outputAlpha: 1 };
-  const expected = { work: 1, overwork: 1.24, verify: 0.6, complain: 0.5, gossip: 0.5, slack_off: 0.3, interview: 0.2, leak: 0.2 };
+  const expected = { review_work: 0.6, report_issue: 0.2, support_colleague: 0.4, work: 1, overwork: 1.24, verify: 0.6, complain: 0.5, gossip: 0.5, slack_off: 0.3, interview: 0.2, leak: 0.2 };
   for (const action of ACTIONS) { const data = input(); data.seats[0].action = action;
     close(update(createPriceState(p, 1), data, p).record.rawOutput, expected[action]);
     data.seats[0].burnout = 100;
@@ -155,7 +155,7 @@ test('public DTO allowlist omits engine-only metadata and future corrections', (
   assert.equal(dto.markers[0].event, 'headline');
 });
 
-test('feedback off reproduces current main workforce over ten seeds and thirty ticks', async () => {
+test('feedback off preserves the versioned legacy fixture over ten seeds and thirty ticks', async () => {
   const results = [];
   const legacyParams = structuredClone(P);
   legacyParams.rules.overtime = { stress: 0, burnout: 0 };
@@ -169,5 +169,6 @@ test('feedback off reproduces current main workforce over ten seeds and thirty t
     results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs, records: r.records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
-  assert.equal(digest, '46ffb128600524e5a1fac5feeaa7e2f88a0c215c32088f4bb2756ae515f6381b');
+  // v2: false announcements no longer apply factual shocks; added employee actions are explicitly masked.
+  assert.equal(digest, 'ac6a3919c62da8922c0af0f1647c94ee446eeae7933ec26e7e02273c6dbf8865');
 });

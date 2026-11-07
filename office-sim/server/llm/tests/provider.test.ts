@@ -49,6 +49,7 @@ try {
       const request = new Request(input, init);
       assert.equal(request.url, 'https://api.anthropic.com/v1/messages');
       const body = await request.json();
+      assert.equal(body.max_tokens, llmConfig.maxOutputTokens);
       prompts.push(body.messages[0].content);
       return Response.json(message('```json\n' + JSON.stringify(output) + '\n```'));
     },
@@ -58,7 +59,7 @@ try {
   assert.equal(metrics.length, 1);
   assert.deepEqual(metrics[0].usage, { promptTokens: 170, completionTokens: 55 });
   const prompt = prompts[0];
-  assert.ok(prompt.startsWith("You're not an assistant, and you're not here to give good advice. You're a person at work, reacting in the moment the way you really would."));
+  assert.ok(prompt.startsWith('You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.'));
   assert.ok(prompt.includes("You've had a headache since this morning and can't get through your list."));
   assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, this morning. you generally trust them.'));
   assert.ok(prompt.includes('A new manager starts today.'));
