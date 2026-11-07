@@ -337,7 +337,7 @@ h3 { font-size: 14px; font-weight: 500; }
 .wall-picture { transform: scale(1.4); transform-origin: top; top: 36px; }
 .bookcase, .plant, .cooler, .exit { transform: scale(1.4); transform-origin: bottom; }
 .clock-hud { position: absolute; top: 17px; left: 50%; transform: translateX(-50%); width: max-content; padding: 0 12px 10px; background: #243b4499; text-shadow: 1px 1px #20313a; }
-.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 14px; }
+.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 14px; font-variant-numeric: tabular-nums; }
 .clock-readout strong { font: 32px 'VCR OSD Mono', monospace; color: #f2e6bf; font-variant-numeric: tabular-nums; }
 .playback-status { color: #d2d9c6; font-size: 12px; min-width: 48px; }
 .playback { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 6px; }

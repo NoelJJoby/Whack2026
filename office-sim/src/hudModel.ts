@@ -13,8 +13,8 @@ export function playerText(text: string) {
     .replace(/\ba tick\b/gi, 'An hour').replace(/\bticks\b/gi, 'hours').replace(/\btick\b/gi, 'hour');
 }
 export function timeLabel(tick: number) {
-  const { day, hour } = workdayTime(tick);
-  return `Day ${day}, ${String(hour).padStart(2, '0')}:00`;
+  const { month, dayOfMonth, hour } = workdayTime(tick);
+  return `Day ${dayOfMonth} (M${month}), ${String(hour).padStart(2, '0')}:00`;
 }
 export type Metric = 'Stress' | 'Burnout' | 'Trust in management' | 'Workload';
 export function metricState(label: Metric, value: number, burnoutThreshold: number) {
