@@ -57,3 +57,9 @@ The UI shows the active mode in the top bar.
 - Confirm start/play/pause/reset/step routes mutate the singleton state.
 - Confirm inject accepts a valid event type and truth flag, and rejects anything else with a 400.
 - Confirm state payloads and feed history remain consistent across updates.
+
+## Backend share price
+
+The existing main-branch stock ticker/chart now consumes the deterministic backend price through current snapshots and SSE history. No extra chart, controls or styling are added. Price combines fixed-seat output, decaying news, six-tick false-claim corrections and an isolated seeded noise stream. Optional feedback defaults off; select it before starting via `/api/sim/settings` with `{ "price_feedback": true }`, or CLI `--price-feedback`.
+
+See [backend implementation and measured acceptance](docs/share-price-implementation.md) for API details, commands, ten-seed results and the remaining calm-volatility tuning target.

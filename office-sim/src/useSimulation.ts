@@ -2,7 +2,7 @@
 // `useSimulation()` for the SSE stream and the controls.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ApiError, CastResponse, HistoryResponse, ModeReason, SimResponse, StreamMessage, TickFrame } from '../shared/api';
+import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 
@@ -46,6 +46,8 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   cast: AgentProfile[];
   maxTicks: number;
+  price: PriceDTO | null;
+  initialPrice: number;
   speed: number;
   setSpeed: (speed: number) => Promise<boolean>;
   mode: SimulationMode | null;
@@ -81,7 +83,7 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state, price: next.price, initial_price: next.initial_price, price_feedback: next.price_feedback });
   }, []);
 
   const replaceHistory = useCallback(
@@ -160,6 +162,8 @@ export function useSimulation(): Simulation {
     cast: cast?.agents ?? [],
     speed: snapshot?.speed ?? 1,
     setSpeed: (speed) => post('/sim/speed', { speed }),
+    price: snapshot?.price ?? null,
+    initialPrice: snapshot?.initial_price ?? 100,
     maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,

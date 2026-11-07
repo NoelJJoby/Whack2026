@@ -20,6 +20,7 @@ import type { CallMetrics } from './llm/client';
 import { withRequestMetrics } from './llm/telemetry';
 import { crackOrderFromEvents, firstQuitTime } from './metrics';
 import { DEFAULT_PARAMS, type Params } from './params';
+import { applyPriceFeedback, createPriceState, updatePrice, workforceReport } from './price';
 import { rngFactory, stream } from './rng';
 import { applyEvent, checkQuit, passiveUpdate, resolveAction, type ResolveResult } from './rules';
 
@@ -66,6 +67,8 @@ export function injectEvent(state: SimulationState, event: EventType): Simulatio
 
 export function createWorld(cast: CastMember[], seed: number, params: Params = DEFAULT_PARAMS): World {
   const ids = cast.map((c) => c.profile.id);
+  const price = createPriceState(params.price, ids.length);
+  if (new Set(ids).size !== ids.length) throw new Error('Duplicate roster ids');
   const agents: Record<string, EngineAgent> = {};
   for (const c of cast) {
     const others = ids.filter((id) => id !== c.profile.id);
@@ -85,7 +88,7 @@ export function createWorld(cast: CastMember[], seed: number, params: Params = D
       claims: [],
     };
   }
-  return { seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [] };
+  return { seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
 }
 
 /** Judge injection: the event applies at the start of the next tick. Returns a new world. */
@@ -203,12 +206,12 @@ export interface TickResult {
   log: EngineTickLog;
 }
 
-export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'>;
+export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>>;
 
 /**
- * One tick: apply event -> agent turns (LLM, all on the start-of-tick
+ * One tick: previous-return feedback -> apply event -> agent turns (LLM, all on the start-of-tick
  * snapshot) -> bias engine -> resolve in seeded order -> passive updates ->
- * quit check -> record. Never mutates `world`.
+ * quit check -> price -> record. Never mutates `world`.
  */
 export async function runTick(
   world: World,
@@ -219,6 +222,7 @@ export async function runTick(
   const w = structuredClone(world);
   w.tick += 1;
   const t = w.tick;
+  const feedbackDeltas = config.priceFeedback ? applyPriceFeedback(world.price, w.ids.map(id => w.agents[id]), params) : [];
 
   // 1. Apply events: scripted for this tick, then anything the judges queued.
   const pending: QueuedEvent[] = [
@@ -271,6 +275,8 @@ export async function runTick(
     }
   }
 
+  const seats = w.ids.map(id => ({ id, action: decisions[id]?.action ?? null, burnout: w.agents[id].state.burnout }));
+
   // 4. Resolve in order.
   const results: Record<string, ResolveResult> = {};
   for (const id of order) results[id] = resolveAction(w, id, decisions[id], params, rngFactory(w.seed, t, id));
@@ -287,6 +293,15 @@ export async function runTick(
     }
   }
 
+  const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
+  const valuation = updatePrice(world.price, {
+    tick: t, events, leaks, claims: w.claims, seats,
+    postQuit: w.ids.map(id => ({ id, active: w.agents[id].status === 'active', state: w.agents[id].state })),
+    feedback: config.priceFeedback ?? false, feedbackDeltas,
+  }, params.price, stream(w.seed, t, '*', 'price'));
+  w.price = valuation.state;
+  w.priceRecord = valuation.record;
+
   // 7. Record.
   const firstEvent = events[0]?.type ?? null;
   const records: TickRecord[] = order.map((id) => ({
@@ -302,6 +317,7 @@ export async function runTick(
   for (const id of w.ids) states[id] = { ...structuredClone(w.agents[id].state), status: w.agents[id].status };
 
   const log: EngineTickLog = {
+    price: valuation.record,
     tick: t,
     events,
     order,
@@ -313,7 +329,7 @@ export async function runTick(
     })),
     hops: order.flatMap((id) => (results[id].hop ? [results[id].hop!] : [])),
     verifications: order.flatMap((id) => (results[id].verification ? [results[id].verification!] : [])),
-    leaks: order.flatMap((id) => (results[id].leak ? [results[id].leak!] : [])),
+    leaks,
     quits,
     states,
     reach: claimReach(w),
@@ -335,6 +351,10 @@ export interface RunSummary {
   reach: { true_holders: number; false_holders: number };
   leaks: number;
   fallbacks: number;
+  price: number;
+  priceFeedback: boolean;
+  headcount: number;
+  morale: number | null;
 }
 
 export interface RunResult {
@@ -361,6 +381,9 @@ export function summariseRun(world: World, config: RunConfig, logs: EngineTickLo
     quits: world.quits.length,
     reach: claimReach(world),
     leaks: world.leaks.length,
+    price: world.price.price,
+    priceFeedback: config.priceFeedback,
+    ...workforceReport(world.ids.map(id => ({ id, active: world.agents[id].status === 'active', state: world.agents[id].state }))),
     fallbacks: logs.reduce((n, l) => n + l.decisions.filter((d) => d.fallback).length, 0),
   };
 }

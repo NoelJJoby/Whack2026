@@ -122,7 +122,7 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
     captured.push({ tick: ctx.tick, agent: agent.id, ctx: structuredClone(ctx), prompt: buildTurnPrompt(agent, ctx) });
     return real(agent, ctx);
   };
-  const config: RunConfig = { seed, mode, ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true };
+  const config: RunConfig = { seed, mode, ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: false };
   const originalKey = process.env.ANTHROPIC_API_KEY;
   const originalInfo = console.info;
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';

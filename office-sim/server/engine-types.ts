@@ -1,6 +1,7 @@
 // Engine-local types: anything the engine needs that shared/types.ts does not
 // (yet) define. Proposed shared-type changes are in docs/engine-handoff.md.
 import type { Action, AgentProfile, AgentState, Claim, EventType, TickRecord } from '../shared/types';
+import type { PriceState, PriceRecord } from './price';
 import type { ClaimImpact, Params } from './params';
 
 export type { Action, AgentState, EventType, TickRecord, Params };
@@ -126,6 +127,8 @@ export interface ScenarioEvent {
 export type QueuedEvent = Omit<ScenarioEvent, 'tick'>;
 
 export interface World {
+  price: PriceState;
+  priceRecord: PriceRecord | null;
   seed: number;
   tick: number;
   /** Agent ids in cast order (stable). */
@@ -145,6 +148,8 @@ export interface RunConfig {
   /** Ablation toggles (agent.md). */
   gossip: boolean;
   billboard: boolean;
+  /** Run-level option, default off in runners and API. */
+  priceFeedback: boolean;
 }
 
 // --- Turn provider (the LLM is injected) -----------------------------------
@@ -226,6 +231,7 @@ export interface HopLog {
 }
 
 export interface EngineTickLog {
+  price: PriceRecord;
   tick: number;
   events: Array<{ type: EventType; is_true: boolean; claim: string }>;
   order: string[];

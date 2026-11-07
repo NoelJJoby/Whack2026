@@ -8,7 +8,7 @@ import { createStubProvider } from '../stub-provider';
 import { createWorld, queueEvent, runSimulation, runTick, toSimulationState } from '../tick';
 
 const config = (over: Partial<RunConfig> = {}): RunConfig => ({
-  seed: 42, mode: 'llm_bias', ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, ...over,
+  seed: 42, mode: 'llm_bias', ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: false, ...over,
 });
 
 const run = (c: RunConfig, provider = createStubProvider(c.seed)) => runSimulation(fixtureCast(c.seed), c, provider);
