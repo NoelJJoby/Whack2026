@@ -9,15 +9,19 @@ This project provides the integration shell for an office simulation backend and
    ```bash
    pnpm install
    ```
-3. Start the backend:
+3. Run the automated test suite:
+   ```bash
+   pnpm test
+   ```
+4. Start the backend:
    ```bash
    PORT=3010 ./node_modules/.bin/tsx server/index.ts
    ```
-4. Start the frontend:
+5. Start the frontend:
    ```bash
    ./node_modules/.bin/vite --host 0.0.0.0 --port 5173
    ```
-5. Open the app at http://localhost:5173.
+6. Open the app at http://localhost:5173.
 
 ## API surface
 
