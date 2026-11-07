@@ -27,6 +27,7 @@ const BriefSchema = z.object({
         action: z.string(),
         weight: z.number().optional(),
         target: z.string().nullable().optional(),
+        claim: z.string().nullable().optional(),
       }),
     )
     .min(1),
@@ -74,7 +75,7 @@ export function toLlmOutput(raw: unknown): AdaptResult {
     }
   }
 
-  let rawProposals: Array<{ action: string; weight?: number; target?: string | null }>;
+  let rawProposals: Array<{ action: string; weight?: number; target?: string | null; claim?: string | null }>;
   let public_line: string;
   let inner_monologue: string;
   let beliefs: Record<string, number> = {};
@@ -88,7 +89,9 @@ export function toLlmOutput(raw: unknown): AdaptResult {
   } else {
     const turn = TurnSchema.safeParse(value);
     if (!turn.success) return fail('schema_mismatch');
-    rawProposals = [{ action: turn.data.action, weight: 1, target: turn.data.target ?? null }];
+    rawProposals = [
+      { action: turn.data.action, weight: 1, target: turn.data.target ?? null, claim: turn.data.claim_id ?? null },
+    ];
     public_line = turn.data.public_line;
     inner_monologue = turn.data.inner_monologue;
   }
@@ -108,7 +111,7 @@ export function toLlmOutput(raw: unknown): AdaptResult {
     }
     const prev = merged.get(action);
     if (prev) prev.weight += weight;
-    else merged.set(action, { action, weight, ...(p.target ? { target: p.target } : {}) });
+    else merged.set(action, { action, weight, ...(p.target ? { target: p.target } : {}), ...(p.claim ? { claim: p.claim } : {}) });
   }
 
   const proposals = [...merged.values()]

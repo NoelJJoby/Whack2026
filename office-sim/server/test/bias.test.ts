@@ -274,6 +274,28 @@ describe('bias engine: determinism and fallback', () => {
     assert.equal(forceComplain(only('nobody')).target, 'tom');
   });
 
+  it('the LLM claim is used when valid, otherwise the belief rule picks one', () => {
+    const held = (claimId: string) => ({ claimId, from: 'tom', tickHeard: TICK - 4, depth: 1, belief: null, verified: null });
+    const mk = () => {
+      const lena = makeAgent('lena', { source_trust: { tom: 70 } }, {}, { claims: [held('a'), held('b'), held('s')] });
+      return { agent: lena, world: makeWorld([lena, makeAgent('tom', {}), makeAgent('priya', {})],
+        [makeClaim('a'), makeClaim('b'), makeClaim('s', { scandal: true })], TICK) };
+    };
+    const forced = (action: Action, claim: string, beliefs: Record<string, number> = {}) => {
+      const w = mk();
+      const llm: LlmOutput = { ...lenaLlm, beliefs, proposals: [{ action, weight: 1, claim }] };
+      return decide({ ...w, llm, mode: 'llm_raw', rngs, params: P });
+    };
+    // Valid picks are honoured, even when the belief rule would choose differently.
+    assert.equal(forced('gossip', 'b', { a: 90, b: 10 }).claim, 'b');
+    assert.equal(forced('verify', 'a').claim, 'a');
+    assert.equal(forced('leak', 's').claim, 's'); // source trust 70 >= 60: believed
+    // Not held: fall back to the rule (highest effective belief).
+    assert.equal(forced('gossip', 'nope', { a: 90, b: 10 }).claim, 'a');
+    // Leak of a non-scandal claim is not valid; the believed scandal is used instead.
+    assert.equal(forced('leak', 'a').claim, 's');
+  });
+
   it('null LLM output in an LLM mode runs as rules and logs the fallback', () => {
     const w = lenaWorld();
     const d = decide({ ...w, llm: null, mode: 'llm_bias', rngs, params: P, options: { fallbackReason: 'invalid_json' } });

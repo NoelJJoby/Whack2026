@@ -109,6 +109,19 @@ function believedScandals(agent: EngineAgent, world: World, beliefs: Beliefs, p:
   );
 }
 
+/** Whether `claimId` may be used for `action` by this agent (held; for leak, a believed scandal). */
+export function claimValidFor(
+  action: 'gossip' | 'verify' | 'leak',
+  claimId: string,
+  agent: EngineAgent,
+  world: World,
+  beliefs: Beliefs,
+  p: Params,
+): boolean {
+  if (action === 'leak') return believedScandals(agent, world, beliefs, p).some((h) => h.claimId === claimId);
+  return agent.claims.some((h) => h.claimId === claimId);
+}
+
 export function hasBelievedScandal(agent: EngineAgent, world: World, beliefs: Beliefs, p: Params): boolean {
   return believedScandals(agent, world, beliefs, p).length > 0;
 }

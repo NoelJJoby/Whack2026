@@ -1,6 +1,6 @@
 // Bias engine (docs/bias-engine-brief.md). One pure decide(): same inputs and
 // seed give the same decision. It never mutates state.
-import { heardFresh, pickGossipClaim, pickLeakClaim, pickVerifyClaim, hasBelievedScandal } from './claims';
+import { claimValidFor, heardFresh, pickGossipClaim, pickLeakClaim, pickVerifyClaim, hasBelievedScandal } from './claims';
 import {
   ACTIONS,
   LLM_MODES,
@@ -186,14 +186,20 @@ export function normalise(scores: PartialActionMap): PartialActionMap {
 
 // --- Step 8: settle claim and target -----------------------------------------
 
+/** The LLM's claim for the sampled action if valid; otherwise the brief's rule. */
 export function settleClaim(
   action: Action,
+  llm: LlmOutput | null,
   agent: EngineAgent,
   world: World,
   beliefs: Record<string, number>,
   rng: Rng,
   p: Params,
 ): string | null {
+  if (action === 'gossip' || action === 'verify' || action === 'leak') {
+    const proposed = llm?.proposals.find((q) => q.action === action)?.claim;
+    if (proposed && claimValidFor(action, proposed, agent, world, beliefs, p)) return proposed;
+  }
   switch (action) {
     case 'gossip':
       return pickGossipClaim(agent, world, beliefs, rng, p);
@@ -393,8 +399,9 @@ export function decide(input: DecideInput): Decision {
   const { value: action, draw } = rngs('action').pick(probs, ACTIONS);
 
   // 8. Settle claim and target (separate streams).
-  const claim = settleClaim(action, agent, world, beliefs, rngs('claim'), p);
-  const target = settleTarget(action, claim, effective === 'rules' ? null : llm, agent, world, rngs('target'), p);
+  const settleLlm = effective === 'rules' ? null : llm;
+  const claim = settleClaim(action, settleLlm, agent, world, beliefs, rngs('claim'), p);
+  const target = settleTarget(action, claim, settleLlm, agent, world, rngs('target'), p);
 
   const useLlmText = !fallback && llm && (llm.public_line || llm.inner_monologue);
   const lines = useLlmText

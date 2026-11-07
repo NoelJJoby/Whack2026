@@ -29,7 +29,10 @@ export const LLM_MODES: readonly Mode[] = ['llm_bias', 'llm_raw'];
 export interface Proposal {
   action: Action;
   weight: number;
+  /** Colleague id; used if valid for the sampled action, otherwise drawn by affinity / source trust. */
   target?: string | null;
+  /** Held claim id for gossip / verify / leak; used if valid, otherwise picked by effective belief. */
+  claim?: string | null;
 }
 
 export interface LlmOutput {

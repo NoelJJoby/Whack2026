@@ -26,9 +26,20 @@ describe('llm adapter', () => {
 
   it('turns a single-action LlmTurn into one proposal with weight 1 and no beliefs', () => {
     const r = toLlmOutput({ action: 'gossip', target: 'tom', claim_id: 'c1', public_line: 'hey', inner_monologue: 'hm' });
-    assert.deepEqual(r.output?.proposals, [{ action: 'gossip', weight: 1, target: 'tom' }]);
+    assert.deepEqual(r.output?.proposals, [{ action: 'gossip', weight: 1, target: 'tom', claim: 'c1' }]);
     assert.deepEqual(r.output?.beliefs, {});
     assert.equal(r.output?.public_line, 'hey');
+  });
+
+  it('carries an optional claim per proposal', () => {
+    const r = toLlmOutput({
+      proposals: [{ action: 'gossip', weight: 0.7, target: 'tom', claim: 'c9' }, { action: 'work', weight: 0.3, claim: null }],
+      public_line: 'x', inner_monologue: 'y', beliefs: { c9: 80 },
+    });
+    assert.deepEqual(r.output?.proposals, [
+      { action: 'gossip', weight: 0.7, target: 'tom', claim: 'c9' },
+      { action: 'work', weight: 0.3 },
+    ]);
   });
 
   it('parses JSON strings', () => {
