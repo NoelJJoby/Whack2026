@@ -9,7 +9,7 @@ import { ACTIONS, MODES, type Action, type Mode, type RunConfig } from '../engin
 import { DEFAULT_PARAMS, type Params } from '../params';
 import { createStubProvider } from '../stub-provider';
 import { runSimulation, type RunResult } from '../tick';
-import { CALM_SCENARIO, SHOCK_SCENARIO, fixtureCast } from './fixture';
+import { CALM_SCENARIO, buildScenario, fixtureCast } from './fixture';
 import { parseArgs } from './run-sim';
 
 export const BANDS = ['0-39', '40-69', '70-100'] as const;
@@ -49,13 +49,13 @@ export interface AblationOptions {
 
 export async function runAblation(opts: AblationOptions) {
   const params = opts.params ?? DEFAULT_PARAMS;
-  const scenario = opts.calm ? CALM_SCENARIO : SHOCK_SCENARIO;
   const seeds = Array.from({ length: opts.seeds }, (_, i) => i + 1);
+  const scenario = (seed: number) => (opts.calm ? CALM_SCENARIO : buildScenario(seed, opts.ticks));
   const runs: Record<Mode, RunResult[]> = { llm_bias: [], llm_raw: [], rules: [], random: [] };
 
   for (const mode of MODES) {
     for (const seed of seeds) {
-      const config: RunConfig = { seed, mode, ticks: opts.ticks, scenario, gossip: opts.gossip ?? true, billboard: true, priceFeedback: opts.priceFeedback ?? false };
+      const config: RunConfig = { seed, mode, ticks: opts.ticks, scenario: scenario(seed), gossip: opts.gossip ?? true, billboard: true, priceFeedback: opts.priceFeedback ?? false };
       runs[mode].push(await runSimulation(fixtureCast(seed, params), config, createStubProvider(seed), params));
     }
   }

@@ -5,7 +5,7 @@ import { ACTIONS, type RunConfig, type TurnContext } from '../engine-types';
 import { DEFAULT_PARAMS as P } from '../params';
 import { applyPriceFeedback, createPriceState, normal, toPriceDTO, updatePrice, validatePriceParams, type PriceInput, type PriceState } from '../price';
 import { stream } from '../rng';
-import { fixtureCast, SHOCK_SCENARIO } from '../scripts/fixture';
+import { buildScenario, fixtureCast } from '../scripts/fixture';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, runSimulation, runTick } from '../tick';
 import { makeAgent, makeClaim } from './helpers';
@@ -158,9 +158,10 @@ test('public DTO allowlist omits engine-only metadata and future corrections', (
 test('feedback off reproduces current main workforce over ten seeds and thirty ticks', async () => {
   const results = [];
   for (let seed = 1; seed <= 10; seed++) {
-    const r = await runSimulation(fixtureCast(seed), config({ seed, scenario: SHOCK_SCENARIO }), createStubProvider(seed));
+    const scenario = buildScenario(seed, 30);
+    const r = await runSimulation(fixtureCast(seed), config({ seed, scenario }), createStubProvider(seed));
     results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs: r.logs.map(({ price: _price, ...log }) => log), records: r.records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
-  assert.equal(digest, '60aa1c5165833ee271d7954f462b98787ff8d0d49c3899a7ebf98ec7625f569e');
+  assert.equal(digest, '2a4b0315c64a367fd6bbd6d892dda836a5998af903542415eb61e9dab3f746ee');
 });

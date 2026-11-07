@@ -15,7 +15,7 @@ import { llmConfig } from '../llm/config';
 import { DEFAULT_PARAMS } from '../params';
 import { createStubProvider } from '../stub-provider';
 import { runSimulation, type TickResult } from '../tick';
-import { CALM_SCENARIO, SHOCK_SCENARIO, dataCast, fixtureCast } from './fixture';
+import { CALM_SCENARIO, buildScenario, dataCast, fixtureCast } from './fixture';
 
 export function parseArgs(argv: string[]): Record<string, string | boolean> {
   const out: Record<string, string | boolean> = {};
@@ -91,11 +91,13 @@ export function configFromArgs(args: Record<string, string | boolean>): RunConfi
   if (args['price-feedback'] !== undefined && args['price-feedback'] !== true) throw new Error('--price-feedback is a flag');
   const mode = (args.mode ?? 'llm_bias') as Mode;
   if (!MODES.includes(mode)) throw new Error(`--mode must be one of ${MODES.join(', ')}`);
+  const seed = Number(args.seed ?? 42);
+  const ticks = Number(args.ticks ?? 16);
   return {
-    seed: Number(args.seed ?? 42),
+    seed,
     mode,
-    ticks: Number(args.ticks ?? 16),
-    scenario: args.calm ? CALM_SCENARIO : SHOCK_SCENARIO,
+    ticks,
+    scenario: args.calm ? CALM_SCENARIO : buildScenario(seed, ticks),
     gossip: !args['no-gossip'],
     billboard: !args['no-billboard'],
     priceFeedback: args['price-feedback'] === true,
