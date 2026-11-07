@@ -31,8 +31,8 @@ const ctx: TurnContext = {
 const prompt = buildTurnPrompt(agent, ctx, 'You remember favours and broken promises.');
 const sections = [
   "You're not an assistant, and you're not here to give good advice. You're a person at work, reacting in the moment the way you really would.",
-  'Who you are:', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.", "What you've heard:",
-  "Just announced (it's Day 1, 16:00):", 'Colleagues still here:', 'What you can do:', 'What you say out loud ("public_line"):',
+  'Who you are:', 'It is day 2, 13:00.', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.",
+  "What you've heard:", 'Just announced:', 'Colleagues still here:', 'What you can do:', 'What you say out loud ("public_line"):',
   'Respond with JSON only, in this shape:',
 ];
 let previous = -1;
@@ -42,9 +42,9 @@ for (const section of sections) {
   previous = index;
 }
 assert.ok(prompt.includes("Who you are: You're A1. You work in Engineering. You remember favours and broken promises."));
-assert.ok(prompt.includes('(key: c1), from Rae, earlier this afternoon. you generally trust them. This is a scandal claim.'));
+assert.ok(prompt.includes('(key: c1), from Rae, yesterday afternoon. you generally trust them. This is a scandal claim.'));
 assert.ok(prompt.includes("(key: c2), from management, just now. you don't believe much of what they say."));
-assert.ok(prompt.includes("(key: c3), from the grapevine, an hour ago. you're not sure how far to trust them."));
+assert.ok(prompt.includes("(key: c3), from the grapevine, a couple of hours ago. you're not sure how far to trust them."));
 assert.ok(prompt.includes('A new manager arrives.'));
 assert.ok(prompt.includes('Colleagues still here: Rae'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
@@ -81,7 +81,7 @@ for (const invalid of [
 
 const empty = buildTurnPrompt(agent, { ...ctx, claims: [], colleagues: [], events: [], available: ['work'] });
 assert.ok(empty.includes("What you've heard:\nYou haven't heard anything new."));
-assert.ok(empty.includes("Nothing new has been announced. It's Day 1, 16:00."));
+assert.ok(empty.includes('Nothing new has been announced.'));
 assert.ok(empty.includes('Colleagues still here: None.'));
 assert.deepEqual(LlmOutputSchema.parse(example(empty)).beliefs, {});
 // Each seed deals the placeholder personas out in its own order, one per character.

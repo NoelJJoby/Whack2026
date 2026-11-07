@@ -17,9 +17,14 @@ import type {
 import type { DecisionLog, EventType, SimulationMode, SimulationState, TickRecord } from '../shared/types';
 import type { CastMember, DecisionLog as EngineDecisionLog, ScenarioEvent, TurnProvider, World } from './engine-types';
 import {
-  CUSTOM_EVENT_KINDS, CUSTOM_EVENT_KIND_IDS, CUSTOM_EVENT_LIMITS, checkHeadline, headlineKey,
+  CUSTOM_EVENT_KINDS, CUSTOM_EVENT_LIMITS, checkHeadline, headlineKey,
+  inferCustomEventKind,
+  type CustomEventKind,
+  type GeneratedCustomEvent,
 } from '../shared/customEvent';
+import { TICKS_PER_QUARTER } from '../shared/workday';
 import { createTurnProvider } from './llm';
+import { createCustomEventGenerator } from './llm/customEvent';
 import { createHeadlineReviewer, type HeadlineReviewer } from './llm/moderation';
 import { DEFAULT_PARAMS, eventParams } from './params';
 import { toPriceDTO, workforceReport } from './price';
@@ -37,12 +42,13 @@ loadEnv({
 const randomSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
 const envSeed = Number(process.env.SIM_SEED);
 const DEFAULT_SEED = Number.isInteger(envSeed) && envSeed > 0 ? envSeed : randomSeed();
-/** Default run length, and the most ticks a run may be set to. */
-export const DEFAULT_TICKS = 16;
-export const TICK_LIMIT = 128;
-const TICK_INTERVAL_MS = 2500;
+/** Default run length (1 quarter = 30 days = 150 ticks), and the most ticks a run may be set to (2 quarters = 300 ticks). */
+export const DEFAULT_TICKS = TICKS_PER_QUARTER;
+export const TICK_LIMIT = TICKS_PER_QUARTER * 2;
+/** 150 ticks × 800ms = 120,000ms (2 minutes of real-life time at 1× speed). */
+const TICK_INTERVAL_MS = 800;
 const HEARTBEAT_MS = 15_000;
-const MAX_HISTORY = 200;
+const MAX_HISTORY = 300;
 const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 /** Events of any kind waiting for the next tick; injecting more is refused. */
@@ -51,7 +57,6 @@ const MAX_QUEUED = 4;
 const injectSchema = z.object({ type: z.enum(EVENT_TYPES), is_true: z.boolean().optional() }).strict();
 // The raw text cap is generous; checkHeadline enforces the real limit after normalising.
 const customInjectSchema = z.object({
-  kind: z.enum(CUSTOM_EVENT_KIND_IDS),
   text: z.string().max(CUSTOM_EVENT_LIMITS.maxLength * 4),
   is_true: z.boolean(),
 }).strict() satisfies z.ZodType<CustomInjectRequest>;
@@ -115,6 +120,7 @@ class OfficeSimManager {
   private feed: string[] = [];
   private provider: TurnProvider | null = null;
   private reviewer: HeadlineReviewer | null = null;
+  private customEventGenerator: ((headline: string, kind: CustomEventKind, isTrue: boolean) => Promise<GeneratedCustomEvent>) | null = null;
   /** headlineKey of every custom event accepted or under review this run. */
   private customHeadlines = new Set<string>();
   /** Custom events under review, counted against the pending limit. */
@@ -155,11 +161,13 @@ class OfficeSimManager {
     if (hasApiKey()) {
       this.provider ??= createTurnProvider();
       this.reviewer ??= createHeadlineReviewer();
+      this.customEventGenerator ??= createCustomEventGenerator();
       this.mode = 'llm_bias';
       this.modeReason = 'configured';
     } else {
       this.provider = null;
       this.reviewer = null;
+      this.customEventGenerator = createCustomEventGenerator();
       this.mode = 'rules';
       this.modeReason = 'no_api_key';
     }
@@ -414,6 +422,12 @@ class OfficeSimManager {
     }
   }
 
+  private async generateCustomEvent(kind: CustomEventKind | undefined, text: string, isTrue: boolean): Promise<GeneratedCustomEvent> {
+   const generator = this.customEventGenerator ?? createCustomEventGenerator();
+   const resolvedKind = kind ?? inferCustomEventKind(text);
+   return generator(text, resolvedKind, isTrue);
+  }
+
   /**
    * Queue a player-written event. The kind borrows a built-in event's effects;
    * the text must pass the shared rules and, with an API key, a Claude review.
@@ -421,11 +435,11 @@ class OfficeSimManager {
   async injectCustom(body: unknown) {
     const parsed = customInjectSchema.safeParse(body);
     if (!parsed.success) {
-      throw new ApiFailure(400, 'invalid_event', `Expected { kind: one of ${CUSTOM_EVENT_KIND_IDS.join(', ')}; text: string; is_true: boolean }.`, parsed.error.issues);
+      throw new ApiFailure(400, 'invalid_event', 'Expected { text: string; is_true: boolean }.', parsed.error.issues);
     }
     this.assertNotComplete();
     this.assertCustomRoom();
-    const { kind, is_true } = parsed.data;
+    const { is_true } = parsed.data;
     const check = checkHeadline(parsed.data.text);
     if (!check.ok) throw new ApiFailure(422, 'rejected_event', check.message, { reason: check.code });
     const key = headlineKey(check.text);
@@ -433,6 +447,7 @@ class OfficeSimManager {
       throw new ApiFailure(409, 'duplicate_event', 'That announcement has already been posted this run.');
     }
 
+    const inferredKind = inferCustomEventKind(check.text);
     // Reserve the headline and a pending slot while the review is out, so
     // concurrent requests can't slip past the limits or post it twice.
     const generation = this.generation;
@@ -440,7 +455,7 @@ class OfficeSimManager {
     this.reviewing += 1;
     let verdict;
     try {
-      verdict = this.reviewer ? await this.reviewer(check.text, CUSTOM_EVENT_KINDS[kind].label) : null;
+      verdict = this.reviewer ? await this.reviewer(check.text) : null;
     } finally {
       this.reviewing -= 1;
     }
@@ -458,8 +473,16 @@ class OfficeSimManager {
       throw error;
     }
 
-    this.world = queueEvent(this.world, { type: CUSTOM_EVENT_KINDS[kind].base, isTrue: is_true, text: check.text, custom: true });
-    this.feed.push(`Queued custom event: ${check.text}`);
+    const generated = await this.generateCustomEvent(inferredKind, check.text, is_true);
+    this.world = queueEvent(this.world, {
+      type: CUSTOM_EVENT_KINDS[inferredKind].base,
+      isTrue: is_true,
+      text: generated.headline,
+      custom: true,
+      customEffects: generated.effects,
+      customMeta: { severity: generated.severity, durationTicks: generated.durationTicks, summary: generated.summary },
+    });
+    this.feed.push(`Queued custom event: ${generated.headline}`);
     this.emitState();
     return this.response();
   }

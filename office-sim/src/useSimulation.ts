@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
-import type { CustomEventKind } from '../shared/customEvent';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 import { createAnnouncements, type Announcement } from './announcement';
 import { playerText } from './hudModel';
 
-/** Run lengths offered in the UI. The server accepts any integer from 1 to 128. */
-export const RUN_LENGTHS = [16, 32, 64, 128];
+/** Run lengths offered in the UI: 1 week (25), 1 month (50), 2 months (100), 1 quarter (150). */
+export const RUN_LENGTHS = [25, 50, 100, 150];
 
 /** Dev only: `VITE_USE_MOCKS=true` renders the design mock data instead of the server. */
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
@@ -71,7 +70,7 @@ export interface Simulation {
   setRunLength: (maxTicks: number) => Promise<boolean>;
   inject: (type: EventType, isTrue: boolean) => Promise<boolean>;
   /** Post a player-written headline; the server validates it and may reject it. */
-  injectCustom: (kind: CustomEventKind, text: string, isTrue: boolean) => Promise<boolean>;
+  injectCustom: (text: string, isTrue: boolean) => Promise<boolean>;
 }
 
 const errorText = (e: unknown) => playerText(e instanceof Error ? e.message : 'Request failed. Try again.');
@@ -195,6 +194,6 @@ export function useSimulation(): Simulation {
     newSeed: (seed) => post('/sim/new-seed', seed === undefined ? undefined : { seed }),
     setRunLength: (maxTicks) => post('/sim/settings', { max_ticks: maxTicks }),
     inject: (type, isTrue) => post('/sim/inject', { type, is_true: isTrue }),
-    injectCustom: (kind, text, isTrue) => post('/sim/inject-custom', { kind, text, is_true: isTrue }),
+    injectCustom: (text, isTrue) => post('/sim/inject-custom', { text, is_true: isTrue }),
   };
 }

@@ -63,3 +63,7 @@ The UI shows the active mode in the top bar.
 The existing main-branch stock ticker/chart now consumes the deterministic backend price through current snapshots and SSE history. No extra chart, controls or styling are added. Price combines fixed-seat output, decaying news, six-tick false-claim corrections and an isolated seeded noise stream. Optional feedback defaults off; select it before starting via `/api/sim/settings` with `{ "price_feedback": true }`, or CLI `--price-feedback`.
 
 See [backend implementation and measured acceptance](docs/share-price-implementation.md) for API details, commands, ten-seed results and the remaining calm-volatility tuning target.
+
+## Overtime
+
+Each tick represents one hour ending at the displayed time. Hours ending at 18:00 through 24:00 are overtime; the next simulated day resumes at 08:00 (the overnight interval is skipped). Every active employee receives +2 stress and +1 burnout per overtime hour, in addition to their chosen action, before passive updates and the quit check. Values are clamped to the existing 0–100 limits. The separate `overwork` action means taking on extra work and retains its own effects; the long-hours policy remains a separate workload and trust shock. The model assumes everyone active is still on shift, even when their action is an interview or other non-work activity. There is currently no leaving-early or overnight recovery mechanic. These values are initial tuning parameters in `server/params.ts`.

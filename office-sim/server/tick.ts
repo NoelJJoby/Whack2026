@@ -1,3 +1,4 @@
+import { isOvertime } from '../shared/workday';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import { availableActions, decide } from './bias';
 import { claimReach } from './claims';
@@ -22,7 +23,7 @@ import { crackOrderFromEvents, firstQuitTime } from './metrics';
 import { DEFAULT_PARAMS, type Params } from './params';
 import { applyPriceFeedback, createPriceState, updatePrice, workforceReport } from './price';
 import { rngFactory, stream } from './rng';
-import { applyEvent, checkQuit, passiveUpdate, resolveAction, type ResolveResult } from './rules';
+import { applyDelta, applyEvent, checkQuit, passiveUpdate, resolveAction, type ResolveResult } from './rules';
 import { ensureExamples, initSpeech, planRound, recordRound, reviewRound, speechContext } from './speech';
 
 export function createInitialSimulation(seed = 42): SimulationState {
@@ -308,8 +309,13 @@ export async function runTick(
   const results: Record<string, ResolveResult> = {};
   for (const id of order) results[id] = resolveAction(w, id, decisions[id], params, rngFactory(w.seed, t, id));
 
-  // 5. Passive updates, then 6. quit check.
-  for (const id of activeIds) passiveUpdate(w.agents[id], params);
+  // 5. Overtime affects everyone still on shift, regardless of their chosen action.
+  // Apply it before passive updates and the quit check so both can react this tick.
+  for (const id of activeIds) {
+    if (isOvertime(t)) applyDelta(w.agents[id], params.rules.overtime, params);
+    passiveUpdate(w.agents[id], params);
+  }
+  // 6. Quit check.
   const quits: string[] = [];
   for (const id of activeIds) {
     if (checkQuit(w.agents[id], t, params)) {

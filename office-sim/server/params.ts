@@ -234,6 +234,7 @@ export const ruleParams = {
     interview: { loyalty: -3, stress: -2 },
     leak: { trust_mgmt: -8, leakerStress: 5 },
   },
+  overtime: { stress: 2, burnout: 1 },
   passive: {
     /**
      * Stress relaxes toward target = stressBase + stressPerExcessWorkload * max(0, workload - comfortable),
@@ -500,8 +501,8 @@ export const voiceParams = {
     surprise_bonus: ['bonus', 'paycheque', 'paycheck', 'payout'],
     competitor_poaching: ['competitor', 'recruit', 'poach', 'rival', 'jump ship', 'signing'],
   } as Record<EventType, string[]>,
-  /** Mirrors src/Workday.tsx: 16 ticks a day, the first at 09:00. */
-  clock: { ticksPerDay: 16, firstHour: 9, afternoonFrom: 12, eveningFrom: 17 },
+  /** Parts of the day for "heard yesterday afternoon"; the times themselves come from shared/workday.ts. */
+  clock: { afternoonFrom: 12, eveningFrom: 17 },
 };
 
 export type VoiceParams = typeof voiceParams;

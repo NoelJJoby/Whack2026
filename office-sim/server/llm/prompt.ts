@@ -1,7 +1,8 @@
+import { isOvertime, workdayTime } from '../../shared/workday';
 import type { Action, EngineProfile, TurnContext } from '../engine-types';
 import { voiceParams } from '../params';
 import { stateParagraph } from './bands';
-import { clockPhrase, heardWhen } from './clock';
+import { heardWhen } from './clock';
 import { temporaryPersonaFor } from './personas';
 import {
   ambitionSentence, ethicsSentence, financialNeedSentence, impulsivitySentence,
@@ -10,7 +11,7 @@ import {
 
 const actionMeanings: Record<Action, string> = {
   work: 'Work normally',
-  overwork: 'Stay late; take on more',
+  overwork: 'Take on extra work',
   slack_off: 'Disengage for the day',
   complain: 'Vent to a colleague',
   gossip: 'Pass a claim to a colleague',
@@ -58,7 +59,6 @@ export function buildTurnPrompt(
   const traits = agent.traits;
   const keys = claimKeys(ctx);
   const speech = ctx.speech;
-  const now = clockPhrase(ctx.tick, v.clock);
   const claims = ctx.claims.map(claim => {
     // Management uses management trust; unknown sources use the neutral band.
     const trust = claim.from === 'mgmt' ? ctx.state.trust_mgmt
@@ -81,11 +81,12 @@ export function buildTurnPrompt(
       ethicsSentence(traits.ethics), sociabilitySentence(traits.sociability),
       impulsivitySentence(traits.impulsivity),
     ].join(' ')}`,
+    `It is day ${workdayTime(ctx.tick).day}, ${String(workdayTime(ctx.tick).hour).padStart(2, '0')}:00.${isOvertime(ctx.tick) ? ' The current hour is overtime.' : ''}`,
     `How you feel right now: ${stateParagraph(ctx.state, speech?.feelings)}\nThese describe how you feel. Don't reuse their wording.`,
     `What you've heard:\n${claims.length ? claims.join('\n') : "You haven't heard anything new."}`,
     ctx.events.length
-      ? `Just announced (it's ${now}):\n${ctx.events.map(event => `- ${JSON.stringify(event.text)}`).join('\n')}`
-      : `Nothing new has been announced. It's ${now}.`,
+      ? `Just announced:\n${ctx.events.map(event => `- ${JSON.stringify(event.text)}`).join('\n')}`
+      : 'Nothing new has been announced.',
     `Colleagues still here: ${ctx.colleagues.map(c => (c.group ? `${c.name} (${c.group})` : c.name)).join(', ') || 'None.'}`,
     `What you can do:\n${ctx.available.map(action => `- ${action}: ${actionMeanings[action]}`).join('\n')}\nComplain, gossip and verify need a colleague's name as "target". When proposing gossip, verify or leak, you may give a claim key from above (such as c1) as "claim".`,
     speech ? `How you talk: ${speech.voice}\nThis time: ${speech.manner}` : '',

@@ -240,7 +240,7 @@ for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   await page.emulateMedia({reducedMotion:null});
   // Every record of a round stays in the Office wire, beyond the five-line cap.
   await page.getByRole('button',{name:'Expand Office wire history',exact:true}).click();
-  assert.equal(await page.locator('.feed-entry time',{hasText:/^Day 1, 16:00$/}).count(),base.records.length);
+  assert.equal(await page.locator('.feed-entry time',{hasText:/^Day 2, 13:00$/}).count(),base.records.length);
   await page.getByRole('button',{name:'Collapse Office wire history',exact:true}).click();
   // Space is pause/play; Hold for dialogue pauses until the round has played. Start from a fresh history so the run isn't finished.
   await page.evaluate(data=>(window as any).__stream.onmessage({data:JSON.stringify(data)}),{type:'history',...mockResponse,history:mockHistory});
@@ -435,14 +435,14 @@ await page.route('**/api/sim/*',async route=>{
  await route.fulfill({json:mockResponse});
 });
 await page.getByRole('button',{name:'Simulation',exact:true}).click();
-await page.getByRole('button',{name:'32 hours',exact:true}).click();
+await page.getByRole('button',{name:'1 month (10d)',exact:true}).click();
 await page.getByRole('button',{name:'Advance one hour',exact:true}).click();
 await page.getByRole('button',{name:'Reset run',exact:true}).click();
 await page.getByRole('button',{name:'New run',exact:true}).click();
 await page.keyboard.press('Escape');
 await page.getByRole('button',{name:'2×',exact:true}).click();
 await page.getByRole('button',{name:'Play',exact:true}).click();
-assert.ok(requests.some(request=>request.path==='/api/sim/settings'&&(request.body as any).max_ticks===32));
+assert.ok(requests.some(request=>request.path==='/api/sim/settings'&&(request.body as any).max_ticks===50));
 assert.ok(requests.some(request=>request.path==='/api/sim/step'));
 assert.ok(requests.some(request=>request.path==='/api/sim/reset'));
 assert.ok(requests.some(request=>request.path==='/api/sim/new-seed'));

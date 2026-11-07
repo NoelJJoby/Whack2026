@@ -60,7 +60,7 @@ try {
   const prompt = prompts[0];
   assert.ok(prompt.startsWith("You're not an assistant, and you're not here to give good advice. You're a person at work, reacting in the moment the way you really would."));
   assert.ok(prompt.includes("You've had a headache since this morning and can't get through your list."));
-  assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, this afternoon. you generally trust them.'));
+  assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, this morning. you generally trust them.'));
   assert.ok(prompt.includes('A new manager starts today.'));
   assert.ok(prompt.includes('Colleagues still here: Rae'));
   const actions = prompt.split('What you can do:\n')[1].split('\n\n')[0]

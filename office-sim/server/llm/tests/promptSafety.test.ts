@@ -50,7 +50,7 @@ for (const condition of ['calm', 'high-stress'] as const) {
     assert.doesNotMatch(prompt, /"(?:stress|burnout|loyalty|trust_mgmt|ambition|financial_need|ethics|sociability|impulsivity|affinity)"\s*:/);
     // The claim is from the ops manager: by name to colleagues; ops itself can't hear from itself.
     const from = id === 'ops' ? 'the grapevine' : world.agents.ops.profile.name;
-    assert.ok(prompt.includes(`(key: c1), from ${from}, earlier this afternoon.`));
+    assert.ok(prompt.includes(`(key: c1), from ${from}, yesterday afternoon.`));
     assert.doesNotMatch(prompt, /claim-4|\btick/i);
     assert.doesNotMatch(prompt, LABELS);
     for (const other of world.ids) assert.doesNotMatch(outsideActions(prompt), new RegExp(`\\b${other}\\b`), `raw id ${other}`);

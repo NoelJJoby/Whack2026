@@ -109,4 +109,4 @@ export const mockHistory: TickFrame[] = Array.from({ length: TICKS }, (_, i) => 
   return { price: priceAt(t), tick: t, records: recordsAt(t), events: events[t] ? [events[t]] : [], state: stateAt(t) };
 });
 
-export const mockResponse: SimResponse = { price: priceAt(TICKS), initial_price: 100, price_feedback: false, mode: 'rules', mode_reason: 'configured', max_ticks: 16, state: stateAt(TICKS) };
+export const mockResponse: SimResponse = { price: priceAt(TICKS), initial_price: 100, price_feedback: false, mode: 'rules', mode_reason: 'configured', max_ticks: 150, state: stateAt(TICKS) };

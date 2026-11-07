@@ -1,8 +1,8 @@
-// Player-written billboard events. The player writes the headline and picks a
-// kind; the kind decides the effects by borrowing a built-in event's tuned
-// numbers, so custom text can never set its own stress, trust or price values.
-// checkHeadline runs in the browser for instant feedback and again on the
-// server, which is the real gate.
+// Player-written billboard events. The player writes the headline; the sim
+// infers the office impact from the text and borrows a built-in event's tuned
+// numbers so custom text can never set its own stress, trust or price values
+// directly. checkHeadline runs in the browser for instant feedback and again on
+// the server, which is the real gate.
 import type { EventType } from './types';
 
 export const CUSTOM_EVENT_KINDS = {
@@ -18,6 +18,37 @@ export const CUSTOM_EVENT_KINDS = {
 export type CustomEventKind = keyof typeof CUSTOM_EVENT_KINDS;
 export const CUSTOM_EVENT_KIND_IDS = Object.keys(CUSTOM_EVENT_KINDS) as [CustomEventKind, ...CustomEventKind[]];
 
+export function inferCustomEventKind(raw: string): CustomEventKind {
+  const text = normaliseHeadline(raw).toLowerCase();
+  const scores: Record<CustomEventKind, number> = {
+    restructuring: 0,
+    leadership: 0,
+    harsh_policy: 0,
+    scandal: 0,
+    job_rumour: 0,
+    good_news: 0,
+    poaching: 0,
+  };
+
+  const add = (kind: CustomEventKind, ...patterns: string[]) => {
+    for (const pattern of patterns) {
+      if (text.includes(pattern)) scores[kind] += 2;
+    }
+  };
+
+  add('good_news', 'bonus', 'raise', 'pay rise', 'perk', 'promotion', 'retention', 'extra day off', 'team lunch', 'holiday', 'stock award', 'profit sharing', 'raise pay', 'bonus', 'hiring surge', 'strong quarter', 'growth');
+  add('job_rumour', 'layoff', 'laid off', 'fired', 'fire', 'redundancy', 'downsizing', 'cut jobs', 'headcount', 'restructure team', 'reductions', 'cut staff', 'job losses', 'employment cuts', 'cuts', 'sacked', 'termination', 'staff reduction');
+  add('harsh_policy', 'tariff', 'tariffs', 'tariff shock', 'costs rise', 'cost increase', 'costs spike', 'budget cut', 'raise costs', 'salary freeze', 'expensive', 'new policy', 'return to office', 'mandatory overtime', 'long hours', 'rollbacks', 'tightened rules', 'workday', 'hours', 'budget', 'import costs', 'shipping costs', 'office policy', 'hiring freeze', 'budget pressure', 'price rise', 'rising costs');
+  add('scandal', 'scandal', 'fraud', 'cover-up', 'breach', 'misreporting', 'data leak', 'harassment', 'ethics', 'compliance', 'investigation', 'misconduct', 'cover up');
+  add('poaching', 'poach', 'poaching', 'recruiter', 'rival hire', 'competitor hiring', 'counteroffer', 'jump ship', 'headhunters', 'talent raid');
+  add('leadership', 'ceo', 'chief', 'vp', 'director', 'president', 'executive', 'leadership', 'manager', 'boss', 'new boss', 'shakeup', 'appointment', 'board');
+  add('restructuring', 'reorg', 'reorganisation', 'reorganization', 'merge', 'split', 'department', 'restructure', 'office move', 'team realignment', 'consolidation', 'integration', 'realign', 'reorg plan');
+
+  // The business event model is broad; the most likely pattern wins.
+  const best = (Object.keys(scores) as CustomEventKind[]).sort((a, b) => scores[b] - scores[a])[0];
+  return scores[best] > 0 ? best : 'harsh_policy';
+}
+
 export const CUSTOM_EVENT_LIMITS = {
   minLength: 12,
   maxLength: 140,
@@ -27,6 +58,83 @@ export const CUSTOM_EVENT_LIMITS = {
   /** Custom events accepted in one run. */
   maxPerRun: 12,
 } as const;
+
+export interface CustomEventEffectProfile {
+  morale: number;
+  trust: number;
+  stress: number;
+  burnout: number;
+  productivity: number;
+  churnRisk: number;
+  rumorSpread: number;
+  priceImpact: number;
+}
+
+export interface GeneratedCustomEvent {
+  headline: string;
+  kind: CustomEventKind;
+  is_true: boolean;
+  severity: number;
+  durationTicks: number;
+  summary: string;
+  effects: CustomEventEffectProfile;
+}
+
+export const CUSTOM_EVENT_EFFECT_BOUNDS = {
+  morale: { min: -30, max: 30 },
+  trust: { min: -30, max: 30 },
+  stress: { min: -20, max: 35 },
+  burnout: { min: -15, max: 30 },
+  productivity: { min: -25, max: 25 },
+  churnRisk: { min: 0, max: 25 },
+  rumorSpread: { min: 0, max: 35 },
+  priceImpact: { min: -0.15, max: 0.15 },
+} as const;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+export function clampCustomEventEffects(input: Partial<CustomEventEffectProfile>): CustomEventEffectProfile {
+  const values: CustomEventEffectProfile = {
+    morale: 0,
+    trust: 0,
+    stress: 0,
+    burnout: 0,
+    productivity: 0,
+    churnRisk: 0,
+    rumorSpread: 0,
+    priceImpact: 0,
+  };
+  for (const key of Object.keys(values) as Array<keyof CustomEventEffectProfile>) {
+    const bounds = CUSTOM_EVENT_EFFECT_BOUNDS[key];
+    const raw = Number.isFinite(input[key]) ? Number(input[key]) : 0;
+    values[key] = clamp(raw, bounds.min, bounds.max);
+  }
+  return values;
+}
+
+export const CUSTOM_EVENT_FALLBACK_EFFECTS: Record<CustomEventKind, Partial<CustomEventEffectProfile>> = {
+  restructuring: { morale: -8, trust: -10, stress: 8, burnout: 6, productivity: -6, churnRisk: 8, rumorSpread: 12, priceImpact: -0.03 },
+  leadership: { morale: -4, trust: -8, stress: 6, burnout: 4, productivity: -4, churnRisk: 6, rumorSpread: 8, priceImpact: -0.02 },
+  harsh_policy: { morale: -12, trust: -10, stress: 12, burnout: 10, productivity: -10, churnRisk: 8, rumorSpread: 10, priceImpact: -0.05 },
+  scandal: { morale: -16, trust: -18, stress: 10, burnout: 8, productivity: -8, churnRisk: 10, rumorSpread: 18, priceImpact: -0.07 },
+  job_rumour: { morale: -10, trust: -8, stress: 8, burnout: 6, productivity: -5, churnRisk: 10, rumorSpread: 18, priceImpact: -0.04 },
+  good_news: { morale: 12, trust: 14, stress: -6, burnout: -5, productivity: 6, churnRisk: -8, rumorSpread: -6, priceImpact: 0.03 },
+  poaching: { morale: -12, trust: -8, stress: 7, burnout: 5, productivity: -7, churnRisk: 12, rumorSpread: 14, priceImpact: -0.05 },
+};
+
+export function createFallbackCustomEvent(kind: CustomEventKind, headline: string, isTrue: boolean): GeneratedCustomEvent {
+  const base = CUSTOM_EVENT_FALLBACK_EFFECTS[kind];
+  const effects = clampCustomEventEffects(base);
+  return {
+    headline: headline.trim(),
+    kind,
+    is_true: isTrue,
+    severity: 3,
+    durationTicks: 4,
+    summary: `${CUSTOM_EVENT_KINDS[kind].label}: ${CUSTOM_EVENT_KINDS[kind].hint.toLowerCase()}`,
+    effects,
+  };
+}
 
 export type HeadlineRejection =
   | 'not_text'

@@ -3,6 +3,7 @@
 // dataCast() wraps the LLM and Data lane's cast in data.ts for comparison runs.
 import { buildAgentState, cast } from '../data';
 import type { EventType } from '../../shared/types';
+import { TICKS_PER_QUARTER } from '../../shared/workday';
 import type { CastMember, EngineTraits, ScenarioEvent } from '../engine-types';
 import { DEFAULT_PARAMS, eventParams, type Params } from '../params';
 import { placeholderPersonas } from '../llm/personas';
@@ -166,11 +167,12 @@ export const RUMOUR_FALSE_CHANCE = 0.5;
 export const OFFICIAL_FALSE_CHANCE = 0.15;
 
 /**
- * A seeded billboard schedule: events 2-5 ticks apart (the first lands at 1-4),
- * types dealt from a reshuffled deck so none repeats until all have run, truth
- * drawn per event, and each rumour starting from a random colleague or the
- * grapevine. Its first hearer is left to the event stream at apply time.
- * Extending maxTicks keeps the earlier events unchanged.
+ * A seeded billboard schedule: the first event lands on Day 1 (ticks 1-4) and
+ * subsequent events land 22-26 ticks apart (~1 per workweek, 2 per month,
+ * 6-7 per 150-tick quarter), types dealt from a reshuffled deck so none repeats
+ * until all have run, truth drawn per event, and each rumour starting from a
+ * random colleague or the grapevine. Its first hearer is left to the event
+ * stream at apply time. Extending maxTicks keeps the earlier events unchanged.
  */
 export function buildScenario(seed: number, maxTicks: number, ids: readonly string[] = BASE_CAST.map((c) => c.profile.id)): ScenarioEvent[] {
   const rng = stream(seed, 0, '*', 'event');
@@ -180,7 +182,7 @@ export function buildScenario(seed: number, maxTicks: number, ids: readonly stri
   let tick = 0;
 
   while (true) {
-    tick += (tick === 0 ? 1 : 2) + rng.int(4);
+    tick += tick === 0 ? 1 + rng.int(4) : 22 + rng.int(5);
     if (deck.length === 0) deck = rng.shuffle(CURATED_EVENT_TYPES);
     const type = deck.pop()!;
     const base = eventParams[type];
@@ -193,8 +195,8 @@ export function buildScenario(seed: number, maxTicks: number, ids: readonly stri
   return events;
 }
 
-/** Default seeded shock schedule for the checkpoint and ablations. */
-export const SHOCK_SCENARIO: ScenarioEvent[] = buildScenario(42, 16);
+/** Default seeded shock schedule for the checkpoint and ablations (1 quarter = 150 ticks). */
+export const SHOCK_SCENARIO: ScenarioEvent[] = buildScenario(42, TICKS_PER_QUARTER);
 
 /** No billboard events: the calm baseline. */
 export const CALM_SCENARIO: ScenarioEvent[] = [];
