@@ -29,7 +29,7 @@ const line = (agent: string, publicLine = 'Hi.', inner = 'Hm.'): DialogueLine =>
 test('round skips empty lines and orders quit > leak > gossip > stress jump > other', () => {
   const prev = frame(1, []);
   const round = buildRound(frame(2, [
-    { agent: 'marcus' }, { agent: 'priya', public_line: '   ' }, { agent: 'sam', stress: undefined },
+    { agent: 'marcus' }, { agent: 'priya', public_line: '   ' }, { agent: 'sam' },
     { agent: 'dan', action: 'gossip' }, { agent: 'jess', action: 'leak' }, { agent: 'tom', quit: true },
   ], { sam: 70, marcus: 52 }), prev);
   assert.deepEqual(round.map(l => l.agent), ['tom', 'jess', 'dan', 'sam', 'marcus']);

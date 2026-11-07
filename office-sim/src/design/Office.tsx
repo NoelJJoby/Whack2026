@@ -37,12 +37,14 @@ export interface Person extends Look {
     thinks: string;
     quit: boolean;
 }
-export function Sprite({ person, small = false, quit = false }: {
+export function Sprite({ person, small = false, quit = false, crop = false }: {
     person: Pick<Look, 'color' | 'hair' | 'skin'>;
     small?: boolean;
     quit?: boolean;
+    /** Head and shoulders only, for a square portrait. */
+    crop?: boolean;
 }) {
-    return <svg className={small ? 'sprite small' : 'sprite'} viewBox="0 0 16 24" shapeRendering="crispEdges" aria-hidden="true">
+    return <svg className={small ? 'sprite small' : 'sprite'} viewBox={crop ? '1 0 14 14' : '0 0 16 24'} shapeRendering="crispEdges" aria-hidden="true">
     <path fill="#252836" d="M4 17h8v5H9v-3H7v3H4zM3 22h4v2H3zM9 22h5v2H9z"/>
     <path fill={person.color} d="M4 9h8v9H4zM2 10h2v6H2zM12 10h2v6h-2z"/>
     <path fill={person.skin} d="M5 2h7v7H5zM3 15h2v3H3zM12 15h2v3h-2z"/>

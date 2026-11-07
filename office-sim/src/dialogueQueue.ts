@@ -1,5 +1,6 @@
 // The dialogue bar's round queue and playback state. Pure: no React, no timers.
 import type { TickFrame } from '../shared/api';
+import { playerText } from './hudModel';
 
 /** Lines shown per round; the rest stay in the Office wire only. */
 export const DIALOGUE_CAP = 5;
@@ -29,7 +30,7 @@ export interface DialogueLine {
 /** This round's lines, most dramatic first, capped at DIALOGUE_CAP. */
 export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
   const lines = frame.records.flatMap((record, order) => {
-    const publicLine = record.public_line?.trim() ?? '';
+    const publicLine = playerText(record.public_line?.trim() ?? '');
     if (!publicLine) return [];
     const stress = frame.state.agents[record.agent]?.stress ?? record.state?.stress ?? 0;
     const stressDelta = stress - (prev?.state.agents[record.agent]?.stress ?? stress);
@@ -37,7 +38,7 @@ export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
       : record.action === 'gossip' ? 4 : Math.abs(stressDelta) >= STRESS_JUMP ? 5 : 6;
     return [{ order, line: {
       key: `${frame.tick}-${record.agent}`, tick: frame.tick, agent: record.agent, publicLine,
-      inner: record.inner_monologue?.trim() ?? '', quit: Boolean(record.quit), tier, stress, stressDelta,
+      inner: playerText(record.inner_monologue?.trim() ?? ''), quit: Boolean(record.quit), tier, stress, stressDelta,
     } }];
   });
   return lines

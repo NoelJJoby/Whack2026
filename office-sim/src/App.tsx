@@ -9,6 +9,8 @@ import { EmployeePanel, MenuPanel } from './GamePanel';
 import { ACTION_LABEL, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
 import { quitParams } from '../server/params';
 import { RUN_LENGTHS, useSimulation } from './useSimulation';
+import { useDialogue } from './useDialogue';
+import { DialogueBar, type Speaker } from './DialogueBar';
 import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company';
@@ -57,6 +59,26 @@ export default function App() {
   const complete = hour >= sim.maxTicks;
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
+  const running = state?.running ?? false;
+  const canPlay = !disabled && !complete && (state?.started ?? false);
+  const dialogue = useDialogue({
+    history, paused: menu !== null,
+    setPlaying: play => { if (canPlay && play !== running) void sim.togglePlay(); },
+    onSpace: () => toggle(),
+  });
+  function toggle() {
+    if (disabled || complete) return;
+    dialogue.releaseHold();
+    void (state?.started ? sim.togglePlay() : sim.start());
+  }
+  const speaking = dialogue.line?.agent ?? null;
+  const speaker: Speaker | null = useMemo(() => {
+    if (!speaking) return null;
+    const profile = cast.find(p => p.id === speaking);
+    const look = people.find(p => p.id === speaking)
+      ?? lookFor('', [...speaking].reduce((sum, c) => sum + c.charCodeAt(0), 0));
+    return { name: profile?.name ?? speaking, team: profile?.functionGroup ?? '', look };
+  }, [speaking, cast, people]);
   const select = (id: string) => {
     returnFocus.current = document.querySelector<HTMLButtonElement>(`[data-employee="${CSS.escape(id)}"]`);
     setMenu(null); setSelected(id); setHighlight([]);
@@ -68,7 +90,7 @@ export default function App() {
   return <main className="game-window" aria-label="The Daily Grind">
     <Office people={people} selected={selected} onSelect={select} highlight={highlight}/>
     <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
-    <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={() => void (state?.started ? sim.togglePlay() : sim.start())}/>
+    <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
     {sim.announcement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(sim.announcement.event.text)}</p></div><button className="close" onClick={sim.dismissAnnouncement} aria-label="Dismiss announcement">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
@@ -81,12 +103,19 @@ export default function App() {
         {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
       </div>
     </aside>
+    <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} showThoughts={dialogue.showThoughts} hidden={menu !== null}
+      onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
       {menu === 'shake' ? <EventComposer onInject={sim.inject} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
+        <fieldset className="dialogue-settings"><legend>Dialogue</legend>
+          <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
+          <label><input type="checkbox" checked={dialogue.showThoughts} onChange={e => dialogue.setShowThoughts(e.target.checked)}/> Show inner thoughts</label>
+          <label><input type="checkbox" checked={dialogue.hold} onChange={e => dialogue.setHold(e.target.checked)}/> Hold for dialogue <small>Pauses each hour until its lines finish</small></label>
+        </fieldset>
         <div className="diagnostics"><h3>Connection & engine</h3><dl><div><dt>Connection</dt><dd>{live ? 'Connected' : connectionText}</dd></div><div><dt>Engine</dt><dd>{diagnostic}</dd></div><div><dt>Seed</dt><dd>{state?.seed ?? '—'}</dd></div></dl>{sim.error && <p role="status" className="coral">{playerText(sim.error)}</p>}</div>
       </>}
     </MenuPanel>}
