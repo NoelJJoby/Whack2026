@@ -12,6 +12,7 @@ interface ControlsProps {
   onPlayPause?: () => void;
   onStep?: () => void;
   onReset?: () => void;
+  onNewSeed?: () => void;
 }
 
 export function Controls({
@@ -27,6 +28,7 @@ export function Controls({
   onPlayPause,
   onStep,
   onReset,
+  onNewSeed,
 }: ControlsProps) {
   return (
     <>
@@ -41,6 +43,7 @@ export function Controls({
       )}
       <button type="button" disabled={disabled || running || complete} onClick={onStep}>Step →</button>
       <button type="button" disabled={disabled} onClick={onReset}>↺ Reset</button>
+      <button type="button" disabled={disabled} onClick={onNewSeed}>⟳ New seed</button>
     </div>
     </>
   );
