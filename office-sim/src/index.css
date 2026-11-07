@@ -1,6 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@font-face {
+  font-family: 'VCR OSD Mono';
+  src: url('/fonts/VCR_OSD_MONO.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
-  font-family: 'Space Grotesk',sans-serif;
+  font-family: 'VCR OSD Mono', monospace;
   color: #e3e5d5;
   background: #141f20;
   font-synthesis: none;
@@ -53,7 +59,7 @@ a {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-family: 'Pixelify Sans',monospace;
+  font-family: 'VCR OSD Mono', monospace;
   font-size: 33px;
   font-weight: 600;
   letter-spacing: 1px;
@@ -70,7 +76,7 @@ a {
 }
 .brand small {
   display: block;
-  font-family: 'Space Grotesk',sans-serif;
+  font-family: 'VCR OSD Mono', monospace;
   font-size: 9px;
   letter-spacing: 1.7px;
   margin-top: 8px;
@@ -84,7 +90,7 @@ a {
   letter-spacing: 1px
 }
 .run-meta b {
-  font-family: 'Pixelify Sans',monospace;
+  font-family: 'VCR OSD Mono', monospace;
   font-size: 24px;
   margin-left: 6px
 }
@@ -134,7 +140,7 @@ a {
   height: 29px;
   display: grid;
   place-items: center;
-  font: 24px 'Pixelify Sans'
+  font: 24px 'VCR OSD Mono', monospace
 }
 .event-bar small {
   display: block;
@@ -267,7 +273,7 @@ a {
   background: #ab9368
 }
 .roof span {
-  font: 9px 'Pixelify Sans',monospace;
+  font: 9px 'VCR OSD Mono', monospace;
   color: #d5c198;
   letter-spacing: 1px
 }
@@ -285,7 +291,7 @@ a {
   position: absolute;
   left: 10px;
   top: 7px;
-  font: 8px 'Pixelify Sans';
+  font: 8px 'VCR OSD Mono', monospace;
   letter-spacing: 1px;
   color: #d0b88d;
   z-index: 1
@@ -403,7 +409,7 @@ a {
   top: 45px;
   left: 50%;
   transform: translateX(-50%);
-  font: 12px 'Pixelify Sans';
+  font: 12px 'VCR OSD Mono', monospace;
   color: #ede7cf;
   white-space: nowrap;
   background: #28312be8;
@@ -439,7 +445,7 @@ a {
   box-shadow: 2px 2px #28312b;
   width: 172px;
   padding: 7px 9px;
-  font: 13px/1.1 'Pixelify Sans',monospace;
+  font: 13px/1.1 'VCR OSD Mono', monospace;
   text-align: left;
   z-index: 5
 }
@@ -455,7 +461,7 @@ a {
   border-bottom: 2px solid #716d55
 }
 .bubble small {
-  font: 7px 'Space Grotesk';
+  font: 7px 'VCR OSD Mono', monospace;
   display: block;
   letter-spacing: 1px;
   margin-bottom: 3px;
@@ -504,7 +510,7 @@ a {
   background: #2b4240;
   width: 34px;
   text-align: center;
-  font: 23px 'Pixelify Sans';
+  font: 23px 'VCR OSD Mono', monospace;
   color: var(--gold)
 }
 .wall-picture small {
@@ -580,7 +586,7 @@ a {
   position: absolute;
   top: -15px;
   left: -6px;
-  font: 8px 'Pixelify Sans';
+  font: 8px 'VCR OSD Mono', monospace;
   background: #86a98a;
   color: #233b33;
   white-space: nowrap;
@@ -686,7 +692,7 @@ h2 {
   background: #29382f
 }
 .feed-tick {
-  font: 13px 'Pixelify Sans';
+  font: 13px 'VCR OSD Mono', monospace;
   color: #869c8b;
   padding-top: 1px
 }
@@ -965,7 +971,7 @@ h2 {
   padding: 13px
 }
 .rank {
-  font: 22px 'Pixelify Sans';
+  font: 22px 'VCR OSD Mono', monospace;
   color: var(--gold)
 }
 .quit-entry strong {
@@ -1027,7 +1033,7 @@ h2 {
   letter-spacing: 1px
 }
 .inspector-person h2 {
-  font: 30px 'Pixelify Sans';
+  font: 30px 'VCR OSD Mono', monospace;
   margin-top: 7px
 }
 .inspector-person p {
@@ -1384,19 +1390,19 @@ h2 {
 .event-composer { margin-top: 20px; padding: 22px; border-top: 3px solid var(--gold); }
 .event-composer-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .event-eyebrow { font-size: 10px; color: var(--gold); letter-spacing: 1.4px; }
-.event-composer h2 { font: 28px 'Pixelify Sans', monospace; margin-top: 5px; }
+.event-composer h2 { font: 28px 'VCR OSD Mono', monospace; margin-top: 5px; }
 .event-composer-heading p { font-size: 14px; color: var(--muted); margin: 7px 0 0; }
 .event-preview-label { font-size: 10px; letter-spacing: 1px; border: 1px solid var(--border); padding: 7px; white-space: nowrap; color: var(--mint); }
 .event-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 20px 0; }
 .event-preset { border: 1px solid var(--border); padding: 12px; background: #25332e; text-align: left; font-size: 14px; line-height: 1.4; display: flex; align-items: center; gap: 10px; }
-.event-preset > span { font: 25px 'Pixelify Sans', monospace; color: var(--gold); }
+.event-preset > span { font: 25px 'VCR OSD Mono', monospace; color: var(--gold); }
 .event-preset:hover { background: #364536; }
 .event-preset.chosen { border-color: var(--gold); background: #3b3d2c; box-shadow: inset 0 -2px var(--gold); }
 .event-form { display: flex; flex-direction: column; gap: 16px; border-top: 1px solid var(--border); padding-top: 18px; }
 .event-fields { display: grid; gap: 8px; align-content: start; }
 .event-fields > label { display: flex; justify-content: space-between; font-size: 14px; }
 .event-fields > label > span { color: var(--muted); font-size: 12px; }
-.event-fields input, .event-fields textarea { width: 100%; min-width: 0; background: #15221f; border: 1px solid #596451; color: #e3e5d5; padding: 11px; font: 14px/1.5 'Space Grotesk', sans-serif; border-radius: 0; }
+.event-fields input, .event-fields textarea { width: 100%; min-width: 0; background: #15221f; border: 1px solid #596451; color: #e3e5d5; padding: 11px; font: 14px/1.5 'VCR OSD Mono', monospace; border-radius: 0; }
 .event-fields textarea { resize: vertical; min-height: 90px; max-height: 300px; }
 .event-fields input:focus-visible, .event-fields textarea:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .event-selection { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -1439,7 +1445,7 @@ h2 {
 .workday-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
 .workday-clock { display: flex; align-items: center; gap: 15px; }
 .workday-clock > span { font-size: 11px; letter-spacing: 1px; }
-.workday-clock strong { font: 32px 'Pixelify Sans', monospace; }
+.workday-clock strong { font: 32px 'VCR OSD Mono', monospace; }
 .speed-controls { display: flex; align-items: center; gap: 5px; }
 .speed-controls > span { font-size: 10px; letter-spacing: 1px; color: var(--muted); margin-right: 9px; }
 .speed-controls button { border: 1px solid var(--border); background: #15231f; min-width: 43px; padding: 8px; font-size: 14px; }
@@ -1460,13 +1466,13 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .stock-ticker:hover { border-color: var(--gold); }
 .stock-ticker > span { display: block; font-size: 11px; color: var(--gold); }
 .stock-ticker small { font-size: 8px; margin-left: 9px; color: var(--muted); }
-.stock-ticker strong { display: block; font: 25px 'Pixelify Sans'; margin-top: 3px; }
-.stock-ticker em { font: normal 12px 'Space Grotesk'; margin-left: 8px; }
+.stock-ticker strong { display: block; font: 25px 'VCR OSD Mono', monospace; margin-top: 3px; }
+.stock-ticker em { font: normal 12px 'VCR OSD Mono', monospace; margin-left: 8px; }
 .stock-dialog { color: #e3e5d5; width: min(760px, calc(100% - 32px)); padding: 30px; border: 2px solid #81916f; max-height: 90vh; overflow: auto; }
 .stock-dialog::backdrop { background: #091413d9; }
-.stock-dialog h2 { font: 32px 'Pixelify Sans'; margin-top: 8px; }
-.stock-dialog .stock-value { font: 38px 'Pixelify Sans'; margin: 22px 0 8px; }
-.stock-value span { font: 13px 'Space Grotesk'; margin-left: 12px; }
+.stock-dialog h2 { font: 32px 'VCR OSD Mono', monospace; margin-top: 8px; }
+.stock-dialog .stock-value { font: 38px 'VCR OSD Mono', monospace; margin: 22px 0 8px; }
+.stock-value span { font: 13px 'VCR OSD Mono', monospace; margin-left: 12px; }
 .stock-dialog svg { width: 100%; display: block; }
 .stock-dialog p { font-size: 13px; line-height: 1.6; color: var(--muted); }
 @media(max-width: 1100px) { .topbar .time { display: none; } .run-meta { gap: 10px; } .brand { font-size: 27px; } }
