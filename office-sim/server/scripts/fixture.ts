@@ -8,6 +8,39 @@ import { stream } from '../rng';
 
 type Base = Omit<CastMember, 'profile'> & { profile: Omit<CastMember['profile'], 'traits'> & { traits: EngineTraits } };
 
+const NAME_POOLS: Record<string, readonly string[]> = {
+  ceo: ['Ava', 'Daniel', 'Priya', 'Noah', 'Elena', 'Marcus', 'Sofia', 'Ethan'],
+  ops: ['Omar', 'Iris', 'Leo', 'Rae', 'Miguel', 'Nadia', 'Sasha', 'Theo'],
+  gossip: ['Priya', 'Jules', 'Maya', 'Harper', 'Cora', 'Zoe', 'Rafi', 'Nia'],
+  climber: ['Marcus', 'Milo', 'Dante', 'Mina', 'Wren', 'Parker', 'Leah', 'Kai'],
+  loyalist: ['Tom', 'Olivia', 'Jin', 'Nora', 'Ari', 'Camila', 'Gavin', 'Elsa'],
+  skeptic: ['Sam', 'Val', 'Drew', 'Alicia', 'Iwan', 'Mila', 'Reed', 'Tessa'],
+  breadwinner: ['Rosa', 'Anika', 'Leon', 'Carmen', 'Hugo', 'Tessa', 'Nico', 'Lena'],
+  flight: ['Lena', 'Maya', 'Ben', 'Sofia', 'Noah', 'Sara', 'Chris', 'Leah'],
+};
+
+const TRAIT_BANDS: Record<string, Partial<Record<typeof NUMERIC_TRAITS[number], [number, number]>>> = {
+  ceo: { ambition: [80, 96], financial_need: [10, 35], ethics: [40, 75], sociability: [20, 60], distortion_rate: [5, 25], quit_threshold: [80, 95], impulsivity: [25, 55] },
+  ops: { ambition: [45, 78], financial_need: [25, 60], ethics: [45, 80], sociability: [20, 65], distortion_rate: [10, 35], quit_threshold: [70, 88], impulsivity: [20, 45] },
+  gossip: { ambition: [25, 65], financial_need: [20, 70], ethics: [25, 65], sociability: [75, 98], distortion_rate: [35, 80], quit_threshold: [65, 90], impulsivity: [45, 88] },
+  climber: { ambition: [75, 98], financial_need: [20, 60], ethics: [20, 60], sociability: [35, 80], distortion_rate: [20, 60], quit_threshold: [68, 88], impulsivity: [40, 75] },
+  loyalist: { ambition: [20, 55], financial_need: [20, 65], ethics: [60, 95], sociability: [20, 65], distortion_rate: [5, 30], quit_threshold: [75, 94], impulsivity: [10, 40] },
+  skeptic: { ambition: [25, 65], financial_need: [10, 55], ethics: [70, 96], sociability: [25, 70], distortion_rate: [5, 35], quit_threshold: [65, 86], impulsivity: [25, 60] },
+  breadwinner: { ambition: [20, 55], financial_need: [75, 98], ethics: [40, 80], sociability: [25, 70], distortion_rate: [5, 35], quit_threshold: [70, 95], impulsivity: [10, 35] },
+  flight: { ambition: [35, 75], financial_need: [20, 85], ethics: [15, 60], sociability: [20, 65], distortion_rate: [10, 60], quit_threshold: [55, 78], impulsivity: [45, 88] },
+};
+
+const START_BANDS: Record<string, Partial<Record<'stress' | 'workload' | 'loyalty' | 'trust_mgmt' | 'burnout', [number, number]>>> = {
+  ceo: { stress: [25, 42], workload: [35, 62], loyalty: [70, 88], trust_mgmt: [72, 92], burnout: [18, 32] },
+  ops: { stress: [30, 52], workload: [38, 62], loyalty: [55, 78], trust_mgmt: [55, 82], burnout: [22, 42] },
+  gossip: { stress: [25, 48], workload: [35, 55], loyalty: [45, 72], trust_mgmt: [42, 72], burnout: [18, 40] },
+  climber: { stress: [30, 52], workload: [40, 65], loyalty: [40, 68], trust_mgmt: [46, 72], burnout: [20, 40] },
+  loyalist: { stress: [22, 42], workload: [35, 58], loyalty: [70, 92], trust_mgmt: [62, 84], burnout: [10, 24] },
+  skeptic: { stress: [25, 45], workload: [35, 55], loyalty: [40, 68], trust_mgmt: [22, 55], burnout: [18, 36] },
+  breadwinner: { stress: [34, 56], workload: [44, 68], loyalty: [48, 72], trust_mgmt: [42, 66], burnout: [24, 42] },
+  flight: { stress: [36, 58], workload: [38, 60], loyalty: [28, 58], trust_mgmt: [28, 62], burnout: [30, 55] },
+};
+
 export const BASE_CAST: Base[] = [
   {
     profile: { id: 'ceo', name: 'Dan', archetype: 'CEO', role: 'Manager', functionGroup: 'Exec',
@@ -55,6 +88,16 @@ const NUMERIC_TRAITS = [
   'ambition', 'financial_need', 'ethics', 'sociability', 'distortion_rate', 'quit_threshold', 'impulsivity',
 ] as const;
 
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+function pickFromPool(rng: ReturnType<typeof stream>, pool: readonly string[]) {
+  return pool[Math.floor(rng.next() * pool.length)] ?? pool[0];
+}
+
+function jitteredValue(rng: ReturnType<typeof stream>, low: number, high: number) {
+  return clamp(Math.round(low + rng.next() * (high - low)), 0, 100);
+}
+
 /** The cast for one run: every fixed trait is its archetype value +/- traitJitter, drawn from the run seed. */
 export function fixtureCast(seed: number, params: Params = DEFAULT_PARAMS, jitter = true): CastMember[] {
   return BASE_CAST.map((c) => {
@@ -62,9 +105,28 @@ export function fixtureCast(seed: number, params: Params = DEFAULT_PARAMS, jitte
     const traits = { ...c.profile.traits };
     if (jitter) {
       const j = params.setup.traitJitter;
-      for (const k of NUMERIC_TRAITS) traits[k] = Math.min(100, Math.max(0, Math.round(traits[k] + (rng.next() * 2 - 1) * j)));
+      const spread = Math.max(6, Math.round(j * 0.8));
+      for (const k of NUMERIC_TRAITS) {
+        const base = c.profile.traits[k];
+        const low = clamp(base - spread, 0, 100);
+        const high = clamp(base + spread, 0, 100);
+        traits[k] = jitteredValue(rng, low, high);
+      }
     }
-    return { profile: { ...c.profile, traits }, start: structuredClone(c.start) };
+
+    const start = structuredClone(c.start);
+    for (const key of ['stress', 'workload', 'loyalty', 'trust_mgmt', 'burnout'] as const) {
+      const base = c.start[key] ?? start[key];
+      const low = clamp((typeof base === 'number' ? base : 50) - 12, 0, 100);
+      const high = clamp((typeof base === 'number' ? base : 50) + 12, 0, 100);
+      start[key] = jitteredValue(rng, low, high);
+    }
+
+    const namePool = NAME_POOLS[c.profile.id] ?? [c.profile.name];
+    return {
+      profile: { ...c.profile, name: pickFromPool(rng, namePool), traits },
+      start,
+    };
   });
 }
 

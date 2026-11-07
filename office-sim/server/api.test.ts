@@ -82,6 +82,28 @@ describe('api routes', () => {
     assert.equal(stateJson.state.tick, 0);
   });
 
+  test('reset keeps the current seed while new-seed changes the company', async () => {
+    const seedA = 91;
+    const seedB = 92;
+
+    const firstSeed = (await post('/api/sim/new-seed', { seed: seedA })).json();
+    const castA = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+    const afterReset = (await post('/api/sim/reset')).json();
+    const castAfterReset = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+
+    assert.equal(firstSeed.state.seed, seedA);
+    assert.equal(afterReset.state.seed, seedA);
+    assert.deepEqual(castA, castAfterReset);
+    assert.equal(castA.filter((agent: { role: string }) => agent.role === 'Manager').length, 2);
+
+    const secondSeed = (await post('/api/sim/new-seed', { seed: seedB })).json();
+    const castB = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json().agents;
+
+    assert.equal(secondSeed.state.seed, seedB);
+    assert.notDeepEqual(castA, castB);
+    assert.ok(castB.some((agent: { name: string }) => agent.name !== castA[0].name));
+  });
+
   test('errors use one shape', async () => {
     await post('/api/sim/reset');
     for (const payload of [{ type: 'bogus' }, { type: 'merger', is_true: 'yes' }, { type: 'merger', extra: 1 }, undefined]) {

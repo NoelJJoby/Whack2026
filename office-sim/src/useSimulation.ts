@@ -60,6 +60,7 @@ export interface Simulation {
   togglePlay: () => Promise<boolean>;
   step: () => Promise<boolean>;
   reset: () => Promise<boolean>;
+  newSeed: (seed?: number) => Promise<boolean>;
   setRunLength: (maxTicks: number) => Promise<boolean>;
   inject: (type: EventType, isTrue: boolean) => Promise<boolean>;
 }
@@ -171,6 +172,7 @@ export function useSimulation(): Simulation {
     togglePlay: () => post(running ? '/sim/pause' : '/sim/play'),
     step: () => post('/sim/step'),
     reset: () => post('/sim/reset'),
+    newSeed: (seed) => post('/sim/new-seed', seed === undefined ? undefined : { seed }),
     setRunLength: (maxTicks) => post('/sim/settings', { max_ticks: maxTicks }),
     inject: (type, isTrue) => post('/sim/inject', { type, is_true: isTrue }),
   };
