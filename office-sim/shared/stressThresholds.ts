@@ -1,0 +1,2 @@
+export const BURNOUT_STRESS_THRESHOLD = 60;
+export const BURNOUT_RECOVERY_THRESHOLD = 40;

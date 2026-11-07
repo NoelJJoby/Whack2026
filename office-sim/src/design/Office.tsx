@@ -8,6 +8,7 @@ export interface Employee {
     hair: string;
     skin: string;
     stress: number;
+    workload: number;
     burnout: number;
     trust: number;
     action: string;
@@ -15,14 +16,14 @@ export interface Employee {
     thinks: string;
 }
 export const employees: Employee[] = [
-    { id: 'marcus', name: 'Marcus', role: 'CEO', floor: 0, x: 52, color: '#a383b7', hair: '#463137', skin: '#e5af82', stress: 34, burnout: 20, trust: 82, action: 'Working', says: 'An exciting new chapter for all of us.', thinks: 'The board needs to see results. Whatever it takes.' },
-    { id: 'priya', name: 'Priya', role: 'Ops manager', floor: 1, x: 22, color: '#e2ad58', hair: '#33272f', skin: '#ba805c', stress: 76, burnout: 62, trust: 39, action: 'Overworking', says: 'Let’s just get through this week.', thinks: 'I’m enforcing a policy I wouldn’t survive myself.' },
-    { id: 'sam', name: 'Sam', role: 'Breadwinner', floor: 1, x: 40, color: '#82ab86', hair: '#5a3c32', skin: '#d6a07b', stress: 81, burnout: 68, trust: 32, action: 'Working', says: 'I can pick up the extra shift.', thinks: 'Rent is due Friday. Quitting isn’t an option.' },
-    { id: 'dan', name: 'Dan', role: 'Gossip hub', floor: 1, x: 63, color: '#db8867', hair: '#914d31', skin: '#e5b88d', stress: 58, burnout: 37, trust: 46, action: 'Spreading gossip', says: 'Apparently, Sales is next…', thinks: 'Jess needs to hear this. Well, my version of it.' },
-    { id: 'jess', name: 'Jess', role: 'Climber', floor: 1, x: 79, color: '#b68ac7', hair: '#56364c', skin: '#e7b893', stress: 61, burnout: 42, trust: 51, action: 'Listening', says: 'I’m sure leadership has a plan.', thinks: 'If Dan leaves, that senior role opens up.' },
-    { id: 'tom', name: 'Tom', role: 'Loyalist', floor: 2, x: 23, color: '#669fc6', hair: '#654737', skin: '#e5b38c', stress: 72, burnout: 58, trust: 55, action: 'Overworking', says: 'They’ve always looked after us.', thinks: 'Twenty hours? This isn’t the company I joined.' },
-    { id: 'ravi', name: 'Ravi', role: 'Skeptic', floor: 2, x: 48, color: '#d0b56c', hair: '#302b32', skin: '#b87953', stress: 65, burnout: 49, trust: 24, action: 'Verifying rumour', says: 'Where did that number come from?', thinks: 'Nobody has checked a single word of this.' },
-    { id: 'lena', name: 'Lena', role: 'Flight risk', floor: 2, x: 77, color: '#69b9ad', hair: '#b66b3e', skin: '#e9bd96', stress: 92, burnout: 87, trust: 12, action: 'Slacking off', says: 'Just taking a quick break.', thinks: 'I’m done. There has to be more to life than this.' },
+    { id: 'marcus', name: 'Marcus', role: 'CEO', floor: 0, x: 52, color: '#a383b7', hair: '#463137', skin: '#e5af82', stress: 34, workload: 48, burnout: 20, trust: 82, action: 'Working', says: 'An exciting new chapter for all of us.', thinks: 'The board needs to see results. Whatever it takes.' },
+    { id: 'priya', name: 'Priya', role: 'Ops manager', floor: 1, x: 22, color: '#e2ad58', hair: '#33272f', skin: '#ba805c', stress: 76, workload: 94, burnout: 62, trust: 39, action: 'Overworking', says: 'Let’s just get through this week.', thinks: 'I’m enforcing a policy I wouldn’t survive myself.' },
+    { id: 'sam', name: 'Sam', role: 'Breadwinner', floor: 1, x: 40, color: '#82ab86', hair: '#5a3c32', skin: '#d6a07b', stress: 81, workload: 91, burnout: 68, trust: 32, action: 'Working', says: 'I can pick up the extra shift.', thinks: 'Rent is due Friday. Quitting isn’t an option.' },
+    { id: 'dan', name: 'Dan', role: 'Gossip hub', floor: 1, x: 63, color: '#db8867', hair: '#914d31', skin: '#e5b88d', stress: 58, workload: 62, burnout: 37, trust: 46, action: 'Spreading gossip', says: 'Apparently, Sales is next…', thinks: 'Jess needs to hear this. Well, my version of it.' },
+    { id: 'jess', name: 'Jess', role: 'Climber', floor: 1, x: 79, color: '#b68ac7', hair: '#56364c', skin: '#e7b893', stress: 61, workload: 70, burnout: 42, trust: 51, action: 'Listening', says: 'I’m sure leadership has a plan.', thinks: 'If Dan leaves, that senior role opens up.' },
+    { id: 'tom', name: 'Tom', role: 'Loyalist', floor: 2, x: 23, color: '#669fc6', hair: '#654737', skin: '#e5b38c', stress: 72, workload: 88, burnout: 58, trust: 55, action: 'Overworking', says: 'They’ve always looked after us.', thinks: 'Twenty hours? This isn’t the company I joined.' },
+    { id: 'ravi', name: 'Ravi', role: 'Skeptic', floor: 2, x: 48, color: '#d0b56c', hair: '#302b32', skin: '#b87953', stress: 65, workload: 75, burnout: 49, trust: 24, action: 'Verifying rumour', says: 'Where did that number come from?', thinks: 'Nobody has checked a single word of this.' },
+    { id: 'lena', name: 'Lena', role: 'Flight risk', floor: 2, x: 77, color: '#69b9ad', hair: '#b66b3e', skin: '#e9bd96', stress: 92, workload: 83, burnout: 87, trust: 12, action: 'Slacking off', says: 'Just taking a quick break.', thinks: 'I’m done. There has to be more to life than this.' },
 ];
 export function Sprite({ person, small = false, quit = false }: {
     person: Employee;
