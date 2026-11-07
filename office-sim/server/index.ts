@@ -1,143 +1,405 @@
-import 'dotenv/config';
 import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
 import Fastify from 'fastify';
+import { z } from 'zod';
 
-import type { EventType, SimulationMode, SimulationState } from '../shared/types';
-import { createInitialSimulation, injectEvent, stepSimulation } from './tick';
+import type {
+  ApiError,
+  CastResponse,
+  HistoryResponse,
+  ModeReason,
+  SettingsRequest,
+  SimResponse,
+  StreamMessage,
+  TickFrame,
+} from '../shared/api';
+import type { DecisionLog, EventType, SimulationMode, SimulationState, TickRecord } from '../shared/types';
+import type { CastMember, DecisionLog as EngineDecisionLog, TurnProvider, World } from './engine-types';
+import { createTurnProvider } from './llm';
+import { eventParams } from './params';
+import { SHOCK_SCENARIO, fixtureCast } from './scripts/fixture';
+import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
 
-const DEFAULT_MODE: SimulationMode = 'llm_bias';
+// Load the key from office-sim/.env (then the repo-root .env) wherever the server is started from.
+// A variable already set in the environment wins, so `ANTHROPIC_API_KEY= ...` forces rules mode.
+loadEnv({
+  path: [fileURLToPath(new URL('../.env', import.meta.url)), fileURLToPath(new URL('../../.env', import.meta.url))],
+  quiet: true,
+});
 
-class OfficeSimManager {
-  private readonly listeners = new Set<(payload: unknown) => void>();
-  state: SimulationState;
+const SEED = 42;
+/** Default run length, and the most ticks a run may be set to. */
+export const DEFAULT_TICKS = 16;
+export const TICK_LIMIT = 128;
+const TICK_INTERVAL_MS = 2500;
+const HEARTBEAT_MS = 15_000;
+const MAX_HISTORY = 200;
+const FEED_LINES = 20;
+const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 
-  constructor() {
-    this.state = createInitialSimulation(42);
-    this.state.mode = DEFAULT_MODE;
-  }
+const injectSchema = z.object({ type: z.enum(EVENT_TYPES), is_true: z.boolean().optional() }).strict();
+const settingsSchema = z.object({ max_ticks: z.number().int().min(1).max(TICK_LIMIT) }).strict() satisfies z.ZodType<SettingsRequest>;
 
-  subscribe(listener: (payload: unknown) => void) {
-    this.listeners.add(listener);
-  }
-
-  unsubscribe(listener: (payload: unknown) => void) {
-    this.listeners.delete(listener);
-  }
-
-  private emit(payload: unknown) {
-    for (const listener of this.listeners) {
-      listener(payload);
-    }
-  }
-
-  async start() {
-    this.state.started = true;
-    this.state.running = true;
-    this.state.mode = DEFAULT_MODE;
-    this.emit({ type: 'state', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
-  }
-
-  async play() {
-    this.state.started = true;
-    this.state.running = true;
-    this.state.mode = DEFAULT_MODE;
-    this.emit({ type: 'state', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
-  }
-
-  async pause() {
-    this.state.running = false;
-    this.emit({ type: 'state', mode: this.state.mode ?? DEFAULT_MODE, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
-  }
-
-  async reset() {
-    this.state = { ...createInitialSimulation(this.state.seed), mode: DEFAULT_MODE };
-    this.emit({ type: 'state', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
-  }
-
-  async step() {
-    const nextState = stepSimulation(this.state);
-    this.state = { ...nextState, mode: this.state.mode ?? DEFAULT_MODE };
-    this.emit({ type: 'tick', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
-  }
-
-  async inject(type: EventType, isTrue = true) {
-    const nextState = injectEvent(this.state, type);
-    this.state = { ...nextState, mode: this.state.mode ?? DEFAULT_MODE };
-    this.state.event = type;
-    this.state.feed = [...this.state.feed, `Queued event: ${type} (truth=${String(isTrue)})`];
-    this.emit({ type: 'inject', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
-    return this.state;
+class ApiFailure extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
   }
 }
 
-const sim = new OfficeSimManager();
+function errorBody(code: string, message: string, details?: unknown): ApiError {
+  return { error: details === undefined ? { code, message } : { code, message, details } };
+}
+
+function hasApiKey(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
+}
+
+function toSharedDecision(d: EngineDecisionLog): DecisionLog {
+  return {
+    source: d.fallback ? 'fallback' : d.effective_mode === 'rules' ? 'rules' : 'llm',
+    agent: d.agent,
+    chosen_action: d.chosen.action,
+    ...(d.llm ? { proposals: d.llm.proposals } : {}),
+    ...(d.llm?.cache_hit != null ? { cache_hit: d.llm.cache_hit } : {}),
+    reason: d.explain,
+  };
+}
+
+/** TickRecords from runTick, filled in with the lines, quit flag, state and decision from the tick log. */
+function enrichRecords(r: TickResult): TickRecord[] {
+  return r.records.map((rec) => {
+    const line = r.log.lines.find((l) => l.agent === rec.agent);
+    const decision = r.log.decisions.find((d) => d.agent === rec.agent);
+    const { status: _status, ...state } = r.log.states[rec.agent];
+    return {
+      ...rec,
+      public_line: line?.public_line,
+      inner_monologue: line?.inner_monologue,
+      quit: r.log.quits.includes(rec.agent),
+      state,
+      ...(decision ? { decision: toSharedDecision(decision) } : {}),
+    };
+  });
+}
+
+type Listener = (message: StreamMessage) => void;
+
+class OfficeSimManager {
+  private readonly listeners = new Set<Listener>();
+  readonly cast: CastMember[] = fixtureCast(SEED);
+  private world!: World;
+  private frames: TickFrame[] = [];
+  private feed: string[] = [];
+  private provider: TurnProvider | null = null;
+  private mode: SimulationMode = 'rules';
+  private modeReason: ModeReason = 'no_api_key';
+  private maxTicks = DEFAULT_TICKS;
+  private started = false;
+  private running = false;
+  private timer: NodeJS.Timeout | null = null;
+  private inFlight: Promise<void> | null = null;
+  /** Bumped on reset so a tick that was in flight is discarded. */
+  private generation = 0;
+
+  constructor() {
+    this.init();
+  }
+
+  get listenerCount() {
+    return this.listeners.size;
+  }
+
+  subscribe(listener: Listener) {
+    this.listeners.add(listener);
+  }
+
+  unsubscribe(listener: Listener) {
+    this.listeners.delete(listener);
+  }
+
+  private emit(message: StreamMessage) {
+    for (const listener of this.listeners) listener(message);
+  }
+
+  private init() {
+    if (hasApiKey()) {
+      this.provider ??= createTurnProvider();
+      this.mode = 'llm_bias';
+      this.modeReason = 'configured';
+    } else {
+      this.provider = null;
+      this.mode = 'rules';
+      this.modeReason = 'no_api_key';
+    }
+    this.world = createWorld(this.cast, SEED);
+    this.frames = [];
+    this.feed = ['Simulation ready.'];
+    this.started = false;
+    this.running = false;
+  }
+
+  private tickConfig(): TickConfig {
+    return { mode: this.mode, scenario: SHOCK_SCENARIO, gossip: true, billboard: true };
+  }
+
+  state(): SimulationState {
+    const lastEvent = [...this.frames].reverse().find((f) => f.events.length > 0)?.events.at(-1)?.type ?? null;
+    return {
+      ...toSimulationState(this.world, this.feed.slice(-FEED_LINES)),
+      started: this.started,
+      running: this.running,
+      event: lastEvent,
+      mode: this.mode,
+    };
+  }
+
+  response(): SimResponse {
+    return { mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, state: this.state() };
+  }
+
+  history(): HistoryResponse {
+    return { ...this.response(), history: this.frames };
+  }
+
+  castResponse(): CastResponse {
+    return { agents: this.cast.map((c) => c.profile) };
+  }
+
+  private emitState() {
+    this.emit({ type: 'state', ...this.response() });
+  }
+
+  private assertNotComplete() {
+    if (this.world.tick >= this.maxTicks) {
+      throw new ApiFailure(409, 'run_complete', `The run has finished (${this.maxTicks} ticks). Reset, or raise the run length.`);
+    }
+  }
+
+  private schedule(delayMs: number) {
+    if (this.timer || !this.running) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      void this.loop();
+    }, delayMs);
+  }
+
+  private clearTimer() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private async loop() {
+    if (!this.running) return;
+    try {
+      await this.runOne();
+    } catch (error) {
+      console.error('Tick failed:', error instanceof Error ? error.message : String(error));
+      this.running = false;
+      this.emitState();
+      return;
+    }
+    this.schedule(TICK_INTERVAL_MS);
+  }
+
+  /** At most one tick in flight; concurrent callers share it. */
+  private runOne(): Promise<void> {
+    this.inFlight ??= this.advance().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
+  private async advance() {
+    const generation = this.generation;
+    const result = await runTick(this.world, this.provider, this.tickConfig());
+    if (generation !== this.generation) return;
+
+    this.world = result.world;
+    const records = enrichRecords(result);
+    const events = result.log.events.map((e) => ({
+      type: e.type,
+      is_true: e.is_true,
+      text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
+    }));
+    this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
+
+    // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.
+    const decisions = result.log.decisions;
+    if (
+      this.mode !== 'rules' &&
+      decisions.length > 0 &&
+      decisions.every((d) => d.fallback !== null && d.fallback !== 'llm_proposed_only_masked_actions')
+    ) {
+      this.mode = 'rules';
+      this.modeReason = 'llm_failed';
+      console.warn(`LLM unavailable on tick ${result.world.tick}; continuing in rules mode.`);
+    }
+
+    if (this.world.tick >= this.maxTicks) {
+      this.running = false;
+      this.clearTimer();
+    }
+
+    const frame: TickFrame = { tick: this.world.tick, records, events, state: this.state() };
+    this.frames.push(frame);
+    if (this.frames.length > MAX_HISTORY) this.frames.shift();
+    this.emit({ type: 'tick', frame, ...this.response() });
+  }
+
+  start() {
+    return this.play();
+  }
+
+  play() {
+    this.assertNotComplete();
+    this.started = true;
+    if (!this.running) {
+      this.running = true;
+      this.emitState();
+      this.schedule(0);
+    }
+    return this.response();
+  }
+
+  pause() {
+    this.running = false;
+    this.clearTimer();
+    this.emitState();
+    return this.response();
+  }
+
+  reset() {
+    this.clearTimer();
+    this.generation += 1;
+    this.init();
+    this.emit({ type: 'history', ...this.history() });
+    return this.response();
+  }
+
+  async step() {
+    if (this.running) throw new ApiFailure(409, 'sim_running', 'Pause the simulation before stepping.');
+    if (this.inFlight) throw new ApiFailure(409, 'tick_in_progress', 'A tick is already running.');
+    this.assertNotComplete();
+    this.started = true;
+    await this.runOne();
+    return this.response();
+  }
+
+  /** Run length. Can change mid-run, but not below the current tick; kept across reset. */
+  settings(body: unknown) {
+    const parsed = settingsSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ApiFailure(400, 'invalid_settings', `Expected { max_ticks: an integer from 1 to ${TICK_LIMIT} }.`, parsed.error.issues);
+    }
+    const { max_ticks } = parsed.data;
+    if (max_ticks < this.world.tick) {
+      throw new ApiFailure(409, 'below_current_tick', `The run is already at tick ${this.world.tick}; the run length can't go below that.`);
+    }
+    this.maxTicks = max_ticks;
+    if (this.world.tick >= this.maxTicks && this.running) {
+      this.running = false;
+      this.clearTimer();
+    }
+    this.emitState();
+    return this.response();
+  }
+
+  inject(body: unknown) {
+    const parsed = injectSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ApiFailure(400, 'invalid_event', `Expected { type: one of ${EVENT_TYPES.join(', ')}; is_true?: boolean }.`, parsed.error.issues);
+    }
+    this.assertNotComplete();
+    const { type, is_true } = parsed.data;
+    this.world = queueEvent(this.world, is_true === undefined ? { type } : { type, isTrue: is_true });
+    this.feed.push(`Queued event: ${type}`);
+    this.emitState();
+    return this.response();
+  }
+}
+
+export const sim = new OfficeSimManager();
 const app = Fastify({ logger: false });
 
-app.get('/api/health', async () => ({ ok: true }));
-app.get('/api/sim/state', async () => ({ mode: sim.state.mode ?? DEFAULT_MODE, state: sim.state }));
-app.post('/api/sim/start', async () => ({ mode: DEFAULT_MODE, state: await sim.start() }));
-app.post('/api/sim/play', async () => ({ mode: DEFAULT_MODE, state: await sim.play() }));
-app.post('/api/sim/pause', async () => ({ mode: sim.state.mode ?? DEFAULT_MODE, state: await sim.pause() }));
-app.post('/api/sim/reset', async () => ({ mode: DEFAULT_MODE, state: await sim.reset() }));
-app.post('/api/sim/step', async () => ({ mode: sim.state.mode ?? DEFAULT_MODE, state: await sim.step() }));
-app.post('/api/sim/inject', async (request) => {
-  const body = request.body as { type?: EventType; is_true?: boolean };
-  const type = body.type ?? 'merger';
-  return { mode: sim.state.mode ?? DEFAULT_MODE, state: await sim.inject(type, body.is_true ?? true) };
+app.setErrorHandler((error, _request, reply) => {
+  if (error instanceof ApiFailure) {
+    return reply.status(error.status).send(errorBody(error.code, error.message, error.details));
+  }
+  const status = (error as { statusCode?: number }).statusCode;
+  const message = error instanceof Error ? error.message : String(error);
+  if (status && status >= 400 && status < 500) {
+    return reply.status(status).send(errorBody('bad_request', message));
+  }
+  console.error('Unhandled error:', message);
+  return reply.status(500).send(errorBody('internal', 'Internal server error'));
 });
 
-app.get('/api/events', async (request, reply) => {
-  reply.raw.setHeader('Content-Type', 'text/event-stream');
-  reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
-  reply.raw.setHeader('Connection', 'keep-alive');
-  reply.raw.setHeader('X-Accel-Buffering', 'no');
-  reply.raw.flushHeaders?.();
+app.setNotFoundHandler((request, reply) => {
+  reply.status(404).send(errorBody('not_found', `No route for ${request.method} ${request.url}`));
+});
 
-  const write = (payload: unknown) => {
-    reply.raw.write(`data: ${JSON.stringify(payload)}\n\n`);
-  };
+app.get('/api/health', async () => {
+  const { mode, mode_reason } = sim.response();
+  return { ok: true, mode, mode_reason };
+});
+app.get('/api/sim/cast', async () => sim.castResponse());
+app.get('/api/sim/state', async () => sim.response());
+app.get('/api/sim/history', async () => sim.history());
+app.post('/api/sim/start', async () => sim.start());
+app.post('/api/sim/play', async () => sim.play());
+app.post('/api/sim/pause', async () => sim.pause());
+app.post('/api/sim/reset', async () => sim.reset());
+app.post('/api/sim/step', async () => sim.step());
+app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/settings', async (request) => sim.settings(request.body));
 
-  sim.subscribe(write);
-  write({ type: 'history', mode: sim.state.mode ?? DEFAULT_MODE, state: sim.state, history: sim.state.feed.slice(-20) });
-
-  request.raw.on('close', () => {
-    sim.unsubscribe(write);
+app.get('/api/events', (request, reply) => {
+  reply.hijack();
+  const res = reply.raw;
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
   });
+  const write = (chunk: string) => {
+    if (!res.writableEnded && !res.destroyed) res.write(chunk);
+  };
+  const send: Listener = (message) => write(`data: ${JSON.stringify(message)}\n\n`);
 
-  return reply;
+  write('retry: 3000\n\n');
+  send({ type: 'history', ...sim.history() });
+  sim.subscribe(send);
+  const heartbeat = setInterval(() => write(': ping\n\n'), HEARTBEAT_MS);
+
+  res.on('close', () => {
+    clearInterval(heartbeat);
+    sim.unsubscribe(send);
+  });
+  request.raw.on('error', () => res.destroy());
 });
 
 const port = Number(process.env.PORT ?? '3010');
-
-let tickLoop: NodeJS.Timeout | null = null;
+let listening = false;
 
 export function startServer() {
-  if (tickLoop) {
-    return app;
-  }
-
-  tickLoop = setInterval(() => {
-    if (!sim.state.running) {
-      return;
-    }
-    void sim.step();
-  }, 2500);
-
+  if (listening) return app;
+  listening = true;
   void (async () => {
     try {
       await app.listen({ port, host: '0.0.0.0' });
-      console.log(`Office sim server listening on http://localhost:${port}`);
+      const { mode, mode_reason } = sim.response();
+      console.log(`Office sim server listening on http://localhost:${port} (mode: ${mode}, ${mode_reason})`);
     } catch (error) {
-      console.error('Failed to start server', error);
+      console.error('Failed to start server:', error instanceof Error ? error.message : String(error));
       process.exit(1);
     }
   })();
-
   return app;
 }
 

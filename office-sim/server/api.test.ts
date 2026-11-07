@@ -1,64 +1,193 @@
 import assert from 'node:assert/strict';
-import { describe, test } from 'node:test';
+import type { AddressInfo } from 'node:net';
+import { after, describe, test } from 'node:test';
 
-import { app } from './index';
+import type { StreamMessage } from '../shared/api';
 
-describe('api routes', () => {
-  test('GET /api/health returns ok', async () => {
-    const response = await app.inject({ method: 'GET', url: '/api/health' });
+// No key: the server must run in rules mode and never call the LLM.
+// dotenv (loaded by index.ts) does not override a variable that is already set.
+process.env.ANTHROPIC_API_KEY = '';
+const { app, sim, DEFAULT_TICKS, TICK_LIMIT } = await import('./index');
+const MAX_TICKS = DEFAULT_TICKS;
 
-    assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.json(), { ok: true });
+const post = (url: string, payload?: unknown) =>
+  app.inject({
+    method: 'POST',
+    url,
+    ...(payload === undefined ? {} : { payload: payload as object, headers: { 'content-type': 'application/json' } }),
   });
 
-  test('simulation lifecycle routes mutate singleton state', async () => {
-    await app.inject({ method: 'POST', url: '/api/sim/reset' });
+after(async () => {
+  await post('/api/sim/reset');
+  await app.close();
+});
 
-    let response = await app.inject({ method: 'POST', url: '/api/sim/start' });
-    let json = response.json();
+describe('api routes', () => {
+  test('GET /api/health reports the rules fallback without a key', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/health' });
     assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json(), { ok: true, mode: 'rules', mode_reason: 'no_api_key' });
+  });
+
+  test('GET /api/sim/cast returns the engine cast', async () => {
+    const json = (await app.inject({ method: 'GET', url: '/api/sim/cast' })).json();
+    assert.equal(json.agents.length, 8);
+    assert.ok(json.agents.every((a: { id: string; name: string; archetype: string }) => a.id && a.name && a.archetype));
+  });
+
+  test('lifecycle routes drive the real engine', async () => {
+    let json = (await post('/api/sim/reset')).json();
+    assert.equal(json.state.tick, 0);
+    assert.equal(Object.keys(json.state.agents).length, 8);
+
+    json = (await post('/api/sim/start')).json();
     assert.equal(json.state.started, true);
     assert.equal(json.state.running, true);
 
-    response = await app.inject({ method: 'POST', url: '/api/sim/pause' });
-    json = response.json();
-    assert.equal(response.statusCode, 200);
+    json = (await post('/api/sim/pause')).json();
     assert.equal(json.state.running, false);
+    const before = json.state.tick;
 
-    response = await app.inject({ method: 'POST', url: '/api/sim/step' });
+    let response = await post('/api/sim/step');
     json = response.json();
     assert.equal(response.statusCode, 200);
-    assert.equal(json.state.tick, 1);
+    assert.equal(json.mode, 'rules');
+    assert.equal(json.state.tick, before + 1);
 
-    response = await app.inject({
-      method: 'POST',
-      url: '/api/sim/inject',
-      payload: { type: 'merger', is_true: false },
-      headers: { 'content-type': 'application/json' },
-    });
+    response = await post('/api/sim/inject', { type: 'merger', is_true: false });
     json = response.json();
     assert.equal(response.statusCode, 200);
-    assert.equal(json.state.event, 'merger');
     assert.ok(json.state.queue.includes('merger'));
-    assert.ok(json.state.feed.some((line: string) => line.includes('Queued event: merger')));
 
-    response = await app.inject({ method: 'POST', url: '/api/sim/reset' });
-    json = response.json();
-    assert.equal(response.statusCode, 200);
+    json = (await post('/api/sim/step')).json();
+    assert.deepEqual(json.state.queue, []);
+    const history = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json().history;
+    const last = history.at(-1);
+    assert.equal(last.tick, json.state.tick);
+    assert.ok(last.events.some((e: { type: string; is_true: boolean }) => e.type === 'merger' && e.is_true === false));
+    assert.ok(last.records.length > 0);
+    assert.ok(last.records.every((r: { public_line?: string; state?: unknown }) => typeof r.public_line === 'string' && r.state));
+
+    json = (await post('/api/sim/reset')).json();
     assert.equal(json.state.started, false);
     assert.equal(json.state.running, false);
     assert.equal(json.state.tick, 0);
+    assert.deepEqual((await app.inject({ method: 'GET', url: '/api/sim/history' })).json().history, []);
   });
 
   test('GET /api/sim/state returns the singleton state', async () => {
-    const response = await app.inject({ method: 'POST', url: '/api/sim/reset' });
-    const resetJson = response.json();
-
-    const stateResponse = await app.inject({ method: 'GET', url: '/api/sim/state' });
-    const stateJson = stateResponse.json();
-
-    assert.equal(stateResponse.statusCode, 200);
+    const resetJson = (await post('/api/sim/reset')).json();
+    const stateJson = (await app.inject({ method: 'GET', url: '/api/sim/state' })).json();
     assert.deepEqual(stateJson.state, resetJson.state);
     assert.equal(stateJson.state.tick, 0);
+  });
+
+  test('errors use one shape', async () => {
+    await post('/api/sim/reset');
+    for (const payload of [{ type: 'bogus' }, { type: 'merger', is_true: 'yes' }, { type: 'merger', extra: 1 }, undefined]) {
+      const response = await post('/api/sim/inject', payload);
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().error.code, 'invalid_event');
+      assert.equal(typeof response.json().error.message, 'string');
+    }
+
+    await post('/api/sim/play');
+    const running = await post('/api/sim/step');
+    assert.equal(running.statusCode, 409);
+    assert.equal(running.json().error.code, 'sim_running');
+    await post('/api/sim/pause');
+
+    const missing = await app.inject({ method: 'GET', url: '/api/nope' });
+    assert.equal(missing.statusCode, 404);
+    assert.equal(missing.json().error.code, 'not_found');
+  });
+
+  test('a full run ends at the tick limit with a quit recorded', async () => {
+    await post('/api/sim/reset');
+    for (let i = 0; i < MAX_TICKS; i++) assert.equal((await post('/api/sim/step')).statusCode, 200);
+    const json = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json();
+    assert.equal(json.state.tick, MAX_TICKS);
+    assert.equal(json.history.length, MAX_TICKS);
+    assert.ok(json.state.metrics.crack_order.length > 0);
+    const quitter = json.state.metrics.crack_order[0];
+    assert.equal(json.state.agents[quitter].status, 'quit');
+    assert.ok(json.history.some((f: { records: Array<{ agent: string; quit?: boolean }> }) => f.records.some((r) => r.agent === quitter && r.quit)));
+
+    for (const url of ['/api/sim/step', '/api/sim/play']) {
+      const response = await post(url);
+      assert.equal(response.statusCode, 409);
+      assert.equal(response.json().error.code, 'run_complete');
+    }
+  });
+
+  test('run length is adjustable from 1 to 128 and kept across reset', async () => {
+    let json = (await post('/api/sim/reset')).json();
+    assert.equal(json.max_ticks, DEFAULT_TICKS);
+
+    for (const payload of [{ max_ticks: 0 }, { max_ticks: TICK_LIMIT + 1 }, { max_ticks: 2.5 }, { max_ticks: '32' }, { max_ticks: 32, x: 1 }, undefined]) {
+      const response = await post('/api/sim/settings', payload);
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.json().error.code, 'invalid_settings');
+    }
+
+    json = (await post('/api/sim/settings', { max_ticks: 3 })).json();
+    assert.equal(json.max_ticks, 3);
+    for (let i = 0; i < 3; i++) assert.equal((await post('/api/sim/step')).statusCode, 200);
+    assert.equal((await post('/api/sim/step')).json().error.code, 'run_complete');
+
+    const below = await post('/api/sim/settings', { max_ticks: 2 });
+    assert.equal(below.statusCode, 409);
+    assert.equal(below.json().error.code, 'below_current_tick');
+
+    // Raising the limit after the run ended lets it continue.
+    assert.equal((await post('/api/sim/settings', { max_ticks: 4 })).statusCode, 200);
+    assert.equal((await post('/api/sim/step')).json().state.tick, 4);
+
+    json = (await post('/api/sim/settings', { max_ticks: TICK_LIMIT })).json();
+    assert.equal(json.max_ticks, TICK_LIMIT);
+    json = (await post('/api/sim/reset')).json();
+    assert.equal(json.max_ticks, TICK_LIMIT);
+    assert.equal(json.state.tick, 0);
+    await post('/api/sim/settings', { max_ticks: DEFAULT_TICKS });
+  });
+
+  test('SSE sends history on connect, then ticks, and cleans up on disconnect', async () => {
+    await post('/api/sim/reset');
+    await app.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = app.server.address() as AddressInfo;
+    const controller = new AbortController();
+    const response = await fetch(`http://127.0.0.1:${port}/api/events`, { signal: controller.signal });
+    assert.equal(response.headers.get('content-type'), 'text/event-stream');
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const next = async (): Promise<StreamMessage> => {
+      for (;;) {
+        const match = buffer.match(/^data: (.*)$/m);
+        const end = match ? buffer.indexOf('\n\n', match.index) : -1;
+        if (match && end !== -1) {
+          buffer = buffer.slice(end + 2);
+          return JSON.parse(match[1]);
+        }
+        const { value, done } = await reader.read();
+        if (done) throw new Error('stream ended');
+        buffer += decoder.decode(value, { stream: true });
+      }
+    };
+
+    const first = await next();
+    assert.equal(first.type, 'history');
+    assert.equal(sim.listenerCount, 1);
+
+    await post('/api/sim/play');
+    let message = await next();
+    while (message.type !== 'tick') message = await next();
+    assert.equal(message.frame.tick, 1);
+    await post('/api/sim/pause');
+
+    controller.abort();
+    for (let i = 0; i < 50 && sim.listenerCount > 0; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.equal(sim.listenerCount, 0);
   });
 });
