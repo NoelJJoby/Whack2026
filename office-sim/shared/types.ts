@@ -49,8 +49,8 @@ export interface AgentProfile {
     sociability: number;
     distortion_rate: number;
     quit_threshold: number;
-    impulsivity?: number;
-    recruiter_contact?: boolean;
+    impulsivity: number;
+    recruiter_contact: boolean;
   };
 }
 

@@ -8,7 +8,12 @@ const DEFAULT_MODE: SimulationMode = 'llm_bias';
 
 class OfficeSimManager {
   private readonly listeners = new Set<(payload: unknown) => void>();
-  state: SimulationState = { ...createInitialSimulation(), mode: DEFAULT_MODE };
+  state: SimulationState;
+
+  constructor() {
+    this.state = createInitialSimulation(42);
+    this.state.mode = DEFAULT_MODE;
+  }
 
   subscribe(listener: (payload: unknown) => void) {
     this.listeners.add(listener);
@@ -42,7 +47,7 @@ class OfficeSimManager {
 
   async pause() {
     this.state.running = false;
-    this.emit({ type: 'state', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
+    this.emit({ type: 'state', mode: this.state.mode ?? DEFAULT_MODE, state: this.state, history: this.state.feed.slice(-20) });
     return this.state;
   }
 
@@ -53,13 +58,15 @@ class OfficeSimManager {
   }
 
   async step() {
-    this.state = { ...stepSimulation(this.state), mode: this.state.mode ?? DEFAULT_MODE };
+    const nextState = stepSimulation(this.state);
+    this.state = { ...nextState, mode: this.state.mode ?? DEFAULT_MODE };
     this.emit({ type: 'tick', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
     return this.state;
   }
 
   async inject(type: EventType, isTrue = true) {
-    this.state = injectEvent(this.state, type);
+    const nextState = injectEvent(this.state, type);
+    this.state = { ...nextState, mode: this.state.mode ?? DEFAULT_MODE };
     this.state.event = type;
     this.state.feed = [...this.state.feed, `Queued event: ${type} (truth=${String(isTrue)})`];
     this.emit({ type: 'inject', mode: this.state.mode, state: this.state, history: this.state.feed.slice(-20) });
