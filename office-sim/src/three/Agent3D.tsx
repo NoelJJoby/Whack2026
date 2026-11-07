@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import type { Group } from 'three';
 import type { Person } from '../design/Office';
+import type { DialogueLine } from '../dialogueQueue';
 import { playerText } from '../hudModel';
 import { FLOOR, type Seat } from './layout';
 import { mat, unitBox } from './voxel';
@@ -16,29 +17,20 @@ function Part({ p, s, c }: { p: [number, number, number]; s: [number, number, nu
 
 const clip = (text: string) => { const t = playerText(text); return t.length > 60 ? `${t.slice(0, 58).trimEnd()}…` : t; };
 
-/** Half the cast talks at a time (alternating every 3 s) so bubbles don't pile up; selected/highlighted always show. */
-function Bubble({ person, phase, pinned }: { person: Person; phase: number; pinned: boolean }) {
-  const [beat, setBeat] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setBeat(b => b + 1), 3000);
-    return () => clearInterval(id);
-  }, []);
-  const turn = beat + phase;
-  if (!pinned && turn % 2) return null;
-  // Alternate speech and thought on each of this agent's turns.
-  const showThought = person.says ? (person.thinks ? Math.floor(turn / 2) % 2 === 1 : false) : true;
-  const text = showThought ? person.thinks : person.says;
-  if (!text) return null;
+/** The dialogue bar's current line, above its speaker: speech bubble, plus a thought cloud when thoughts are on. */
+function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine; showThoughts: boolean }) {
+  const thought = showThoughts && line.inner ? line.inner : '';
+  if (!line.publicLine && !thought) return null;
   return <Html position={[0, 1.95, 0]} zIndexRange={[4, 0]} className="o3-anchor">
-    <div className={`o3-bubble ${showThought ? 'thought' : 'speech'}`}>
-      <small>{person.name} {showThought ? 'thinks' : 'says'}</small>
-      <span>{clip(text)}</span>
+    <div className="o3-stack">
+      {thought && <div className="o3-bubble thought"><small>{name} thinks</small><span>{clip(thought)}</span></div>}
+      {line.publicLine && <div className="o3-bubble speech"><small>{name} says</small><span>{clip(line.publicLine)}</span></div>}
     </div>
   </Html>;
 }
 
-export function Agent3D({ person, seat, phase, selected, highlighted, speaking, onSelect }: {
-  person: Person; seat: Seat; phase: number; selected: boolean; highlighted: boolean; speaking: boolean; onSelect: (id: string) => void;
+export function Agent3D({ person, seat, phase, selected, highlighted, line, showThoughts, onSelect }: {
+  person: Person; seat: Seat; phase: number; selected: boolean; highlighted: boolean; line: DialogueLine | null; showThoughts: boolean; onSelect: (id: string) => void;
 }) {
   const torso = useRef<Group>(null);
   const armL = useRef<Group>(null);
@@ -51,7 +43,7 @@ export function Agent3D({ person, seat, phase, selected, highlighted, speaking, 
     if (armR.current) armR.current.rotation.x = -1.15 + Math.sin(t * 14 + 1.6) * 0.08;
   });
   if (person.quit) return null;
-  const ring = selected ? '#d7b66c' : highlighted ? '#fff2cf' : speaking ? '#8abca2' : null;
+  const ring = selected ? '#d7b66c' : highlighted ? '#fff2cf' : line ? '#8abca2' : null;
   return <group position={[seat.x, FLOOR, seat.z]}
     onClick={e => { e.stopPropagation(); onSelect(person.id); }}
     onPointerOver={e => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
@@ -76,6 +68,6 @@ export function Agent3D({ person, seat, phase, selected, highlighted, speaking, 
     <Part p={[0, 1.44, -0.22]} s={[0.54, 0.4, 0.1]} c={person.hair} />
     <Part p={[-0.1, 1.4, 0.235]} s={[0.08, 0.08, 0.02]} c={EYES} />
     <Part p={[0.1, 1.4, 0.235]} s={[0.08, 0.08, 0.02]} c={EYES} />
-    <Bubble person={person} phase={phase} pinned={selected || highlighted || speaking} />
+    {line && <Bubble name={person.name} line={line} showThoughts={showThoughts} />}
   </group>;
 }

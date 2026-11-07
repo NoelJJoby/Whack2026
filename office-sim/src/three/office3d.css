@@ -2,7 +2,9 @@
 .o3-scene { background: #14203a; }
 .o3-scene canvas { touch-action: none; }
 .o3-anchor { pointer-events: none; }
-.o3-bubble { position: relative; width: max-content; max-width: 150px; padding: 4px 7px 5px; font: 10px/1.3 "VCR OSD Mono", monospace; transform: translate(-50%, -100%); }
+.o3-bubble { position: relative; width: max-content; max-width: 150px; padding: 4px 7px 5px; font: 10px/1.3 "VCR OSD Mono", monospace; }
+/* Stack sits bottom-centre on the head anchor. */
+.o3-stack { display: flex; flex-direction: column; align-items: center; gap: 14px; transform: translate(-50%, -100%); }
 .o3-bubble small { display: block; font-size: 9px; letter-spacing: .04em; margin-bottom: 2px; opacity: .7; }
 .o3-bubble.speech { background: #fbf7ec; color: #1d2928; border: 2px solid #1d2928; box-shadow: 3px 3px 0 #10192b88; }
 .o3-bubble.speech::after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -5px; border: 5px solid transparent; border-top: 5px solid #1d2928; border-bottom: 0; }

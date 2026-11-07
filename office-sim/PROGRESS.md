@@ -7,9 +7,8 @@
 - `src/three/`: voxel.ts (box data → one merged mesh), world.ts (plot, street, cars, building,
   cutaway walls, meeting room, lounge, coffee bar, cooler, glass CEO office), layout.ts (seats
   by archetype), Agent3D.tsx (seated voxel figure, typing/breathing, bubbles), office3d.css.
-- Main now has a DialogueBar + `speaking` prop; Office3D takes it too (mint ring + bubble pinned).
-- Bubbles: drei <Html>, half the cast at a time (3 s turns), speech (white, tail) vs
-  thought (dim dashed cloud); selected/highlighted agents always show theirs.
+- Bubbles (user decision): only the dialogue bar's current speaker gets one (App passes
+  `dialogue.line` + `showThoughts`). Speech = white box w/ tail; thought cloud above it when thoughts on.
 - Quit agents are hidden and their monitor goes dark (walk-out is Pass 2).
 
 ## Next

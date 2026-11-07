@@ -4,6 +4,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Stats } from '@react-three/drei';
 import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial } from 'three';
 import type { Person } from '../design/Office';
+import type { DialogueLine } from '../dialogueQueue';
 import { Agent3D } from './Agent3D';
 import { DESK_OFFSET, FLOOR, seatFor } from './layout';
 import { glass, glow, solid } from './world';
@@ -41,13 +42,14 @@ function FitZoom() {
   return null;
 }
 
-export default function Office3D({ people, selected, onSelect, highlight, speaking = null }: {
+export default function Office3D({ people, selected, onSelect, highlight, line = null, showThoughts = false }: {
   people: Person[];
   selected: string | null;
   onSelect: (id: string) => void;
   highlight: string[];
-  /** The agent the dialogue bar is showing. */
-  speaking?: string | null;
+  /** The line the dialogue bar is showing: only its speaker gets a bubble. */
+  line?: DialogueLine | null;
+  showThoughts?: boolean;
 }) {
   return <div className="office-scene o3-scene">
     <Canvas orthographic shadows flat dpr={[1, 1.5]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
@@ -63,7 +65,7 @@ export default function Office3D({ people, selected, onSelect, highlight, speaki
           <mesh position={[seat.x + 0.4, FLOOR + 1.08, seat.z + DESK_OFFSET + 0.035]} scale={[0.58, 0.32, 0.01]} material={p.quit ? screenOff : screenOn}>
             <boxGeometry />
           </mesh>
-          <Agent3D person={p} seat={seat} phase={i} selected={selected === p.id} highlighted={highlight.includes(p.id)} speaking={speaking === p.id} onSelect={onSelect} />
+          <Agent3D person={p} seat={seat} phase={i} selected={selected === p.id} highlighted={highlight.includes(p.id)} line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={onSelect} />
         </group>;
       })}
       <OrbitControls makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
