@@ -169,15 +169,21 @@ export function seedEventClaim(
   tick: number,
   p: Params,
   text = p.events[type].text,
+  custom = false,
 ): EngineClaim {
   const e = p.events[type];
   const base = createClaimFromEvent(text, source, tick, isTrue);
+  // Two events of one type in the same tick (a scheduled one and an injected
+  // one, say) each get their own claim.
+  let id = `claim-${tick}-${type}`;
+  for (let n = 2; world.claims[id]; n++) id = `claim-${tick}-${type}-${n}`;
   const claim: EngineClaim = {
     ...base,
-    id: `claim-${tick}-${type}`,
+    id,
     scandal: e.scandal,
     parentId: null,
-    rootId: `claim-${tick}-${type}`,
+    rootId: id,
+    ...(custom ? { custom: true } : {}),
     event: type,
     onHear: { ...e.onHear },
   };

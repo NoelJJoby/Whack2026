@@ -47,10 +47,10 @@ export default function App() {
     };
   }), [cast, latest, state]);
   const entries = useMemo(() => feedEntries(history), [history]);
-  const queued: FeedEntry[] = [...(state?.queue ?? [])].reverse().map((type, index) => ({
+  const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
     key: `queued-${index}`, label: 'Queued', time: timeLabel((state?.tick ?? 0) + 1),
-    text: presets.find(p => p.type === type)?.title ?? type, ids: [],
-  }));
+    text: state?.queue_text?.[index] ?? presets.find(p => p.type === type)?.title ?? type, ids: [],
+  })).reverse();
   const wireEntries = [...queued, ...entries];
   const person = people.find(p => p.id === selected);
   const hour = state?.tick ?? 0;
@@ -85,7 +85,7 @@ export default function App() {
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'shake' ? <EventComposer onInject={sim.inject} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+      {menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
         <div className="diagnostics"><h3>Connection & engine</h3><dl><div><dt>Connection</dt><dd>{live ? 'Connected' : connectionText}</dd></div><div><dt>Engine</dt><dd>{diagnostic}</dd></div><div><dt>Seed</dt><dd>{state?.seed ?? '—'}</dd></div></dl>{sim.error && <p role="status" className="coral">{playerText(sim.error)}</p>}</div>
       </>}

@@ -116,6 +116,8 @@ export interface SimulationState {
   running: boolean;
   event: EventType | null;
   queue: EventType[];
+  /** Same order as queue: the player's headline for a custom event, else null. */
+  queue_text?: Array<string | null>;
   feed: string[];
   claims: Claim[];
   agents: Record<string, AgentRuntimeState>;

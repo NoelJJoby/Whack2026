@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type {
   ApiError,
   CastResponse,
+  CustomInjectRequest,
   HistoryResponse,
   ModeReason,
   SettingsRequest,
@@ -15,7 +16,11 @@ import type {
 } from '../shared/api';
 import type { DecisionLog, EventType, SimulationMode, SimulationState, TickRecord } from '../shared/types';
 import type { CastMember, DecisionLog as EngineDecisionLog, ScenarioEvent, TurnProvider, World } from './engine-types';
+import {
+  CUSTOM_EVENT_KINDS, CUSTOM_EVENT_KIND_IDS, CUSTOM_EVENT_LIMITS, checkHeadline, headlineKey,
+} from '../shared/customEvent';
 import { createTurnProvider } from './llm';
+import { createHeadlineReviewer, type HeadlineReviewer } from './llm/moderation';
 import { DEFAULT_PARAMS, eventParams } from './params';
 import { toPriceDTO, workforceReport } from './price';
 import { buildScenario, fixtureCast } from './scripts/fixture';
@@ -40,8 +45,16 @@ const HEARTBEAT_MS = 15_000;
 const MAX_HISTORY = 200;
 const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
+/** Events of any kind waiting for the next tick; injecting more is refused. */
+const MAX_QUEUED = 4;
 
 const injectSchema = z.object({ type: z.enum(EVENT_TYPES), is_true: z.boolean().optional() }).strict();
+// The raw text cap is generous; checkHeadline enforces the real limit after normalising.
+const customInjectSchema = z.object({
+  kind: z.enum(CUSTOM_EVENT_KIND_IDS),
+  text: z.string().max(CUSTOM_EVENT_LIMITS.maxLength * 4),
+  is_true: z.boolean(),
+}).strict() satisfies z.ZodType<CustomInjectRequest>;
 const settingsSchema = z.object({ max_ticks: z.number().int().min(1).max(TICK_LIMIT).optional(), price_feedback: z.boolean().optional() }).strict().refine(v => v.max_ticks !== undefined || v.price_feedback !== undefined) satisfies z.ZodType<SettingsRequest>;
 
 class ApiFailure extends Error {
@@ -101,6 +114,11 @@ class OfficeSimManager {
   private frames: TickFrame[] = [];
   private feed: string[] = [];
   private provider: TurnProvider | null = null;
+  private reviewer: HeadlineReviewer | null = null;
+  /** headlineKey of every custom event accepted or under review this run. */
+  private customHeadlines = new Set<string>();
+  /** Custom events under review, counted against the pending limit. */
+  private reviewing = 0;
   private mode: SimulationMode = 'rules';
   private modeReason: ModeReason = 'no_api_key';
   private maxTicks = DEFAULT_TICKS;
@@ -136,10 +154,12 @@ class OfficeSimManager {
   private init(seed = this.seed) {
     if (hasApiKey()) {
       this.provider ??= createTurnProvider();
+      this.reviewer ??= createHeadlineReviewer();
       this.mode = 'llm_bias';
       this.modeReason = 'configured';
     } else {
       this.provider = null;
+      this.reviewer = null;
       this.mode = 'rules';
       this.modeReason = 'no_api_key';
     }
@@ -147,6 +167,7 @@ class OfficeSimManager {
     this.world = createWorld(this.cast, seed);
     this.frames = [];
     this.feed = ['Simulation ready.'];
+    this.customHeadlines = new Set();
     this.started = false;
     this.running = false;
   }
@@ -261,6 +282,7 @@ class OfficeSimManager {
       type: e.type,
       is_true: e.is_true,
       text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
+      ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
     }));
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
 
@@ -367,9 +389,77 @@ class OfficeSimManager {
       throw new ApiFailure(400, 'invalid_event', `Expected { type: one of ${EVENT_TYPES.join(', ')}; is_true?: boolean }.`, parsed.error.issues);
     }
     this.assertNotComplete();
+    this.assertQueueRoom();
     const { type, is_true } = parsed.data;
     this.world = queueEvent(this.world, is_true === undefined ? { type } : { type, isTrue: is_true });
     this.feed.push(`Queued event: ${type}`);
+    this.emitState();
+    return this.response();
+  }
+
+  private assertQueueRoom() {
+    if (this.world.queue.length + this.reviewing >= MAX_QUEUED) {
+      throw new ApiFailure(429, 'queue_full', `${MAX_QUEUED} announcements are already waiting. Let the next hour run first.`);
+    }
+  }
+
+  private assertCustomRoom() {
+    this.assertQueueRoom();
+    const pending = this.world.queue.filter((e) => e.custom).length + this.reviewing;
+    if (pending >= CUSTOM_EVENT_LIMITS.maxPending) {
+      throw new ApiFailure(429, 'custom_pending', `${CUSTOM_EVENT_LIMITS.maxPending} of your announcements are already waiting for the next hour.`);
+    }
+    if (this.customHeadlines.size >= CUSTOM_EVENT_LIMITS.maxPerRun) {
+      throw new ApiFailure(429, 'custom_limit', `You can post ${CUSTOM_EVENT_LIMITS.maxPerRun} of your own announcements per run. Reset for more.`);
+    }
+  }
+
+  /**
+   * Queue a player-written event. The kind borrows a built-in event's effects;
+   * the text must pass the shared rules and, with an API key, a Claude review.
+   */
+  async injectCustom(body: unknown) {
+    const parsed = customInjectSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new ApiFailure(400, 'invalid_event', `Expected { kind: one of ${CUSTOM_EVENT_KIND_IDS.join(', ')}; text: string; is_true: boolean }.`, parsed.error.issues);
+    }
+    this.assertNotComplete();
+    this.assertCustomRoom();
+    const { kind, is_true } = parsed.data;
+    const check = checkHeadline(parsed.data.text);
+    if (!check.ok) throw new ApiFailure(422, 'rejected_event', check.message, { reason: check.code });
+    const key = headlineKey(check.text);
+    if (this.customHeadlines.has(key)) {
+      throw new ApiFailure(409, 'duplicate_event', 'That announcement has already been posted this run.');
+    }
+
+    // Reserve the headline and a pending slot while the review is out, so
+    // concurrent requests can't slip past the limits or post it twice.
+    const generation = this.generation;
+    this.customHeadlines.add(key);
+    this.reviewing += 1;
+    let verdict;
+    try {
+      verdict = this.reviewer ? await this.reviewer(check.text, CUSTOM_EVENT_KINDS[kind].label) : null;
+    } finally {
+      this.reviewing -= 1;
+    }
+    if (generation !== this.generation) {
+      throw new ApiFailure(409, 'run_changed', 'The simulation was reset while your announcement was being checked. Post it again.');
+    }
+    if (verdict && !verdict.allowed) {
+      this.customHeadlines.delete(key);
+      throw new ApiFailure(422, 'rejected_event', verdict.reason, { reason: 'review' });
+    }
+    try {
+      this.assertNotComplete();
+    } catch (error) {
+      this.customHeadlines.delete(key);
+      throw error;
+    }
+
+    this.world = queueEvent(this.world, { type: CUSTOM_EVENT_KINDS[kind].base, isTrue: is_true, text: check.text, custom: true });
+    this.feed.push(`Queued custom event: ${check.text}`);
     this.emitState();
     return this.response();
   }
@@ -413,6 +503,7 @@ app.post('/api/sim/new-seed', async (request) => {
 });
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
+app.post('/api/sim/inject-custom', { bodyLimit: 4_096 }, async (request) => sim.injectCustom(request.body));
 app.post('/api/sim/speed', async (request) => sim.setSpeed(request.body));
 app.post('/api/sim/settings', async (request) => sim.settings(request.body));
 

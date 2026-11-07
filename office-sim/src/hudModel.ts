@@ -41,7 +41,7 @@ export function feedEntries(history: TickFrame[]): FeedEntry[] {
     })),
     ...[...frame.events].reverse().map((event, i) => ({
       key: `${frame.tick}-event-${i}`, time: timeLabel(frame.tick),
-      label: event.type === 'layoffs_rumour' ? 'Rumour' : 'Announcement', text: playerText(event.text), ids: [], truth: event.is_true,
+      label: event.custom ? 'Your announcement' : event.type === 'layoffs_rumour' ? 'Rumour' : 'Announcement', text: playerText(event.text), ids: [], truth: event.is_true,
     })),
   ]);
 }

@@ -115,6 +115,8 @@ export interface EngineClaim extends Claim {
   onHear: ClaimImpact;
   /** A distorted claim's text without its retelling frame. */
   core?: string;
+  /** Lineage started by a player-written event. */
+  custom?: boolean;
 }
 
 export interface ScenarioEvent {
@@ -126,6 +128,10 @@ export interface ScenarioEvent {
   hearers?: string[];
   /** Rumours: who they hear it from. Defaults to 'grapevine'. */
   source?: string;
+  /** Player-written headline, already validated; replaces the type's wording. */
+  text?: string;
+  /** Written by the player rather than the scheduler or a preset. */
+  custom?: boolean;
 }
 
 export type QueuedEvent = Omit<ScenarioEvent, 'tick'>;

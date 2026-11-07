@@ -427,6 +427,7 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
     running: false,
     event: null,
     queue: world.queue.map((e) => e.type),
+    queue_text: world.queue.map((e) => e.text ?? null),
     feed,
     claims: Object.values(world.claims).map(({ id, text, is_true, source, created_tick, hops }) => ({
       id,

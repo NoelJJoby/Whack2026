@@ -76,7 +76,8 @@ export function applyEvent(
     hearers = given.length > 0 ? given : pool.length > 0 ? [pool[rng.int(pool.length)]] : [];
   }
   const texts = [e.text, ...(e.variants ?? [])];
-  const claim = seedEventClaim(world, ev.type, isTrue, source, world.tick, p, texts[rng.int(texts.length)]);
+  const wording = texts[rng.int(texts.length)];
+  const claim = seedEventClaim(world, ev.type, isTrue, source, world.tick, p, ev.text ?? wording, ev.custom);
   for (const id of hearers) {
     if (id === source) continue;
     const r = receiveClaim(world, id, claim.id, source, world.tick, 0, p);

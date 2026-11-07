@@ -1,6 +1,7 @@
 // HTTP + SSE contract between server/index.ts and the web client.
 // PENDING TEAM SIGN-OFF (integration plan item S2). Additive only: nothing in
 // shared/types.ts changes.
+import type { CustomEventKind } from './customEvent';
 import type { AgentProfile, EventType, SimulationMode, SimulationState, TickRecord } from './types';
 
 /** Why the server runs in its current mode. */
@@ -51,11 +52,20 @@ export interface InjectRequest {
   is_true?: boolean;
 }
 
+/** POST /api/sim/inject-custom. The kind sets the effects; the text is checked by shared/customEvent.ts. */
+export interface CustomInjectRequest {
+  kind: CustomEventKind;
+  text: string;
+  is_true: boolean;
+}
+
 /** An event the engine applied this tick. */
 export interface TickEvent {
   type: EventType;
   is_true: boolean;
   text: string;
+  /** Written by the player. */
+  custom?: boolean;
 }
 
 export interface TickFrame {
