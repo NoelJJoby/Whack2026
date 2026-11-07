@@ -184,6 +184,17 @@ describe('bias engine: invariants', () => {
     assert.ok(total > 1);
   });
 
+  it('higher impulsivity shifts the mix away from work faster as stress rises (all else equal)', () => {
+    const awayFromWork = (stress: number, impulsivity: number) => {
+      const agent = makeAgent('a', { stress, burnout: 30, loyalty: 50, trust_mgmt: 50 }, { impulsivity });
+      const d = decide({ agent, world: makeWorld([agent, makeAgent('b', {})]), llm: null, mode: 'rules', rngs, params: P });
+      return 1 - (d.probs.work ?? 0) - (d.probs.overwork ?? 0);
+    };
+    const shift = (imp: number) => awayFromWork(90, imp) - awayFromWork(30, imp);
+    assert.ok(shift(20) > 0);
+    assert.ok(shift(80) > shift(20), `${shift(80)} vs ${shift(20)}`);
+  });
+
   it('random is uniform over available actions', () => {
     const avail: Action[] = ['work', 'overwork', 'complain', 'interview'];
     const probs = normalise(scoreActions('random', avail, { raw: {}, w: {} }, modifiers(scale(makeAgent('a', {})), false, P), 1, P));
