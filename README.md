@@ -1,4 +1,4 @@
-# Office Sim
+# Agentic Chaos
 
 This project provides the integration shell for an office simulation backend and client UI. It focuses on the simulation lifecycle, state streaming, and event injection rather than presentation details.
 
