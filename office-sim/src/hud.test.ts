@@ -6,13 +6,15 @@ import { workdayTime } from './Workday';
 import { StockPrice, stockSeries } from './StockPrice';
 import { mockHistory } from './mocks';
 
-test('workday shows lunch, home time, overtime and midnight before rolling to a new day', () => {
-  assert.deepEqual(workdayTime(0), { day: 1, hour: 8, progress: 0 });
-  assert.equal(workdayTime(4).hour, 12);
-  assert.equal(workdayTime(9).hour, 17);
-  assert.equal(workdayTime(13).hour, 21);
-  assert.deepEqual(workdayTime(16), { day: 1, hour: 24, progress: 100 });
-  assert.deepEqual(workdayTime(17), { day: 2, hour: 9, progress: 6.25 });
+test('workday maps 5 ticks per day across 10-day months and a 30-day (150-tick) quarter', () => {
+  assert.deepEqual(workdayTime(0), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, hour: 8, progress: 0 });
+  assert.deepEqual(workdayTime(1), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, hour: 9, progress: 20 });
+  assert.equal(workdayTime(3).hour, 13);
+  assert.deepEqual(workdayTime(5), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, hour: 17, progress: 100 });
+  assert.deepEqual(workdayTime(6), { quarter: 1, month: 1, week: 1, day: 2, dayOfMonth: 2, hour: 9, progress: 20 });
+  assert.deepEqual(workdayTime(50), { quarter: 1, month: 1, week: 2, day: 10, dayOfMonth: 10, hour: 17, progress: 100 });
+  assert.deepEqual(workdayTime(51), { quarter: 1, month: 2, week: 3, day: 11, dayOfMonth: 1, hour: 9, progress: 20 });
+  assert.deepEqual(workdayTime(150), { quarter: 1, month: 3, week: 6, day: 30, dayOfMonth: 10, hour: 17, progress: 100 });
 });
 test('stock indicator starts at 100 and projects backend prices without mutating history', () => {
   assert.deepEqual(stockSeries([]), [{ tick: 0, price: 100 }]);
@@ -138,7 +140,7 @@ test('metric states use strict simulation boundaries and trust has the favourabl
 
 test('display adapters remove engine hour terminology from errors and accessible metric text', () => {
   assert.equal(playerText('A tick is running. Try again in 2 ticks. max_ticks'), 'An hour is running. Try again in 2 hours. duration');
-  assert.equal(timeLabel(17), 'Day 2, 09:00');
+  assert.equal(timeLabel(6), 'Day 2, 09:00');
   const markup = renderToStaticMarkup(createElement(MetricBar, { label: 'Trust in management', value: 82, threshold: 80 }));
   assert.ok(markup.includes('82 out of 100, Outside low-trust range'));
   assert.ok(markup.includes('Trust in management'));

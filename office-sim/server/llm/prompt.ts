@@ -1,3 +1,4 @@
+import { isOvertime, workdayTime } from '../../shared/workday';
 import type { Action, EngineProfile, TurnContext } from '../engine-types';
 import { stateParagraph } from './bands';
 import { temporaryPersonaFor } from './personas';
@@ -8,7 +9,7 @@ import {
 
 const actionMeanings: Record<Action, string> = {
   work: 'Work normally',
-  overwork: 'Stay late; take on more',
+  overwork: 'Take on extra work',
   slack_off: 'Disengage for the day',
   complain: 'Vent to a colleague',
   gossip: 'Pass a claim to a colleague',
@@ -42,6 +43,7 @@ export function buildTurnPrompt(
       ethicsSentence(traits.ethics), sociabilitySentence(traits.sociability),
       impulsivitySentence(traits.impulsivity),
     ].join(' ')}`,
+    `It is day ${workdayTime(ctx.tick).day}, ${String(workdayTime(ctx.tick).hour).padStart(2, '0')}:00.${isOvertime(ctx.tick) ? ' The current hour is overtime.' : ''}`,
     `How you feel right now: ${stateParagraph(ctx.state)}`,
     `What you've heard:\n${claims.length ? claims.join('\n') : "You haven't heard anything new."}`,
     `This tick's announcements:\n${ctx.events.length

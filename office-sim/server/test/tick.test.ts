@@ -14,20 +14,21 @@ const config = (over: Partial<RunConfig> = {}): RunConfig => ({
 const run = (c: RunConfig, provider = createStubProvider(c.seed)) => runSimulation(fixtureCast(c.seed), c, provider);
 
 describe('tick loop: seeded event scheduling', () => {
-  it('buildScenario uses the curated event pool and spaces events by 2-5 ticks', () => {
-    const schedule = buildScenario(77, 40);
-    assert.ok(schedule.length > 0);
+  it('buildScenario uses the curated event pool and spaces events realistically across a 150-tick quarter', () => {
+    const schedule = buildScenario(77, 150);
+    assert.ok(schedule.length >= 6 && schedule.length <= 7, `expected 6-7 events per quarter, got ${schedule.length}`);
     assert.ok(schedule.every((event) => CURATED_EVENT_TYPES.includes(event.type)));
+    assert.ok(schedule[0].tick >= 1 && schedule[0].tick <= 4);
     for (let i = 1; i < schedule.length; i++) {
       const gap = schedule[i].tick - schedule[i - 1].tick;
-      assert.ok(gap >= 2 && gap <= 5, `gap ${gap} outside 2-5 ticks`);
+      assert.ok(gap >= 22 && gap <= 26, `gap ${gap} outside 22-26 ticks (~1 workweek)`);
     }
   });
 
   it('the same seed gives the same schedule, a different seed gives a different one', () => {
-    const a = buildScenario(99, 50);
-    const b = buildScenario(99, 50);
-    const c = buildScenario(100, 50);
+    const a = buildScenario(99, 150);
+    const b = buildScenario(99, 150);
+    const c = buildScenario(100, 150);
     assert.deepEqual(a, b);
     assert.notDeepEqual(a, c);
   });
@@ -36,9 +37,9 @@ describe('tick loop: seeded event scheduling', () => {
     const truths = new Set<boolean>();
     const sources = new Set<string>();
     for (let seed = 1; seed <= 100; seed++) {
-      const types = buildScenario(seed, 16).map((event) => event.type);
-      assert.equal(new Set(types).size, types.length, `seed ${seed} repeats an event`);
-      for (const event of buildScenario(seed, 16)) {
+      const types = buildScenario(seed, 150).map((event) => event.type);
+      assert.equal(new Set(types).size, types.length, `seed ${seed} repeats an event within a quarter`);
+      for (const event of buildScenario(seed, 150)) {
         truths.add(event.isTrue!);
         if (event.source) sources.add(event.source);
       }
@@ -48,8 +49,8 @@ describe('tick loop: seeded event scheduling', () => {
   });
 
   it('extending the run length keeps the earlier schedule', () => {
-    const short = buildScenario(5, 16);
-    assert.deepEqual(buildScenario(5, 64).slice(0, short.length), short);
+    const short = buildScenario(5, 50);
+    assert.deepEqual(buildScenario(5, 150).slice(0, short.length), short);
   });
 });
 
@@ -191,8 +192,46 @@ describe('tick loop: events and ablations', () => {
   it('every tunable lives in params: a different param set changes the run', async () => {
     const harsher = structuredClone(P);
     harsher.rules.passive.burnoutGain = 6;
-    const a = await runSimulation(fixtureCast(42), config(), createStubProvider(42));
-    const b = await runSimulation(fixtureCast(42), config(), createStubProvider(42), harsher);
+    const a = await runSimulation(fixtureCast(42), config({ ticks: 50 }), createStubProvider(42));
+    const b = await runSimulation(fixtureCast(42), config({ ticks: 50 }), createStubProvider(42), harsher);
     assert.ok(b.summary.quits > a.summary.quits);
+  });
+});
+
+describe('workday hours', () => {
+  it('runs 5 ticks per standard workday (09:00 to 17:00) without forced daily overtime penalties', async () => {
+    const params = structuredClone(P);
+    params.rules.passive.stressRelax = 0;
+    params.rules.passive.burnoutGain = 0;
+    params.rules.passive.burnoutGainPerStress = 0;
+    params.rules.passive.burnoutDecay = 0;
+    const provider = async () => ({ proposals: [{ action: 'work', weight: 1 }], public_line: '', inner_monologue: '', beliefs: {} });
+    for (const tick of [1, 2, 3, 4, 5, 6] as const) {
+      const world = createWorld(fixtureCast(42), 42, params);
+      world.tick = tick - 1;
+      world.price.tick = tick - 1;
+      const id = world.ids[0];
+      const before = world.agents[id].state;
+      const result = await runTick(world, provider, config({ mode: 'llm_raw', scenario: [] }), params);
+      assert.equal(result.world.agents[id].state.stress, before.stress + params.rules.actions.work.stress);
+      assert.equal(result.world.agents[id].state.burnout, before.burnout);
+    }
+  });
+
+  it('applies overwork burnout only to active employees who choose overwork', async () => {
+    const params = structuredClone(P);
+    params.rules.passive.stressRelax = 0;
+    params.rules.passive.burnoutGain = 0;
+    params.rules.passive.burnoutGainPerStress = 0;
+    params.rules.passive.burnoutDecay = 0;
+    const world = createWorld(fixtureCast(42), 42, params);
+    world.tick = 4;
+    world.price.tick = 4;
+    const [id, quitter] = world.ids;
+    world.agents[quitter].status = 'quit';
+    const before = structuredClone(world.agents);
+    const result = await runTick(world, async () => ({ proposals: [{ action: 'overwork', weight: 1 }], public_line: '', inner_monologue: '', beliefs: {} }), config({ mode: 'llm_raw', scenario: [] }), params);
+    assert.equal(result.world.agents[id].state.burnout, before[id].state.burnout + params.rules.actions.overwork.burnout);
+    assert.deepEqual(result.world.agents[quitter], before[quitter]);
   });
 });

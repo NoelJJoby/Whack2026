@@ -19,6 +19,7 @@ import type { CastMember, DecisionLog as EngineDecisionLog, ScenarioEvent, TurnP
 import {
   CUSTOM_EVENT_KINDS, CUSTOM_EVENT_KIND_IDS, CUSTOM_EVENT_LIMITS, checkHeadline, headlineKey,
 } from '../shared/customEvent';
+import { TICKS_PER_QUARTER } from '../shared/workday';
 import { createTurnProvider } from './llm';
 import { createHeadlineReviewer, type HeadlineReviewer } from './llm/moderation';
 import { DEFAULT_PARAMS, eventParams } from './params';
@@ -37,12 +38,13 @@ loadEnv({
 const randomSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
 const envSeed = Number(process.env.SIM_SEED);
 const DEFAULT_SEED = Number.isInteger(envSeed) && envSeed > 0 ? envSeed : randomSeed();
-/** Default run length, and the most ticks a run may be set to. */
-export const DEFAULT_TICKS = 16;
-export const TICK_LIMIT = 128;
-const TICK_INTERVAL_MS = 2500;
+/** Default run length (1 quarter = 30 days = 150 ticks), and the most ticks a run may be set to (2 quarters = 300 ticks). */
+export const DEFAULT_TICKS = TICKS_PER_QUARTER;
+export const TICK_LIMIT = TICKS_PER_QUARTER * 2;
+/** 150 ticks × 800ms = 120,000ms (2 minutes of real-life time at 1× speed). */
+const TICK_INTERVAL_MS = 800;
 const HEARTBEAT_MS = 15_000;
-const MAX_HISTORY = 200;
+const MAX_HISTORY = 300;
 const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 /** Events of any kind waiting for the next tick; injecting more is refused. */

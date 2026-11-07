@@ -157,11 +157,13 @@ test('public DTO allowlist omits engine-only metadata and future corrections', (
 
 test('feedback off reproduces current main workforce over ten seeds and thirty ticks', async () => {
   const results = [];
+  const legacyParams = structuredClone(P);
+  legacyParams.rules.overtime = { stress: 0, burnout: 0 };
   for (let seed = 1; seed <= 10; seed++) {
     const scenario = buildScenario(seed, 30);
-    const r = await runSimulation(fixtureCast(seed), config({ seed, scenario }), createStubProvider(seed));
+    const r = await runSimulation(fixtureCast(seed), config({ seed, scenario }), createStubProvider(seed), legacyParams);
     results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs: r.logs.map(({ price: _price, ...log }) => log), records: r.records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
-  assert.equal(digest, '78b8ffce9ecd4866c7f97ade869ecdc540c4103a0d8915e1133f4146014d4393');
+  assert.equal(digest, '46ffb128600524e5a1fac5feeaa7e2f88a0c215c32088f4bb2756ae515f6381b');
 });

@@ -9,8 +9,8 @@ import { mockCast, mockHistory, mockResponse } from './mocks';
 import { createAnnouncements, type Announcement } from './announcement';
 import { playerText } from './hudModel';
 
-/** Run lengths offered in the UI. The server accepts any integer from 1 to 128. */
-export const RUN_LENGTHS = [16, 32, 64, 128];
+/** Run lengths offered in the UI: 1 week (25), 1 month (50), 2 months (100), 1 quarter (150). */
+export const RUN_LENGTHS = [25, 50, 100, 150];
 
 /** Dev only: `VITE_USE_MOCKS=true` renders the design mock data instead of the server. */
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';

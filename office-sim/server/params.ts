@@ -234,6 +234,7 @@ export const ruleParams = {
     interview: { loyalty: -3, stress: -2 },
     leak: { trust_mgmt: -8, leakerStress: 5 },
   },
+  overtime: { stress: 2, burnout: 1 },
   passive: {
     /**
      * Stress relaxes toward target = stressBase + stressPerExcessWorkload * max(0, workload - comfortable),
