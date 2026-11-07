@@ -10,6 +10,8 @@ import { StockPrice, stockSeries } from '../src/StockPrice';
 // No key: the server must run in rules mode and never call the LLM.
 // dotenv (loaded by index.ts) does not override a variable that is already set.
 process.env.ANTHROPIC_API_KEY = '';
+// The server starts on a random seed; pin one so run outcomes are repeatable.
+process.env.SIM_SEED = '42';
 const { app, sim, DEFAULT_TICKS, TICK_LIMIT } = await import('./index');
 const MAX_TICKS = DEFAULT_TICKS;
 
@@ -128,7 +130,8 @@ describe('api routes', () => {
   });
 
   test('a full run ends at the tick limit with a quit recorded', async () => {
-    await post('/api/sim/reset');
+    // Seed 4: someone quits within the default run in rules mode.
+    await post('/api/sim/new-seed', { seed: 4 });
     for (let i = 0; i < MAX_TICKS; i++) assert.equal((await post('/api/sim/step')).statusCode, 200);
     const json = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json();
     assert.equal(json.state.tick, MAX_TICKS);

@@ -10,9 +10,32 @@ const DISTORTIONS: Array<(text: string) => string> = [
   (t) => `I heard it's even bigger than that: ${t}`,
 ];
 
-export function distortClaim(text: string, rng?: Rng): string {
-  const pick = rng ? rng.int(DISTORTIONS.length) : 0;
-  return DISTORTIONS[pick](text);
+/** Numbers grow in the retelling. Each rule rewrites the first match it finds. */
+const EXAGGERATIONS: Array<[RegExp, (match: string, n: string) => string]> = [
+  [/(\d+)%/, (_m, n) => `${Math.min(90, Math.round(Number(n) * 1.5))}%`],
+  [/(\d+)-hour/, (_m, n) => `${Math.min(24, Number(n) + 4)}-hour`],
+  [/(\d+) (million|people|months|weeks)/, (m, n) => m.replace(n, String(Number(n) * 2))],
+  [/\bhalf\b/, () => 'most'],
+  [/a third/, () => 'half'],
+  [/1 in 4/, () => '1 in 3'],
+];
+
+function exaggerate(text: string): string {
+  for (const [pattern, grow] of EXAGGERATIONS) {
+    if (pattern.test(text)) return text.replace(pattern, grow);
+  }
+  return text;
+}
+
+/**
+ * Retell a claim: maybe inflate its numbers, then wrap the underlying claim
+ * (not the parent's wrapper, so retellings never pile up) in a frame other
+ * than the one `avoid` already uses.
+ */
+export function distortClaim(core: string, rng?: Rng, avoid?: string): { core: string; text: string } {
+  const grown = rng && rng.chance(0.5) ? exaggerate(core) : core;
+  const options = DISTORTIONS.map((frame) => frame(grown)).filter((text) => text !== avoid);
+  return { core: grown, text: options[rng ? rng.int(options.length) : 0] };
 }
 
 export function createClaimFromEvent(text: string, source: string, tick: number, is_true: boolean): Claim {
@@ -145,9 +168,10 @@ export function seedEventClaim(
   source: string,
   tick: number,
   p: Params,
+  text = p.events[type].text,
 ): EngineClaim {
   const e = p.events[type];
-  const base = createClaimFromEvent(e.text, source, tick, isTrue);
+  const base = createClaimFromEvent(text, source, tick, isTrue);
   const claim: EngineClaim = {
     ...base,
     id: `claim-${tick}-${type}`,
@@ -211,7 +235,7 @@ export function gossipHop(
     const child: EngineClaim = {
       ...parent,
       id: `${parent.id}~${world.tick}-${speakerId}`,
-      text: distortClaim(parent.text, rng),
+      ...distortClaim(parent.core ?? parent.text, rng, parent.text),
       is_true: false,
       source: speakerId,
       created_tick: world.tick,

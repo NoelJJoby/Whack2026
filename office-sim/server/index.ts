@@ -14,7 +14,7 @@ import type {
   TickFrame,
 } from '../shared/api';
 import type { DecisionLog, EventType, SimulationMode, SimulationState, TickRecord } from '../shared/types';
-import type { CastMember, DecisionLog as EngineDecisionLog, TurnProvider, World } from './engine-types';
+import type { CastMember, DecisionLog as EngineDecisionLog, ScenarioEvent, TurnProvider, World } from './engine-types';
 import { createTurnProvider } from './llm';
 import { DEFAULT_PARAMS, eventParams } from './params';
 import { toPriceDTO, workforceReport } from './price';
@@ -28,7 +28,10 @@ loadEnv({
   quiet: true,
 });
 
-const DEFAULT_SEED = 42;
+/** A fresh company on every server start; set SIM_SEED to replay one. */
+const randomSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
+const envSeed = Number(process.env.SIM_SEED);
+const DEFAULT_SEED = Number.isInteger(envSeed) && envSeed > 0 ? envSeed : randomSeed();
 /** Default run length, and the most ticks a run may be set to. */
 export const DEFAULT_TICKS = 16;
 export const TICK_LIMIT = 128;
@@ -149,7 +152,7 @@ class OfficeSimManager {
   }
 
   reseed(seed?: number) {
-    const next = typeof seed === 'number' && Number.isInteger(seed) ? seed : Math.floor(Math.random() * 1_000_000) + 1;
+    const next = typeof seed === 'number' && Number.isInteger(seed) ? seed : randomSeed();
     this.clearTimer();
     this.generation += 1;
     this.seed = next;
@@ -158,8 +161,19 @@ class OfficeSimManager {
     return this.response();
   }
 
+  private scenario: { key: string; events: ScenarioEvent[] } | null = null;
+
+  /** The billboard schedule for this seed and run length, built once rather than every tick. */
+  private billboard(): ScenarioEvent[] {
+    const key = `${this.seed}:${this.maxTicks}`;
+    if (this.scenario?.key !== key) {
+      this.scenario = { key, events: buildScenario(this.seed, this.maxTicks, this.cast.map((c) => c.profile.id)) };
+    }
+    return this.scenario.events;
+  }
+
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: buildScenario(this.seed, this.maxTicks), gossip: true, billboard: true, priceFeedback: this.priceFeedback };
+    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback };
   }
 
   state(): SimulationState {

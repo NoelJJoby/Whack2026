@@ -63,6 +63,8 @@ export interface EngineTraits {
 
 export interface EngineProfile extends Omit<AgentProfile, 'traits'> {
   traits: EngineTraits;
+  /** Persona line for the LLM prompt; defaults to the id's placeholder. */
+  persona?: string;
 }
 
 /** Starting point for one cast member. Missing pairwise values use params defaults. */
@@ -111,6 +113,8 @@ export interface EngineClaim extends Claim {
   rootId: string;
   event: EventType | null;
   onHear: ClaimImpact;
+  /** A distorted claim's text without its retelling frame. */
+  core?: string;
 }
 
 export interface ScenarioEvent {

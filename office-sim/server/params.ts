@@ -86,6 +86,8 @@ export interface ClaimImpact {
 
 export interface EventParams {
   text: string;
+  /** Other wordings; each run's billboard picks one of text and these. */
+  variants?: string[];
   isTrue: boolean;
   scandal: boolean;
   /** Official: everyone hears it from management and direct effects apply. */
@@ -104,6 +106,12 @@ const noDirect = { stress: 0, workload: 0, baselineWorkload: 0, loyalty: 0, trus
 export const eventParams: Record<EventType, EventParams> = {
   merger: {
     text: "We're merging with a competitor; Sales and Operations will be restructured.",
+    variants: [
+      "We're being acquired by our biggest rival; Sales and Operations will be folded into theirs.",
+      'Merger confirmed: two Sales teams, two Ops teams, one org chart by next quarter.',
+      "We're combining with a competitor; expect Sales and Operations to be cut by 15%.",
+      'The board approved a merger; Sales and Operations report to new leads from Monday.',
+    ],
     isTrue: true,
     scandal: false,
     official: true,
@@ -114,6 +122,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   new_management: {
     text: 'A new VP is taking over and wants big changes fast.',
+    variants: [
+      'A new VP starts Monday with a 90-day plan to change everything.',
+      'Leadership shake-up: a VP from the competition takes over and wants results in 30 days.',
+      'A new VP of Operations is reviewing every team, starting this week.',
+      "The new VP's first memo: 'Nothing here is sacred.'",
+    ],
     isTrue: true,
     scandal: false,
     official: true,
@@ -124,6 +138,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   long_hours_policy: {
     text: 'Leadership says 20-hour days until the launch ships.',
+    variants: [
+      'Leadership says 16-hour days and working weekends until the launch ships.',
+      'All leave is cancelled; 18-hour days until the release is out.',
+      'New policy: everyone stays until 2am until the launch date.',
+      'Leadership wants 7-day weeks for the next 6 weeks to hit the deadline.',
+    ],
     isTrue: true,
     scandal: false,
     official: true,
@@ -134,6 +154,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   pr_scandal: {
     text: 'The company hid a customer data breach for months.',
+    variants: [
+      'The company covered up a breach that exposed 2 million customer records.',
+      'Customer passwords leaked 8 months ago and nobody was told.',
+      'Legal buried a report about a customer data leak last spring.',
+      'Someone in Security says a breach was hushed up before the funding round.',
+    ],
     isTrue: true,
     scandal: true,
     official: false,
@@ -144,6 +170,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   layoffs_rumour: {
     text: 'Layoffs are coming in Q4, a third of the team.',
+    variants: [
+      'Layoffs are coming next month, half of Sales.',
+      'HR is drafting a list: 1 in 4 people are getting cut before the holidays.',
+      'Layoffs in Q1, about 20% of the company.',
+      'Every team has been told to cut 2 people by the end of the quarter.',
+    ],
     isTrue: false,
     scandal: false,
     official: false,
@@ -154,6 +186,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   surprise_bonus: {
     text: 'Everyone gets a surprise bonus this month.',
+    variants: [
+      'Everyone gets an extra 10% bonus in the next paycheque.',
+      "A one-off bonus of two weeks' pay goes out on Friday.",
+      'Record quarter: everyone gets a $2,000 bonus this month.',
+      'Leadership is sharing the profits, with a bonus for every employee this month.',
+    ],
     isTrue: true,
     scandal: false,
     official: true,
@@ -164,6 +202,12 @@ export const eventParams: Record<EventType, EventParams> = {
   },
   competitor_poaching: {
     text: 'A competitor is hiring our people at 30% more pay.',
+    variants: [
+      'A competitor is offering our engineers 40% more to jump ship.',
+      "A rival's recruiter has messaged half the office this week, offering 25% more.",
+      'Three people already left for a competitor paying 50% more.',
+      'A competitor is offering signing bonuses to anyone from our team.',
+    ],
     isTrue: true,
     scandal: false,
     official: false,

@@ -76,8 +76,12 @@ assert.ok(empty.includes("What you've heard:\nYou haven't heard anything new."))
 assert.ok(empty.includes('No new announcements.'));
 assert.ok(empty.includes('Colleagues still here: None.'));
 assert.deepEqual(LlmOutputSchema.parse(example(empty)).beliefs, {});
+// Each seed deals the placeholder personas out in its own order, one per character.
+const dealt = fixtureCast(42).map((member) => member.profile.persona!);
+assert.deepEqual([...dealt].sort(), [...placeholderPersonas].sort());
+assert.notDeepEqual(dealt, fixtureCast(43).map((member) => member.profile.persona!));
 fixtureCast(42).forEach((member, index) => {
   assert.equal(temporaryPersonaFor(member.profile.id), placeholderPersonas[index]);
-  assert.ok(buildTurnPrompt(member.profile, ctx).includes(`Who you are: ${placeholderPersonas[index]}`));
+  assert.ok(buildTurnPrompt(member.profile, ctx).includes(`Who you are: ${member.profile.persona}`));
 });
-console.log('Prompt contract checks passed: context, actions, beliefs, desired schema and approved temporary persona mapping.');
+console.log('Prompt contract checks passed: context, actions, beliefs, desired schema and seeded persona assignment.');

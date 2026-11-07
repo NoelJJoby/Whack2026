@@ -28,7 +28,8 @@ for (const condition of ['calm', 'high-stress'] as const) {
     const prompt = buildTurnPrompt(agent.profile, ctx);
     const identity = prompt.split('Who you are: ')[1].split('\n\n')[0];
     const feelings = prompt.split('How you feel right now: ')[1].split('\n\n')[0];
-    assert.ok(identity.startsWith(placeholderPersonas[world.ids.indexOf(id)]));
+    assert.ok(placeholderPersonas.includes(agent.profile.persona!));
+    assert.ok(identity.startsWith(agent.profile.persona!));
     assert.doesNotMatch(identity, /archetype|CEO|ops manager|gossip hub|climber|loyalist|skeptic|breadwinner|flight risk/i);
     assert.doesNotMatch(identity, /\d/);
     assert.doesNotMatch(feelings, /\d|workload|stress:|burnout:|trust_mgmt|loyalty:/);

@@ -66,14 +66,17 @@ export function applyEvent(
     if (agent.profile.role === 'Manager' && e.managerStress) applyDelta(agent, { stress: e.managerStress }, p);
   }
 
-  const source = e.official ? 'mgmt' : ev.source ?? 'grapevine';
-  const claim = seedEventClaim(world, ev.type, isTrue, source, world.tick, p);
+  // A rumour from someone who has since left reaches the office via the grapevine.
+  const named = ev.source && (ev.source === 'grapevine' || ids.includes(ev.source)) ? ev.source : 'grapevine';
+  const source = e.official ? 'mgmt' : named;
   let hearers = ids;
   if (!e.official) {
     const given = (ev.hearers ?? []).filter((id) => ids.includes(id));
     const pool = ids.filter((id) => id !== source);
     hearers = given.length > 0 ? given : pool.length > 0 ? [pool[rng.int(pool.length)]] : [];
   }
+  const texts = [e.text, ...(e.variants ?? [])];
+  const claim = seedEventClaim(world, ev.type, isTrue, source, world.tick, p, texts[rng.int(texts.length)]);
   for (const id of hearers) {
     if (id === source) continue;
     const r = receiveClaim(world, id, claim.id, source, world.tick, 0, p);

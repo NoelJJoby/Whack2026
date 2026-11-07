@@ -31,6 +31,26 @@ describe('tick loop: seeded event scheduling', () => {
     assert.deepEqual(a, b);
     assert.notDeepEqual(a, c);
   });
+
+  it('buildScenario deals every event type before repeating one, and varies truth and rumour sources', () => {
+    const truths = new Set<boolean>();
+    const sources = new Set<string>();
+    for (let seed = 1; seed <= 100; seed++) {
+      const types = buildScenario(seed, 16).map((event) => event.type);
+      assert.equal(new Set(types).size, types.length, `seed ${seed} repeats an event`);
+      for (const event of buildScenario(seed, 16)) {
+        truths.add(event.isTrue!);
+        if (event.source) sources.add(event.source);
+      }
+    }
+    assert.deepEqual([...truths].sort(), [false, true]);
+    assert.ok(sources.size > 3, `rumour sources: ${[...sources]}`);
+  });
+
+  it('extending the run length keeps the earlier schedule', () => {
+    const short = buildScenario(5, 16);
+    assert.deepEqual(buildScenario(5, 64).slice(0, short.length), short);
+  });
 });
 
 describe('tick loop: checkpoint', () => {
@@ -149,9 +169,13 @@ describe('tick loop: events and ablations', () => {
     assert.ok(r.records.every((rec) => rec.action !== 'gossip'));
   });
 
-  it('calm run: at most one agent quits in 30 ticks', async () => {
-    const r = await run(config({ scenario: CALM_SCENARIO, ticks: 30 }));
-    assert.ok(r.summary.quits <= 1, `quits: ${r.summary.quits}`);
+  it('calm run: at most one agent quits in 30 ticks, in all but a few seeds', async () => {
+    let unstable = 0;
+    for (let seed = 1; seed <= 50; seed++) {
+      const r = await run(config({ seed, scenario: CALM_SCENARIO, ticks: 30 }));
+      if (r.summary.quits > 1) unstable++;
+    }
+    assert.ok(unstable <= 3, `${unstable} of 50 calm runs lost more than one agent`);
   });
 
   it('toSimulationState projects onto the shared shape', async () => {

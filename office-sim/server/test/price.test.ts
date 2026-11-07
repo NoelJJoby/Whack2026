@@ -163,5 +163,5 @@ test('feedback off reproduces current main workforce over ten seeds and thirty t
     results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs: r.logs.map(({ price: _price, ...log }) => log), records: r.records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
-  assert.equal(digest, '2a4b0315c64a367fd6bbd6d892dda836a5998af903542415eb61e9dab3f746ee');
+  assert.equal(digest, '78b8ffce9ecd4866c7f97ade869ecdc540c4103a0d8915e1133f4146014d4393');
 });

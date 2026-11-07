@@ -2,8 +2,10 @@
 // Archetypes follow office-sim/agent.md; impulsivity follows the bias brief.
 // dataCast() wraps the LLM and Data lane's cast in data.ts for comparison runs.
 import { buildAgentState, cast } from '../data';
+import type { EventType } from '../../shared/types';
 import type { CastMember, EngineTraits, ScenarioEvent } from '../engine-types';
 import { DEFAULT_PARAMS, eventParams, type Params } from '../params';
+import { placeholderPersonas } from '../llm/personas';
 import { stream } from '../rng';
 
 type Base = Omit<CastMember, 'profile'> & { profile: Omit<CastMember['profile'], 'traits'> & { traits: EngineTraits } };
@@ -98,33 +100,44 @@ function jitteredValue(rng: ReturnType<typeof stream>, low: number, high: number
   return clamp(Math.round(low + rng.next() * (high - low)), 0, 100);
 }
 
-/** The cast for one run: every fixed trait is its archetype value +/- traitJitter, drawn from the run seed. */
+/**
+ * A range as wide as the archetype's band (never narrower than +/- spread) but
+ * centred on its tuned value, so runs vary widely without shifting the balance the brief was tuned on.
+ */
+function around(base: number, band: [number, number] | undefined, spread: number): [number, number] {
+  const half = Math.max(spread, band ? Math.round((band[1] - band[0]) / 2) : 0);
+  return [clamp(base - half, 0, 100), clamp(base + half, 0, 100)];
+}
+
+/**
+ * The cast for one run, drawn from the run seed: each fixed trait and starting
+ * value is drawn from around(), its archetype band's width centred on the tuned value,
+ * every name is distinct, and personas are dealt out in a seeded order.
+ */
 export function fixtureCast(seed: number, params: Params = DEFAULT_PARAMS, jitter = true): CastMember[] {
-  return BASE_CAST.map((c) => {
+  const used = new Set<string>();
+  const personas = jitter ? stream(seed, 0, '*', 'traits').shuffle(placeholderPersonas) : placeholderPersonas;
+  return BASE_CAST.map((c, index) => {
     const rng = stream(seed, 0, c.profile.id, 'traits');
     const traits = { ...c.profile.traits };
+    const start = structuredClone(c.start);
     if (jitter) {
-      const j = params.setup.traitJitter;
-      const spread = Math.max(6, Math.round(j * 0.8));
+      const spread = Math.max(6, Math.round(params.setup.traitJitter * 0.8));
       for (const k of NUMERIC_TRAITS) {
         const base = c.profile.traits[k];
-        const low = clamp(base - spread, 0, 100);
-        const high = clamp(base + spread, 0, 100);
-        traits[k] = jitteredValue(rng, low, high);
+        traits[k] = jitteredValue(rng, ...around(base, TRAIT_BANDS[c.profile.id]?.[k], spread));
+      }
+      for (const key of ['stress', 'workload', 'loyalty', 'trust_mgmt', 'burnout'] as const) {
+        const base = c.start[key];
+        start[key] = jitteredValue(rng, ...around(base, START_BANDS[c.profile.id]?.[key], 12));
       }
     }
 
-    const start = structuredClone(c.start);
-    for (const key of ['stress', 'workload', 'loyalty', 'trust_mgmt', 'burnout'] as const) {
-      const base = c.start[key] ?? start[key];
-      const low = clamp((typeof base === 'number' ? base : 50) - 12, 0, 100);
-      const high = clamp((typeof base === 'number' ? base : 50) + 12, 0, 100);
-      start[key] = jitteredValue(rng, low, high);
-    }
-
-    const namePool = NAME_POOLS[c.profile.id] ?? [c.profile.name];
+    const pool = (NAME_POOLS[c.profile.id] ?? []).filter((name) => !used.has(name));
+    const name = jitter && pool.length > 0 ? pickFromPool(rng, pool) : c.profile.name;
+    used.add(name);
     return {
-      profile: { ...c.profile, name: pickFromPool(rng, namePool), traits },
+      profile: { ...c.profile, name, traits, persona: personas[index % personas.length] },
       start,
     };
   });
@@ -148,23 +161,33 @@ export const CURATED_EVENT_TYPES = [
   'competitor_poaching',
 ] as const;
 
-export function buildScenario(seed: number, maxTicks: number, startTick = 0): ScenarioEvent[] {
+/** Chance an event is secretly false: rumours are a coin flip, announcements are sometimes bluffs. */
+export const RUMOUR_FALSE_CHANCE = 0.5;
+export const OFFICIAL_FALSE_CHANCE = 0.15;
+
+/**
+ * A seeded billboard schedule: events 2-5 ticks apart (the first lands at 1-4),
+ * types dealt from a reshuffled deck so none repeats until all have run, truth
+ * drawn per event, and each rumour starting from a random colleague or the
+ * grapevine. Its first hearer is left to the event stream at apply time.
+ * Extending maxTicks keeps the earlier events unchanged.
+ */
+export function buildScenario(seed: number, maxTicks: number, ids: readonly string[] = BASE_CAST.map((c) => c.profile.id)): ScenarioEvent[] {
   const rng = stream(seed, 0, '*', 'event');
   const events: ScenarioEvent[] = [];
-  let tick = startTick;
+  const sources = ['grapevine', ...ids];
+  let deck: EventType[] = [];
+  let tick = 0;
 
-  while (tick < maxTicks) {
-    const gap = 2 + rng.int(4);
-    tick += gap;
-    if (tick > maxTicks) break;
-    const type = CURATED_EVENT_TYPES[rng.int(CURATED_EVENT_TYPES.length)];
+  while (true) {
+    tick += (tick === 0 ? 1 : 2) + rng.int(4);
+    if (deck.length === 0) deck = rng.shuffle(CURATED_EVENT_TYPES);
+    const type = deck.pop()!;
     const base = eventParams[type];
-    const event: ScenarioEvent = { tick, type, isTrue: base.isTrue };
-    if (!base.official) {
-      event.hearers = [base.groups === 'all' ? 'gossip' : 'skeptic'];
-      event.source = 'grapevine';
-    }
-    events.push(event);
+    const isTrue = !rng.chance(base.official ? OFFICIAL_FALSE_CHANCE : RUMOUR_FALSE_CHANCE);
+    const source = sources[rng.int(sources.length)];
+    if (tick > maxTicks) break;
+    events.push(base.official ? { tick, type, isTrue } : { tick, type, isTrue, source });
   }
 
   return events;

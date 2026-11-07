@@ -8,14 +8,13 @@ import assert from 'node:assert/strict';
 
 import type { Action, EngineProfile, RunConfig, TurnContext, TurnProvider } from '../engine-types';
 import { createTurnProvider } from '../llm';
-import { placeholderPersonas } from '../llm/personas';
 import { DEFAULT_PARAMS as P } from '../params';
 import { buildTurnPrompt } from '../llm/prompt';
 import { buildScenario, fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
 
 const USAGE = { input_tokens: 900, output_tokens: 150 };
-const FLIGHT_PERSONA = placeholderPersonas[7];
+const FLIGHT_PERSONA = fixtureCast(7).find((member) => member.profile.id === 'flight')!.profile.persona!;
 
 /** What a model can read off the prompt. */
 interface PromptFacts {

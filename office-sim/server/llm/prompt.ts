@@ -18,7 +18,7 @@ const actionMeanings: Record<Action, string> = {
 };
 
 export function buildTurnPrompt(
-  agent: EngineProfile, ctx: TurnContext, persona = temporaryPersonaFor(agent.id),
+  agent: EngineProfile, ctx: TurnContext, persona = agent.persona ?? temporaryPersonaFor(agent.id),
 ): string {
   const traits = agent.traits;
   const claims = ctx.claims.map(claim => {
