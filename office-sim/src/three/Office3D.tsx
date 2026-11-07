@@ -1,7 +1,7 @@
 // 3D isometric voxel office (VITE_VIEW=3d). Same props as the 2D <Office>; renders only what it is given.
-import { useEffect, useMemo, useRef, type ElementRef } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Stats } from '@react-three/drei';
+import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
 import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, type OrthographicCamera } from 'three';
 import type { Person } from '../design/Office';
 import type { DialogueLine } from '../dialogueQueue';
@@ -74,6 +74,15 @@ function FitZoom() {
   return null;
 }
 
+/** Keeps the HTML compass needle pointing north as the camera orbits. */
+function CompassSync({ controls, needle }: { controls: RefObject<ElementRef<typeof OrbitControls>>; needle: RefObject<HTMLDivElement> }) {
+  useFrame(() => {
+    const c = controls.current, n = needle.current;
+    if (c && n) n.style.transform = `rotate(${c.getAzimuthalAngle()}rad)`;
+  });
+  return null;
+}
+
 export default function Office3D({ people, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1 }: {
   people: Person[];
   selected: string | null;
@@ -90,6 +99,19 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
   const layoutKey = people.map(p => `${p.id}:${p.role}`).join();
   const seats = useMemo(() => new Map(people.map((p, i) => [p.id, seatFor(p.role, i)])), [layoutKey]);
   const controls = useRef<ElementRef<typeof OrbitControls>>(null);
+  const needle = useRef<HTMLDivElement>(null);
+  // Integrated GPUs: drop to 1x pixels if the frame rate falls.
+  const [maxDpr, setMaxDpr] = useState(1.5);
+  const resetView = () => {
+    const c = controls.current;
+    if (!c) return;
+    c.object.position.set(...CAMERA);
+    c.target.set(...TARGET);
+    // Drop any leftover orbit momentum so the reset lands exactly.
+    c.enableDamping = false;
+    c.update();
+    c.enableDamping = true;
+  };
   const zoom = (factor: number) => {
     const c = controls.current;
     if (!c) return;
@@ -100,8 +122,9 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
   };
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
   return <div className="office-scene o3-scene">
-    <Canvas orthographic shadows flat dpr={[1, 1.5]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
+    <Canvas orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
       <color attach="background" args={['#14203a']} />
+      <PerformanceMonitor onDecline={() => setMaxDpr(1)} />
       <hemisphereLight args={['#c9d6ff', '#6b4a2a', 1.4]} />
       <directionalLight position={[-14, 26, 16]} color="#ffe0b0" intensity={2.4} castShadow
         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.03}
@@ -126,8 +149,12 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
       <OrbitControls ref={controls} makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
+      <CompassSync controls={controls} needle={needle} />
       {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
+    <button className="o3-compass" onClick={resetView} aria-label="Reset view" title="Reset view">
+      <div ref={needle}><span className="n">N</span><span className="e">E</span><span className="s">S</span><span className="w">W</span><i /></div>
+    </button>
     <div className="o3-zoom">
       <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>
       <button onClick={() => zoom(0.8)} aria-label="Zoom out">−</button>
