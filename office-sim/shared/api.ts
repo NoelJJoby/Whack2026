@@ -6,30 +6,7 @@ import type { AgentProfile, EventType, SimulationMode, SimulationState, TickReco
 /** Why the server runs in its current mode. */
 export type ModeReason = 'configured' | 'no_api_key' | 'llm_failed';
 
-/** Public price decomposition. No truth, lineage, claim details or future corrections. */
-export interface PriceDTO {
-  tick: number;
-  price: number;
-  ret: number;
-  rawOutput: number;
-  effectiveOutput: number;
-  oEma: number;
-  outputLog: number;
-  newsLevel: number;
-  noise: number;
-  headcount: number;
-  morale: number | null;
-  feedback: boolean;
-  guards: { outputFloor: boolean; priceBound: 'min' | 'max' | null; rawLogPrice: number; logPrice: number };
-  markers: Array<{ id: string; kind: EventType | 'leak'; event: 'headline' | 'correction' }>;
-}
-
 export interface SimResponse {
-  price: PriceDTO;
-  initial_price: number;
-  price_feedback: boolean;
-  /** Complete parameter snapshot for replay (synthetic model assumptions only). */
-  params?: unknown;
   mode: SimulationMode;
   mode_reason: ModeReason;
   /** Run length: the run auto-pauses when state.tick reaches it. */
@@ -37,10 +14,9 @@ export interface SimResponse {
   state: SimulationState;
 }
 
-/** POST /api/sim/settings. Supply at least one field. Feedback changes require reset once started. */
+/** POST /api/sim/settings. max_ticks: integer, 1 to 128, not below the current tick. */
 export interface SettingsRequest {
-  max_ticks?: number;
-  price_feedback?: boolean;
+  max_ticks: number;
 }
 
 export interface InjectRequest {
@@ -57,7 +33,6 @@ export interface TickEvent {
 }
 
 export interface TickFrame {
-  price: PriceDTO;
   tick: number;
   records: TickRecord[];
   events: TickEvent[];

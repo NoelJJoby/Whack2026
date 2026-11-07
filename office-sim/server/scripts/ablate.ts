@@ -1,7 +1,7 @@
 // Ablation runner: the same scenario across all four policy modes and N seeds,
 // with the stub LLM. Writes JSON and CSV summaries and prints the brief's
 // behaviour checks.
-//   pnpm exec tsx server/scripts/ablate.ts --seeds 10 --ticks 16 --out runs/ablation [--calm] [--price-feedback] [--no-gossip]
+//   pnpm exec tsx server/scripts/ablate.ts --seeds 10 --ticks 16 --out runs/ablation [--calm]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -42,8 +42,6 @@ export interface AblationOptions {
   seeds: number;
   ticks: number;
   calm: boolean;
-  priceFeedback?: boolean;
-  gossip?: boolean;
   params?: Params;
 }
 
@@ -55,7 +53,7 @@ export async function runAblation(opts: AblationOptions) {
 
   for (const mode of MODES) {
     for (const seed of seeds) {
-      const config: RunConfig = { seed, mode, ticks: opts.ticks, scenario, gossip: opts.gossip ?? true, billboard: true, priceFeedback: opts.priceFeedback ?? false };
+      const config: RunConfig = { seed, mode, ticks: opts.ticks, scenario, gossip: true, billboard: true };
       runs[mode].push(await runSimulation(fixtureCast(seed, params), config, createStubProvider(seed), params));
     }
   }
@@ -92,13 +90,13 @@ export async function runAblation(opts: AblationOptions) {
   }
 
   // --- Per-run rows.
-  const runRows: string[] = ['seed,mode,quits,crack_order,first_quit_tick,time_to_first_quit,true_reach,false_reach,leaks,fallbacks,ending_price,price_feedback,headcount,morale'];
+  const runRows: string[] = ['seed,mode,quits,crack_order,first_quit_tick,time_to_first_quit,true_reach,false_reach,leaks,fallbacks'];
   for (const mode of MODES) {
     for (const r of runs[mode]) {
       const s = r.summary;
       runRows.push(
         [s.seed, mode, s.quits, s.crack_order_archetypes.join(' > '), s.first_quit_tick ?? '', s.time_to_first_quit ?? '',
-          s.reach.true_holders, s.reach.false_holders, s.leaks, s.fallbacks, s.price, s.priceFeedback, s.headcount, s.morale ?? ''].join(','),
+          s.reach.true_holders, s.reach.false_holders, s.leaks, s.fallbacks].join(','),
       );
     }
   }
@@ -129,12 +127,6 @@ export async function runAblation(opts: AblationOptions) {
     perMode[mode] = {
       crack,
       mean_quits: r3(mean(runs[mode].map((r) => r.summary.quits))),
-      price: {
-        feedback: opts.priceFeedback ?? false,
-        mean_ending_price: mean(runs[mode].map(r => r.summary.price)),
-        mean_headcount: mean(runs[mode].map(r => r.summary.headcount)),
-        mean_morale: mean(runs[mode].map(r => r.summary.morale).filter((m): m is number => m !== null)),
-      },
       first_quit: {
         mean_tick: r3(mean(firstQuitTicks)),
         median_tick: median(firstQuitTicks),
@@ -232,7 +224,7 @@ async function behaviourChecks(runs: Record<Mode, RunResult[]>, seeds: number[],
   // 4. Calm run (no billboard events): at most 1 agent quits in 30 ticks.
   let calmOk = 0;
   for (const seed of seeds) {
-    const config: RunConfig = { seed, mode: 'llm_bias', ticks: 30, scenario: CALM_SCENARIO, gossip: opts.gossip ?? true, billboard: true, priceFeedback: opts.priceFeedback ?? false };
+    const config: RunConfig = { seed, mode: 'llm_bias', ticks: 30, scenario: CALM_SCENARIO, gossip: true, billboard: true };
     const r = await runSimulation(fixtureCast(seed, params), config, createStubProvider(seed), params);
     if (r.summary.quits <= 1) calmOk++;
   }
@@ -281,13 +273,10 @@ async function behaviourChecks(runs: Record<Mode, RunResult[]>, seeds: number[],
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (args['price-feedback'] !== undefined && args['price-feedback'] !== true) throw new Error('--price-feedback is a flag');
   const opts: AblationOptions = {
     seeds: Number(args.seeds ?? 10),
     ticks: Number(args.ticks ?? 16),
     calm: Boolean(args.calm),
-    priceFeedback: args['price-feedback'] === true,
-    gossip: !args['no-gossip'],
   };
   const out = String(args.out ?? 'runs/ablation');
   const result = await runAblation(opts);

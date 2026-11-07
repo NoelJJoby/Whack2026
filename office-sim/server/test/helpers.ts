@@ -1,6 +1,4 @@
 import type { EngineAgent, EngineClaim, EngineTraits, World } from '../engine-types';
-import { createPriceState } from '../price';
-import { DEFAULT_PARAMS } from '../params';
 import type { AgentState } from '../../shared/types';
 
 export function makeAgent(
@@ -67,8 +65,6 @@ export function makeClaim(id: string, extra: Partial<EngineClaim> = {}): EngineC
 
 export function makeWorld(agents: EngineAgent[], claims: EngineClaim[] = [], tick = 5, seed = 1): World {
   return {
-    price: { ...createPriceState(DEFAULT_PARAMS.price, agents.length || 1), tick },
-    priceRecord: null,
     seed,
     tick,
     ids: agents.map((a) => a.id),
