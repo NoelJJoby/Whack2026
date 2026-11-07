@@ -1,5 +1,5 @@
-import 'dotenv/config';
 import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
 import Fastify from 'fastify';
 import { z } from 'zod';
 
@@ -20,6 +20,13 @@ import { SHOCK_SCENARIO, fixtureCast } from './scripts/fixture';
 import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
 
 const SEED = 42;
+// Load the key from office-sim/.env (then the repo-root .env) wherever the server is started from.
+// A variable already set in the environment wins, so `ANTHROPIC_API_KEY= ...` forces rules mode.
+loadEnv({
+  path: [fileURLToPath(new URL('../.env', import.meta.url)), fileURLToPath(new URL('../../.env', import.meta.url))],
+  quiet: true,
+});
+
 export const MAX_TICKS = 16;
 const TICK_INTERVAL_MS = 2500;
 const HEARTBEAT_MS = 15_000;
