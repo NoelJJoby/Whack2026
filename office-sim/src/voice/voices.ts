@@ -15,12 +15,12 @@ export interface Voice {
   lowpassHz?: number;
 }
 
-/** Per emotion: pitch multiplies the speaker's base pitch. Average syllable ≈ 470 ms / speed. */
+/** Per emotion: pitch multiplies the speaker's base pitch. Average syllable ≈ 336 ms / speed (measured, after trimming). */
 export const EMOTION_VOICE: Record<Emotion, Omit<Voice, 'lowpassHz'>> = {
-  normal: { pitch: 1.0, speed: 6, randomness: 0.1, melodyRate: 0.05, melodyAmplitude: 0.1, gain: 0.55 },
-  happy: { pitch: 1.2, speed: 7, randomness: 0.15, melodyRate: 0.15, melodyAmplitude: 0.3, gain: 0.55 },
-  angry: { pitch: 0.85, speed: 9, randomness: 0.35, melodyRate: 0.02, melodyAmplitude: 0.05, gain: 0.75 },
-  sad: { pitch: 0.72, speed: 4.5, randomness: 0.05, melodyRate: 0.03, melodyAmplitude: 0.2, gain: 0.4 },
+  normal: { pitch: 1.0, speed: 4.3, randomness: 0.1, melodyRate: 0.05, melodyAmplitude: 0.1, gain: 0.55 },
+  happy: { pitch: 1.2, speed: 5, randomness: 0.15, melodyRate: 0.15, melodyAmplitude: 0.3, gain: 0.55 },
+  angry: { pitch: 0.85, speed: 6.5, randomness: 0.35, melodyRate: 0.02, melodyAmplitude: 0.05, gain: 0.75 },
+  sad: { pitch: 0.72, speed: 3.2, randomness: 0.05, melodyRate: 0.03, melodyAmplitude: 0.2, gain: 0.4 },
 };
 
 /** The inner monologue: same voice, quieter, a little lower and muffled. */

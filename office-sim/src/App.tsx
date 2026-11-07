@@ -69,6 +69,7 @@ export default function App() {
       return true;
     },
     onSpace: () => toggle(),
+    archetypeOf: id => cast.find(p => p.id === id)?.archetype,
   });
   function toggle() {
     if (disabled || complete) return;
@@ -107,8 +108,8 @@ export default function App() {
         {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
       </div>
     </aside>
-    <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} showThoughts={dialogue.showThoughts} hidden={menu !== null}
-      onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
+    <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null}
+      onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onVoices={() => dialogue.setVoices(!dialogue.voices)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
@@ -117,6 +118,7 @@ export default function App() {
         <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
+          <label><input type="checkbox" checked={dialogue.voices} onChange={e => dialogue.setVoices(e.target.checked)}/> Voices</label>
           <label><input type="checkbox" checked={dialogue.showThoughts} onChange={e => dialogue.setShowThoughts(e.target.checked)}/> Show inner thoughts</label>
           <label><input type="checkbox" checked={dialogue.hold} onChange={e => dialogue.setHold(e.target.checked)}/> Hold for dialogue <small>Pauses each hour until its lines finish</small></label>
         </fieldset>
