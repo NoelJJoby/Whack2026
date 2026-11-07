@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { MODES, type RunConfig, type TurnContext } from '../engine-types';
 import { DEFAULT_PARAMS as P } from '../params';
-import { CALM_SCENARIO, SHOCK_SCENARIO, fixtureCast } from '../scripts/fixture';
+import { CALM_SCENARIO, CURATED_EVENT_TYPES, SHOCK_SCENARIO, buildScenario, fixtureCast } from '../scripts/fixture';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, queueEvent, runSimulation, runTick, toSimulationState } from '../tick';
 
@@ -12,6 +12,26 @@ const config = (over: Partial<RunConfig> = {}): RunConfig => ({
 });
 
 const run = (c: RunConfig, provider = createStubProvider(c.seed)) => runSimulation(fixtureCast(c.seed), c, provider);
+
+describe('tick loop: seeded event scheduling', () => {
+  it('buildScenario uses the curated event pool and spaces events by 2-5 ticks', () => {
+    const schedule = buildScenario(77, 40);
+    assert.ok(schedule.length > 0);
+    assert.ok(schedule.every((event) => CURATED_EVENT_TYPES.includes(event.type)));
+    for (let i = 1; i < schedule.length; i++) {
+      const gap = schedule[i].tick - schedule[i - 1].tick;
+      assert.ok(gap >= 2 && gap <= 5, `gap ${gap} outside 2-5 ticks`);
+    }
+  });
+
+  it('the same seed gives the same schedule, a different seed gives a different one', () => {
+    const a = buildScenario(99, 50);
+    const b = buildScenario(99, 50);
+    const c = buildScenario(100, 50);
+    assert.deepEqual(a, b);
+    assert.notDeepEqual(a, c);
+  });
+});
 
 describe('tick loop: checkpoint', () => {
   it('16 ticks with the stub provider: at least one agent quits', async () => {

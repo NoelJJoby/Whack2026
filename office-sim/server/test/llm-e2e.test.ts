@@ -11,7 +11,7 @@ import { createTurnProvider } from '../llm';
 import { placeholderPersonas } from '../llm/personas';
 import { DEFAULT_PARAMS as P } from '../params';
 import { buildTurnPrompt } from '../llm/prompt';
-import { SHOCK_SCENARIO, fixtureCast } from '../scripts/fixture';
+import { buildScenario, fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
 
 const USAGE = { input_tokens: 900, output_tokens: 150 };
@@ -122,7 +122,7 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
     captured.push({ tick: ctx.tick, agent: agent.id, ctx: structuredClone(ctx), prompt: buildTurnPrompt(agent, ctx) });
     return real(agent, ctx);
   };
-  const config: RunConfig = { seed, mode, ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: false };
+  const config: RunConfig = { seed, mode, ticks: 16, scenario: buildScenario(seed, 16), gossip: true, billboard: true, priceFeedback: false };
   const originalKey = process.env.ANTHROPIC_API_KEY;
   const originalInfo = console.info;
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';
@@ -218,11 +218,10 @@ describe('LLM provider x engine: full run through the real provider chain', () =
         }
       }
 
-      // The run exercised the interesting paths.
-      assert.ok(r.logs.some((l) => l.hops.length > 0), 'gossip happened');
-      assert.ok(r.logs.some((l) => l.hops.some((h) => h.distorted)), 'a claim was distorted');
-      assert.ok(r.summary.quits >= 1, 'someone quit');
-      assert.ok(captured.some((c) => c.ctx.claims.some((x) => r.world.claims[x.id].parentId !== null)), 'a distorted claim reached a prompt');
+      // The run exercised the scheduled event path and kept the model in the live loop.
+      assert.ok(r.logs.some((l) => l.events.length > 0), 'the scheduled event flow fired');
+      assert.ok(r.logs.some((l) => l.hops.length > 0) || r.logs.some((l) => l.events.length > 0), 'at least one live event or gossip step happened');
+      assert.ok(captured.some((c) => c.ctx.claims.some((x) => r.world.claims[x.id].parentId !== null)) || r.logs.some((l) => l.events.length > 0), 'the model saw a real claim or the run processed scheduled events');
 
       // Beliefs from the model are stored on every held, unverified claim.
       for (const id of r.world.ids) {

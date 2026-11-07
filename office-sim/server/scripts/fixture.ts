@@ -3,7 +3,7 @@
 // dataCast() wraps the LLM and Data lane's cast in data.ts for comparison runs.
 import { buildAgentState, cast } from '../data';
 import type { CastMember, EngineTraits, ScenarioEvent } from '../engine-types';
-import { DEFAULT_PARAMS, type Params } from '../params';
+import { DEFAULT_PARAMS, eventParams, type Params } from '../params';
 import { stream } from '../rng';
 
 type Base = Omit<CastMember, 'profile'> & { profile: Omit<CastMember['profile'], 'traits'> & { traits: EngineTraits } };
@@ -138,14 +138,40 @@ export function dataCast(): CastMember[] {
   });
 }
 
-/** Scripted shock scenario for the checkpoint and ablations. */
-export const SHOCK_SCENARIO: ScenarioEvent[] = [
-  { tick: 1, type: 'merger', isTrue: true },
-  { tick: 3, type: 'long_hours_policy', isTrue: true },
-  { tick: 6, type: 'layoffs_rumour', isTrue: false, hearers: ['gossip'], source: 'grapevine' },
-  { tick: 9, type: 'pr_scandal', isTrue: true, hearers: ['skeptic'], source: 'ops' },
-  { tick: 12, type: 'surprise_bonus', isTrue: true },
-];
+export const CURATED_EVENT_TYPES = [
+  'merger',
+  'new_management',
+  'long_hours_policy',
+  'pr_scandal',
+  'layoffs_rumour',
+  'surprise_bonus',
+  'competitor_poaching',
+] as const;
+
+export function buildScenario(seed: number, maxTicks: number, startTick = 0): ScenarioEvent[] {
+  const rng = stream(seed, 0, '*', 'event');
+  const events: ScenarioEvent[] = [];
+  let tick = startTick;
+
+  while (tick < maxTicks) {
+    const gap = 2 + rng.int(4);
+    tick += gap;
+    if (tick > maxTicks) break;
+    const type = CURATED_EVENT_TYPES[rng.int(CURATED_EVENT_TYPES.length)];
+    const base = eventParams[type];
+    const event: ScenarioEvent = { tick, type, isTrue: base.isTrue };
+    if (!base.official) {
+      event.hearers = [base.groups === 'all' ? 'gossip' : 'skeptic'];
+      event.source = 'grapevine';
+    }
+    events.push(event);
+  }
+
+  return events;
+}
+
+/** Default seeded shock schedule for the checkpoint and ablations. */
+export const SHOCK_SCENARIO: ScenarioEvent[] = buildScenario(42, 16);
 
 /** No billboard events: the calm baseline. */
 export const CALM_SCENARIO: ScenarioEvent[] = [];

@@ -18,7 +18,7 @@ import type { CastMember, DecisionLog as EngineDecisionLog, TurnProvider, World 
 import { createTurnProvider } from './llm';
 import { DEFAULT_PARAMS, eventParams } from './params';
 import { toPriceDTO, workforceReport } from './price';
-import { SHOCK_SCENARIO, fixtureCast } from './scripts/fixture';
+import { buildScenario, fixtureCast } from './scripts/fixture';
 import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
 
 // Load the key from office-sim/.env (then the repo-root .env) wherever the server is started from.
@@ -159,7 +159,7 @@ class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: this.priceFeedback };
+    return { mode: this.mode, scenario: buildScenario(this.seed, this.maxTicks), gossip: true, billboard: true, priceFeedback: this.priceFeedback };
   }
 
   state(): SimulationState {
