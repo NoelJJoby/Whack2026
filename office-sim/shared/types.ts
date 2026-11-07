@@ -17,6 +17,25 @@ export type Action =
   | 'interview'
   | 'leak';
 
+export type AgentStatus = 'active' | 'quit';
+export type SimulationMode = 'llm_bias' | 'rules';
+
+export interface Proposal {
+  action: Action;
+  weight: number;
+  target?: string | null;
+  claim?: string | null;
+}
+
+export interface DecisionLog {
+  source: 'llm' | 'rules' | 'fallback';
+  agent: string;
+  chosen_action: Action;
+  proposals?: Proposal[];
+  cache_hit?: boolean;
+  reason?: string;
+}
+
 export interface AgentProfile {
   id: string;
   name: string;
@@ -30,6 +49,8 @@ export interface AgentProfile {
     sociability: number;
     distortion_rate: number;
     quit_threshold: number;
+    impulsivity: number;
+    recruiter_contact: boolean;
   };
 }
 
@@ -43,6 +64,11 @@ export interface AgentState {
   source_trust: Record<string, number>;
 }
 
+export interface AgentRuntimeState extends AgentState {
+  status: AgentStatus;
+  quit_tick: number | null;
+}
+
 export interface Claim {
   id: string;
   text: string;
@@ -50,6 +76,8 @@ export interface Claim {
   source: string;
   created_tick: number;
   hops: number;
+  scandal?: boolean;
+  parent_id?: string | null;
 }
 
 export interface TickRecord {
@@ -59,6 +87,11 @@ export interface TickRecord {
   agent: string;
   target: string | null;
   summary: string;
+  public_line?: string;
+  inner_monologue?: string;
+  quit?: boolean;
+  state?: AgentState;
+  decision?: DecisionLog;
 }
 
 export interface LlmTurn {
@@ -67,6 +100,13 @@ export interface LlmTurn {
   claim_id: string | null;
   public_line: string;
   inner_monologue: string;
+}
+
+export interface LlmOutput {
+  proposals: Proposal[];
+  public_line: string;
+  inner_monologue: string;
+  beliefs: Record<string, number>;
 }
 
 export interface SimulationState {
@@ -78,7 +118,8 @@ export interface SimulationState {
   queue: EventType[];
   feed: string[];
   claims: Claim[];
-  agents: Record<string, AgentState>;
+  agents: Record<string, AgentRuntimeState>;
+  mode?: SimulationMode;
   metrics: {
     crack_order: string[];
     first_quit_tick: number | null;
