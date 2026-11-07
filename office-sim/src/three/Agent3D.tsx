@@ -49,6 +49,8 @@ export function Agent3D({ person, seat, phase, selected, highlighted, line, show
     onPointerOver={e => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
     onPointerOut={() => { document.body.style.cursor = ''; }}>
     {ring && <mesh rotation-x={-Math.PI / 2} position={[0, 0.03, 0.15]}><ringGeometry args={[0.55, 0.72, 24]} /><meshBasicMaterial color={ring} /></mesh>}
+    {/* Floor rings hide behind desks, so highlighted/selected agents also get a marker overhead. */}
+    {(selected || highlighted) && <mesh position={[0, 2.1, 0]} scale={[1, 1.4, 1]}><octahedronGeometry args={[0.2]} /><meshBasicMaterial color={ring!} /></mesh>}
     {/* Seated legs: thighs forward, shins down. */}
     {[-0.12, 0.12].map(x => <group key={x}>
       <Part p={[x, 0.55, 0.22]} s={[0.2, 0.2, 0.5]} c={PANTS} />
