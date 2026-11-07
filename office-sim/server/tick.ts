@@ -1,4 +1,4 @@
-import type { AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
+import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import { availableActions, decide } from './bias';
 import { claimReach } from './claims';
 import {
@@ -387,8 +387,15 @@ export async function runSimulation(
 
 /** Project the engine world onto the shared SimulationState. */
 export function toSimulationState(world: World, feed: string[] = []): SimulationState {
-  const agents: Record<string, AgentState> = {};
-  for (const id of world.ids) agents[id] = structuredClone(world.agents[id].state);
+  const agents: Record<string, AgentRuntimeState> = {};
+  for (const id of world.ids) {
+    const agent = world.agents[id];
+    agents[id] = {
+      ...structuredClone(agent.state),
+      status: agent.status,
+      quit_tick: agent.quitTick,
+    };
+  }
   const reach = claimReach(world);
   return {
     tick: world.tick,
