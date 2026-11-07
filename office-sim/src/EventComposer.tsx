@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 
+import { timeLabel } from './hudModel';
 import type { EventType } from '../shared/types';
 
 // The engine's event types. `isTrue` is the engine's default truth for each.
@@ -41,12 +42,12 @@ export function EventComposer({ onInject, label, error, disabled = false, nextTi
     const ok = await onInject(chosen.type, isTrue);
     setSending(false);
     setFailed(!ok);
-    setMessage(ok ? `Queued. “${chosen.title}” hits the office at tick ${String(nextTick).padStart(2, '0')}.` : '');
+    setMessage(ok ? `Queued for ${timeLabel(nextTick)}. “${chosen.title}”` : '');
   }
 
   return <section className="panel event-composer" aria-labelledby="event-composer-title">
     <div className="event-composer-heading">
-      <div><span className="event-eyebrow">YOU MAKE THE NEWS</span><h2 id="event-composer-title">Shake up the office.</h2><p>Pick an event to shake things up.</p></div>
+      <h3 id="event-composer-title">Choose an announcement</h3>
       <span className="event-preview-label">{label}</span>
     </div>
     <div className="event-presets" aria-label="Event presets">
@@ -54,13 +55,13 @@ export function EventComposer({ onInject, label, error, disabled = false, nextTi
     </div>
     <form onSubmit={submit} className="event-form">
       <div className="event-selection">
-        <div className="event-selection-copy"><span className="event-eyebrow">READY TO POST</span><strong>{chosen.title}</strong></div>
+        <div className="event-selection-copy"><strong>{chosen.title}</strong></div>
       </div>
       <div className="event-action-row">
         <fieldset className="event-truth-options"><legend>Behind the headline</legend><label className={isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={isTrue} onChange={() => setIsTrue(true)} /> True event</label><label className={!isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={!isTrue} onChange={() => setIsTrue(false)} /> False rumour</label></fieldset>
-        <button className="post-event" type="submit" disabled={disabled || sending}>{sending ? 'Posting…' : 'Post to billboard'} <span aria-hidden="true">↗</span></button>
+        <button className="post-event" type="submit" disabled={disabled || sending}>{sending ? 'Posting…' : 'Post announcement'} <span aria-hidden="true">↗</span></button>
       </div>
-      <div className="event-form-note"><span>Truth stays hidden from employees.</span><p className="event-feedback" role="status">{failed && error ? <span className="coral">{error}</span> : message || 'Posted events land at the start of the next tick.'}</p></div>
+      <div className="event-form-note"><span>Truth stays hidden from employees.</span><p className="event-feedback" role="status">{failed && error ? <span className="coral">{error}</span> : message || 'Queued announcements arrive at the start of the next hour.'}</p></div>
     </form>
   </section>;
 }

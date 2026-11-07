@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { workdayTime } from './Workday';
-import { stockSeries } from './StockPrice';
+import { StockPrice, stockSeries } from './StockPrice';
 import { mockHistory } from './mocks';
 
 test('workday shows lunch, home time, overtime and midnight before rolling to a new day', () => {
@@ -12,7 +14,7 @@ test('workday shows lunch, home time, overtime and midnight before rolling to a 
   assert.deepEqual(workdayTime(16), { day: 1, hour: 24, progress: 100 });
   assert.deepEqual(workdayTime(17), { day: 2, hour: 9, progress: 6.25 });
 });
-test('stock indicator starts at 100 and derives reproducibly from history without mutating it', () => {
+test('stock indicator starts at 100 and projects backend prices without mutating history', () => {
   assert.deepEqual(stockSeries([]), [{ tick: 0, price: 100 }]);
   const before = JSON.stringify(mockHistory);
   const points = stockSeries(mockHistory);
@@ -20,4 +22,125 @@ test('stock indicator starts at 100 and derives reproducibly from history withou
   assert.ok(points.every(p => Number.isFinite(p.price) && p.price >= 1));
   assert.deepEqual(stockSeries(mockHistory), points);
   assert.equal(JSON.stringify(mockHistory), before);
+  const latest = mockHistory.at(-1)!.price;
+  assert.equal(stockSeries(mockHistory, 100, { ...latest, price: 63.45 }).at(-1)!.price, 63.45);
+  assert.equal(stockSeries(mockHistory, 100, { ...latest, tick: latest.tick + 1, price: 70 }).length, points.length + 1);
+  assert.equal(JSON.stringify(mockHistory), before);
+});
+
+test('stock chart uses backend valuation even when workforce state implies another display price', () => {
+  const frames = structuredClone(mockHistory);
+  frames[0].price.price = 12.345;
+  const baseline = stockSeries(frames);
+  assert.equal(baseline[1].price, 12.345);
+  for (const frame of frames) for (const agent of Object.values(frame.state.agents)) {
+    agent.stress = 100; agent.trust_mgmt = 0; agent.burnout = 100; agent.status = 'quit';
+  }
+  assert.deepEqual(stockSeries(frames), baseline);
+});
+
+test('existing ticker reads current server snapshot before history, and computes opening percentage', () => {
+  const current = { ...mockHistory[0].price, price: 123.45 };
+  const markup = renderToStaticMarkup(createElement(StockPrice, { history: [], current, initialPrice: 200 }));
+  assert.ok(markup.includes('price $123.45'));
+  assert.ok(markup.includes('-38.28%'));
+  const reset = renderToStaticMarkup(createElement(StockPrice, { history: [], current: { ...current, tick: 0, price: 100 }, initialPrice: 100 }));
+  assert.ok(reset.includes('price $100.00'));
+  assert.ok(reset.includes('+0.00%'));
+});
+
+import { createAnnouncements, type Announcement } from './announcement';
+import { feedEntries, metricState, playerText, timeLabel } from './hudModel';
+import { MetricBar } from './GamePanel';
+
+test('announcement expiry uses elapsed time, replacement restarts it, dismissal and reset cancel it', () => {
+  let now = 0;
+  let id = 0;
+  const pending = new Map<number, { at: number; callback: () => void }>();
+  let visible: Announcement | null = null;
+  const announcements = createAnnouncements(value => { visible = value; }, (callback, delay) => {
+    const handle = ++id;
+    pending.set(handle, { at: now + delay, callback });
+    return handle as unknown as ReturnType<typeof setTimeout>;
+  }, timer => { pending.delete(timer as unknown as number); });
+  const advance = (elapsed: number) => {
+    now += elapsed;
+    for (const [handle, task] of pending) if (task.at <= now) { pending.delete(handle); task.callback(); }
+  };
+  const first = mockHistory[1].events[0];
+  const next = mockHistory[4].events[0];
+  announcements.receive([first]);
+  advance(9_999);
+  assert.equal((visible as Announcement | null)?.event, first);
+  announcements.receive([next]);
+  assert.equal(pending.size, 1);
+  advance(9_999);
+  assert.equal((visible as Announcement | null)?.event, next);
+  advance(1);
+  assert.equal(visible, null);
+  assert.equal(pending.size, 0);
+  announcements.receive([first]);
+  announcements.clear();
+  assert.equal(visible, null);
+  assert.equal(pending.size, 0);
+  announcements.receive([next]);
+  announcements.dispose();
+  assert.equal(pending.size, 0);
+});
+
+test('empty announcement batches do not reset the timer and simultaneous events show the newest', () => {
+  const values: Array<Announcement | null> = [];
+  let scheduled = 0;
+  const announcements = createAnnouncements(value => values.push(value), () => {
+    scheduled++;
+    return 1 as unknown as ReturnType<typeof setTimeout>;
+  }, () => {});
+  announcements.receive([]);
+  assert.equal(scheduled, 0);
+  const events = [mockHistory[1].events[0], mockHistory[4].events[0]];
+  announcements.receive(events);
+  assert.equal(values.at(-1)?.event, events[1]);
+  announcements.receive([]);
+  assert.equal(scheduled, 1);
+});
+
+test('wire preserves history newest-first and each resignation appears only once', () => {
+  const frames = structuredClone(mockHistory);
+  const record = frames.at(-1)!.records[0];
+  record.quit = true;
+  record.summary = 'Marcus resigned at tick 7.';
+  const entries = feedEntries(frames);
+  assert.equal(entries.length, frames.reduce((n, frame) => n + frame.events.length + frame.records.length, 0));
+  assert.equal(entries[0].label, 'Resignation');
+  assert.equal(entries.filter(e => e.key === '7-marcus').length, 1);
+  assert.equal(entries[0].text, 'Marcus resigned at hour 7.');
+  assert.equal(entries.at(-1)!.time, timeLabel(2));
+  assert.equal(entries.filter(e => e.label === 'Announcement').length, 2);
+});
+
+test('metric states use strict simulation boundaries and trust has the favourable direction', () => {
+  assert.equal(metricState('Stress', 39, 80).text, 'Recovery range');
+  assert.equal(metricState('Stress', 40, 80).text, 'Burnout steady');
+  assert.equal(metricState('Stress', 60, 80).text, 'Burnout steady');
+  assert.equal(metricState('Stress', 61, 80).text, 'Burnout rising');
+  assert.equal(metricState('Stress', 60.1, 80).text, 'Burnout rising');
+  assert.equal(metricState('Workload', 45.1, 80).tone, 'coral');
+  assert.equal(metricState('Trust in management', 34.9, 80).tone, 'coral');
+  assert.equal(metricState('Burnout', 80.1, 80).tone, 'coral');
+  assert.equal(metricState('Workload', 45, 80).tone, 'mint');
+  assert.equal(metricState('Workload', 46, 80).tone, 'coral');
+  assert.equal(metricState('Trust in management', 34, 80).tone, 'coral');
+  assert.equal(metricState('Trust in management', 35, 80).tone, 'mint');
+  assert.equal(metricState('Burnout', 80, 80).text, 'Within base exit threshold');
+  assert.equal(metricState('Burnout', 81, 80).text, 'Above base exit threshold');
+  assert.equal(metricState('Burnout', 61, 60).tone, 'coral');
+});
+
+test('display adapters remove engine hour terminology from errors and accessible metric text', () => {
+  assert.equal(playerText('A tick is running. Try again in 2 ticks. max_ticks'), 'An hour is running. Try again in 2 hours. duration');
+  assert.equal(timeLabel(17), 'Day 2, 09:00');
+  const markup = renderToStaticMarkup(createElement(MetricBar, { label: 'Trust in management', value: 82, threshold: 80 }));
+  assert.ok(markup.includes('82 out of 100, Outside low-trust range'));
+  assert.ok(markup.includes('Trust in management'));
+  assert.ok(!/\bticks?\b/i.test(markup));
 });

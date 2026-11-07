@@ -1,6 +1,6 @@
 // Console runner: the engine in the terminal, no server.
 //   Stub LLM (no API calls, the default):
-//     pnpm exec tsx server/scripts/run-sim.ts --seed 42 --ticks 16 --mode llm_bias [--json] [--calm] [--no-gossip] [--no-billboard]
+//     pnpm exec tsx server/scripts/run-sim.ts --seed 42 --ticks 16 --mode llm_bias [--json] [--calm] [--no-gossip] [--no-billboard] [--price-feedback]
 //   Real LLM (Anthropic, needs ANTHROPIC_API_KEY in office-sim/.env, the repo-root .env or the environment):
 //     pnpm exec tsx server/scripts/run-sim.ts --llm [--ticks 16] [--mode llm_bias|llm_raw] [--cast fixture|data] [--out run.json] [--verbose] [--keep-going]
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -66,6 +66,7 @@ function printTick(r: TickResult, showLines: boolean): void {
     console.log(`  X ${name(q)} QUITS (burnout ${Math.round(s.burnout)}, loyalty ${Math.round(s.loyalty)}, trust ${Math.round(s.trust_mgmt)})`);
   }
   console.log(`  reach: true ${log.reach.true_holders}, false ${log.reach.false_holders}`);
+  console.log(`  price: ${log.price.price.toFixed(2)}, log return ${log.price.ret.toFixed(4)}, output ${log.price.outputLog.toFixed(4)}, news ${log.price.newsLevel.toFixed(4)}, noise ${log.price.noise.toFixed(4)}`);
   const usage = tickUsage(r);
   if (usage.requests > 0) {
     console.log(`  llm: ${usage.requests} requests, ${usage.input} in / ${usage.output} out tokens, slowest ${Math.round(usage.slowestMs)} ms`);
@@ -87,6 +88,7 @@ function tickUsage(r: TickResult) {
 }
 
 export function configFromArgs(args: Record<string, string | boolean>): RunConfig {
+  if (args['price-feedback'] !== undefined && args['price-feedback'] !== true) throw new Error('--price-feedback is a flag');
   const mode = (args.mode ?? 'llm_bias') as Mode;
   if (!MODES.includes(mode)) throw new Error(`--mode must be one of ${MODES.join(', ')}`);
   return {
@@ -96,6 +98,7 @@ export function configFromArgs(args: Record<string, string | boolean>): RunConfi
     scenario: args.calm ? CALM_SCENARIO : SHOCK_SCENARIO,
     gossip: !args['no-gossip'],
     billboard: !args['no-billboard'],
+    priceFeedback: args['price-feedback'] === true,
   };
 }
 
@@ -176,6 +179,7 @@ async function main() {
   console.log(`  first quit tick:    ${s.first_quit_tick ?? '-'}  (${s.time_to_first_quit ?? '-'} ticks after first shock)`);
   console.log(`  claim reach:        true ${s.reach.true_holders}, false ${s.reach.false_holders}`);
   console.log(`  leaks:              ${s.leaks}`);
+  console.log(`  ending price:       ${s.price.toFixed(2)} (feedback ${s.priceFeedback ? 'on' : 'off'}, ${s.headcount} active, morale ${s.morale === null ? 'no employees' : (100 * s.morale).toFixed(1)})`);
   console.log(`  LLM fallbacks:      ${s.fallbacks}${s.fallbacks ? `  ${JSON.stringify(fallbackReasons)}` : ''}`);
   if (llm) {
     console.log(`  LLM requests:       ${totals.requests} (${totals.failed} failed), ${totals.input} in / ${totals.output} out tokens, slowest ${Math.round(totals.slowestMs)} ms`);

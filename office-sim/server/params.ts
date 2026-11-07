@@ -235,12 +235,34 @@ export const setupParams = {
   traitJitter: 10,
 };
 
+/** Synthetic valuation assumptions; impacts and returns are in log-price units. */
+export const priceParams = {
+  initialPrice: 100, rho: 0.95, sigma: 0.005, oRef: 0.902724,
+  outputAlpha: 0.3, outputFloor: 0.001, minPrice: 0.000001, maxPrice: 1000000000,
+  refuteDelay: 6,
+  trustCoefficient: 0.25, trustNegativeCap: 2, trustPositiveCap: 2,
+  stressCoefficient: 0.3, stressCap: 1.5,
+  productivity: {
+    work: 1, overwork: 1, verify: 0.6, complain: 0.5, gossip: 0.5,
+    slack_off: 0.3, interview: 0.2, leak: 0.2,
+  } as Record<Action, number>,
+  overworkBonus: 0.3,
+  impacts: {
+    merger: -0.02, new_management: -0.01, long_hours_policy: 0.02,
+    pr_scandal: -0.08, layoffs_rumour: -0.03, surprise_bonus: -0.01,
+    competitor_poaching: -0.04, leak: -0.03,
+  } as Record<EventType | 'leak', number>,
+};
+
+export type PriceParams = typeof priceParams;
+
 export const DEFAULT_PARAMS = {
   bias: biasParams,
   rules: ruleParams,
   events: eventParams,
   quit: quitParams,
   setup: setupParams,
+  price: priceParams,
 };
 
 export type Params = typeof DEFAULT_PARAMS;

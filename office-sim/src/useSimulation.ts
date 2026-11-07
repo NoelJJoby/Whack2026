@@ -2,9 +2,11 @@
 // `useSimulation()` for the SSE stream and the controls.
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ApiError, CastResponse, HistoryResponse, ModeReason, SimResponse, StreamMessage, TickFrame } from '../shared/api';
+import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
+import { createAnnouncements, type Announcement } from './announcement';
+import { playerText } from './hudModel';
 
 /** Run lengths offered in the UI. The server accepts any integer from 1 to 128. */
 export const RUN_LENGTHS = [16, 32, 64, 128];
@@ -44,8 +46,12 @@ export async function api<T>(path: string, init: { method?: 'GET' | 'POST'; body
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 
 export interface Simulation {
+  announcement: Announcement | null;
+  dismissAnnouncement: () => void;
   cast: AgentProfile[];
   maxTicks: number;
+  price: PriceDTO | null;
+  initialPrice: number;
   speed: number;
   setSpeed: (speed: number) => Promise<boolean>;
   mode: SimulationMode | null;
@@ -65,7 +71,7 @@ export interface Simulation {
   inject: (type: EventType, isTrue: boolean) => Promise<boolean>;
 }
 
-const errorText = (e: unknown) => (e instanceof Error ? e.message : 'Something went wrong.');
+const errorText = (e: unknown) => playerText(e instanceof Error ? e.message : 'Request failed. Try again.');
 
 export function useSimulation(): Simulation {
   const [cast, setCast] = useState<CastResponse | null>(USE_MOCKS ? mockCast : null);
@@ -74,6 +80,10 @@ export function useSimulation(): Simulation {
   const [connection, setConnection] = useState<Connection>(USE_MOCKS ? 'mock' : 'connecting');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const announcements = useRef<ReturnType<typeof createAnnouncements>>();
+  if (!announcements.current) announcements.current = createAnnouncements(setAnnouncement);
+  useEffect(() => () => announcements.current?.dispose(), []);
   const lastTick = useRef(0);
   const currentTick = useRef(0);
 
@@ -81,11 +91,12 @@ export function useSimulation(): Simulation {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
     if (!force && next.state.tick < currentTick.current) return;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state });
+    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state, price: next.price, initial_price: next.initial_price, price_feedback: next.price_feedback });
   }, []);
 
   const replaceHistory = useCallback(
     (next: HistoryResponse) => {
+      if (next.state.tick === 0) announcements.current?.clear();
       lastTick.current = next.history.at(-1)?.tick ?? 0;
       setHistory(next.history);
       applySnapshot(next, true);
@@ -118,6 +129,7 @@ export function useSimulation(): Simulation {
         if (frame.tick === lastTick.current + 1) {
           lastTick.current = frame.tick;
           setHistory((h) => [...h, frame]);
+          announcements.current?.receive(frame.events);
           applySnapshot(message);
         } else if (frame.tick > lastTick.current) {
           void resync();
@@ -143,7 +155,8 @@ export function useSimulation(): Simulation {
       setBusy(true);
       setError(null);
       try {
-        applySnapshot(await api<SimResponse>(path, { method: 'POST', body }), path === '/sim/reset');
+        applySnapshot(await api<SimResponse>(path, { method: 'POST', body }), path === '/sim/reset' || path === '/sim/new-seed');
+        if (path === '/sim/reset' || path === '/sim/new-seed') announcements.current?.clear();
         return true;
       } catch (e) {
         setError(errorText(e));
@@ -157,9 +170,13 @@ export function useSimulation(): Simulation {
 
   const running = snapshot?.state.running ?? false;
   return {
+    announcement,
+    dismissAnnouncement: () => announcements.current?.clear(),
     cast: cast?.agents ?? [],
     speed: snapshot?.speed ?? 1,
     setSpeed: (speed) => post('/sim/speed', { speed }),
+    price: snapshot?.price ?? null,
+    initialPrice: snapshot?.initial_price ?? 100,
     maxTicks: snapshot?.max_ticks ?? RUN_LENGTHS[0],
     mode: snapshot?.mode ?? null,
     modeReason: snapshot?.mode_reason ?? null,

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
 import { after, describe, test } from 'node:test';
 
-import type { StreamMessage } from '../shared/api';
+import type { HistoryResponse, SimResponse, StreamMessage } from '../shared/api';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { StockPrice, stockSeries } from '../src/StockPrice';
 
 // No key: the server must run in rules mode and never call the LLM.
 // dotenv (loaded by index.ts) does not override a variable that is already set.
@@ -173,6 +176,66 @@ describe('api routes', () => {
     await post('/api/sim/settings', { max_ticks: DEFAULT_TICKS });
   });
 
+  test('price snapshots, history, feedback configuration and reset are additive', async () => {
+    let json = (await post('/api/sim/reset')).json();
+    assert.equal(json.price.price, 100);
+    assert.equal(json.price.tick, 0);
+    assert.equal(json.price.ret, 0);
+    assert.equal(json.price_feedback, false);
+    assert.ok(json.params.price);
+    for (const payload of [{}, { price_feedback: 'true' }, { price_feedback: true, max_ticks: 0 }]) {
+      assert.equal((await post('/api/sim/settings', payload)).statusCode, 400);
+    }
+    json = (await post('/api/sim/settings', { price_feedback: true })).json();
+    assert.equal(json.price_feedback, true);
+    assert.equal(json.price.feedback, true);
+    json = (await post('/api/sim/step')).json();
+    assert.equal(json.price.tick, 1);
+    assert.equal(json.price.feedback, true);
+    const rejected = await post('/api/sim/settings', { max_ticks: 32, price_feedback: false });
+    assert.equal(rejected.statusCode, 409);
+    assert.equal(rejected.json().error.code, 'reset_required');
+    assert.equal(sim.response().max_ticks, DEFAULT_TICKS);
+    assert.equal((await post('/api/sim/settings', { max_ticks: 32, price_feedback: true })).statusCode, 200);
+    const history = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json();
+    assert.deepEqual(history.history[0].price, json.price);
+    for (const key of ['is_true', 'isTrue', 'rootId', 'parentId', 'correctionTick', 'claimId']) {
+      assert.ok(!JSON.stringify(json.price).includes(`"${key}"`));
+    }
+    json = (await post('/api/sim/reset')).json();
+    assert.equal(json.price.price, 100);
+    assert.equal(json.price_feedback, true);
+    assert.deepEqual((await app.inject({ method: 'GET', url: '/api/sim/history' })).json().history, []);
+    await post('/api/sim/settings', { price_feedback: false, max_ticks: DEFAULT_TICKS });
+  });
+
+  test('main stock chart consumes API prices through ticks, reconnect history, reset and new seed', async () => {
+    const reset = (await post('/api/sim/reset')).json<SimResponse>();
+    const opening = renderToStaticMarkup(createElement(StockPrice, { history: [], current: reset.price, initialPrice: reset.initial_price }));
+    assert.ok(opening.includes('price $100.00'));
+    await post('/api/sim/inject', { type: 'pr_scandal', is_true: false });
+    let current = reset;
+    for (let i = 0; i < 8; i++) {
+      current = (await post('/api/sim/step')).json<SimResponse>();
+      const history = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json<HistoryResponse>();
+      const series = stockSeries(history.history, history.initial_price);
+      assert.equal(series.at(-1)!.price, current.price.price);
+      assert.equal(series.at(-1)!.tick, current.state.tick);
+      const ticker = renderToStaticMarkup(createElement(StockPrice, { history: history.history, current: current.price, initialPrice: history.initial_price }));
+      assert.ok(ticker.includes(`price $${current.price.price.toFixed(2)}`));
+    }
+    const history = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json<HistoryResponse>();
+    assert.ok(history.history[6].price.markers.some(marker => marker.kind === 'pr_scandal' && marker.event === 'correction'));
+    for (const url of ['/api/sim/reset', '/api/sim/new-seed']) {
+      const fresh = (await post(url)).json<SimResponse>();
+      assert.equal(fresh.price.price, 100);
+      assert.equal(fresh.price.ret, 0);
+      const clean = (await app.inject({ method: 'GET', url: '/api/sim/history' })).json<HistoryResponse>();
+      assert.deepEqual(stockSeries(clean.history, clean.initial_price), [{ tick: 0, price: 100 }]);
+    }
+    await post('/api/sim/new-seed', { seed: 42 });
+  });
+
   test('SSE sends history on connect, then ticks, and cleans up on disconnect', async () => {
     await post('/api/sim/reset');
     await app.listen({ port: 0, host: '127.0.0.1' });
@@ -200,12 +263,14 @@ describe('api routes', () => {
 
     const first = await next();
     assert.equal(first.type, 'history');
+    assert.equal(first.price.price, 100);
     assert.equal(sim.listenerCount, 1);
 
     await post('/api/sim/play');
     let message = await next();
     while (message.type !== 'tick') message = await next();
     assert.equal(message.frame.tick, 1);
+    assert.deepEqual(message.frame.price, message.price);
     await post('/api/sim/pause');
 
     controller.abort();

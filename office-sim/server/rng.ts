@@ -23,6 +23,7 @@ export type Purpose =
   | 'stub'
   | 'traits'
   | 'event'
+  | 'price'
   | 'text';
 
 /** FNV-1a over the joined key parts, finished with the murmur3 fmix32 avalanche. */
