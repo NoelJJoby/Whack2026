@@ -5,12 +5,13 @@ import { ruleParams, quitParams } from '../server/params';
 import { workdayTime } from './Workday';
 
 export const ACTION_LABEL: Record<Action, string> = {
+  review_work: 'Reviewing work', report_issue: 'Reporting an issue', support_colleague: 'Supporting a colleague',
   work: 'Working', overwork: 'Overworking', slack_off: 'Slacking off', complain: 'Complaining',
   gossip: 'Spreading gossip', verify: 'Verifying rumour', interview: 'Interviewing', leak: 'Leaking to the press',
 };
 export function playerText(text: string) {
   return text.replace(/max_ticks/gi, 'duration').replace(/tick_in_progress/gi, 'decision in progress')
-    .replace(/\ba tick\b/gi, 'An hour').replace(/\bticks\b/gi, 'hours').replace(/\btick\b/gi, 'hour');
+    .replace(/\ba tick\b/gi, 'A work period').replace(/\bticks\b/gi, 'work periods').replace(/\btick\b/gi, 'work period');
 }
 export function timeLabel(tick: number) {
   const { month, dayOfMonth, hour } = workdayTime(tick);

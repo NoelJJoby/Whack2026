@@ -1,3 +1,4 @@
+import { fallbackCeo, fallbackOps } from './management';
 // A seeded stand-in for the LLM: a "sensible assistant" that mostly proposes
 // working or overworking, like the real LLM tends to. Seeded per
 // (run seed, tick, agent), so every mode sees the same tick-1 proposals, as a
@@ -27,6 +28,11 @@ export function createStubProvider(runSeed: number, opts: StubOptions = {}): Tur
     if (opts.nullFor?.(agent.id, ctx.tick)) return null;
     if (opts.invalidFor?.(agent.id, ctx.tick)) return '{"proposals": [{"action": "work_norm';
 
+    if (ctx.management) return ctx.management.kind === 'ceo' ? fallbackCeo(ctx.management) : fallbackOps(ctx.management);
+    if (ctx.work) {
+      const task = ctx.work.reviewable[0] ?? ctx.work.assignments[0];
+      return { proposals: [task ? { action: ctx.work.reviewable.includes(task) ? 'review_work' : 'work', task_id: task.id, assignment_version: task.version, weight: 1 } : { action: 'slack_off', weight: 1 }], public_line: 'I will follow the current work plan.', inner_monologue: 'I should check the acceptance criteria.', beliefs: Object.fromEntries(ctx.claims.map(c => [c.id,50])) };
+    }
     const rng = stream(runSeed, ctx.tick, agent.id, 'stub');
     const jitter = () => 0.8 + 0.4 * rng.next();
     const t = agent.traits;

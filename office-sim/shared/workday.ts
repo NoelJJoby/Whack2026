@@ -51,3 +51,12 @@ export function workdayTime(tick: number) {
 export function isOvertime(tick: number): boolean {
   return tick > 0 && workdayTime(tick).hour > 17;
 }
+
+/** Financial calendar elapsed, including the two routine days after each workday. */
+export function calendarDaysElapsed(tick: number): number {
+  return Math.floor(tick / TICKS_PER_DAY) * CALENDAR_DAYS_PER_WORKDAY + (tick % TICKS_PER_DAY) / TICKS_PER_DAY;
+}
+export function calendarSpan(fromTick: number, toTick: number): number {
+  if (fromTick < 0 || toTick < fromTick) throw new Error('Invalid calendar span');
+  return Math.round((calendarDaysElapsed(toTick) - calendarDaysElapsed(fromTick)) * 5) / 5;
+}

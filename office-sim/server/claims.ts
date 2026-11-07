@@ -185,7 +185,7 @@ export function seedEventClaim(
     rootId: id,
     ...(custom ? { custom: true } : {}),
     event: type,
-    onHear: { ...e.onHear },
+    onHear: custom ? { stress: 1, trust_mgmt: 0, loyalty: 0 } : { ...e.onHear },
   };
   world.claims[claim.id] = claim;
   return claim;

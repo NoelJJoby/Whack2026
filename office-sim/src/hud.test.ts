@@ -55,7 +55,7 @@ import { createAnnouncements, type Announcement } from './announcement';
 import { feedEntries, metricState, playerText, timeLabel } from './hudModel';
 import { MetricBar } from './GamePanel';
 
-test('announcement expiry uses elapsed time, replacement restarts it, dismissal and reset cancel it', () => {
+test('announcement queue uses elapsed time and keeps simultaneous arrivals until dismissal', () => {
   let now = 0;
   let id = 0;
   const pending = new Map<number, { at: number; callback: () => void }>();
@@ -76,6 +76,8 @@ test('announcement expiry uses elapsed time, replacement restarts it, dismissal 
   assert.equal((visible as Announcement | null)?.event, first);
   announcements.receive([next]);
   assert.equal(pending.size, 1);
+  advance(1);
+  assert.equal((visible as Announcement | null)?.event, next);
   advance(9_999);
   assert.equal((visible as Announcement | null)?.event, next);
   advance(1);
@@ -90,7 +92,7 @@ test('announcement expiry uses elapsed time, replacement restarts it, dismissal 
   assert.equal(pending.size, 0);
 });
 
-test('empty announcement batches do not reset the timer and simultaneous events show the newest', () => {
+test('empty announcement batches do not reset the timer and simultaneous events remain ordered', () => {
   const values: Array<Announcement | null> = [];
   let scheduled = 0;
   const announcements = createAnnouncements(value => values.push(value), () => {
@@ -101,9 +103,11 @@ test('empty announcement batches do not reset the timer and simultaneous events 
   assert.equal(scheduled, 0);
   const events = [mockHistory[1].events[0], mockHistory[4].events[0]];
   announcements.receive(events);
+  assert.equal(values.at(-1)?.event, events[0]);
+  announcements.dismiss();
   assert.equal(values.at(-1)?.event, events[1]);
   announcements.receive([]);
-  assert.equal(scheduled, 1);
+  assert.equal(scheduled, 2);
 });
 
 test('wire preserves history newest-first and each resignation appears only once', () => {
@@ -115,7 +119,7 @@ test('wire preserves history newest-first and each resignation appears only once
   assert.equal(entries.length, frames.reduce((n, frame) => n + frame.events.length + frame.records.length, 0));
   assert.equal(entries[0].label, 'Resignation');
   assert.equal(entries.filter(e => e.key === '7-marcus').length, 1);
-  assert.equal(entries[0].text, 'Marcus resigned at hour 7.');
+  assert.equal(entries[0].text, 'Marcus resigned at work period 7.');
   assert.equal(entries.at(-1)!.time, timeLabel(2));
   assert.equal(entries.filter(e => e.label === 'Announcement').length, 2);
 });
@@ -139,7 +143,7 @@ test('metric states use strict simulation boundaries and trust has the favourabl
 });
 
 test('display adapters remove engine hour terminology from errors and accessible metric text', () => {
-  assert.equal(playerText('A tick is running. Try again in 2 ticks. max_ticks'), 'An hour is running. Try again in 2 hours. duration');
+  assert.equal(playerText('A tick is running. Try again in 2 ticks. max_ticks'), 'A work period is running. Try again in 2 work periods. duration');
   assert.equal(timeLabel(6), 'Day 4 (M1), 09:00');
   const markup = renderToStaticMarkup(createElement(MetricBar, { label: 'Trust in management', value: 82, threshold: 80 }));
   assert.ok(markup.includes('82 out of 100, Outside low-trust range'));

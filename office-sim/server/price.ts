@@ -1,3 +1,4 @@
+import type { BusinessNewsKind } from '../shared/events';
 import type { Action, AgentState, EventType } from '../shared/types';
 import type { PriceDTO } from '../shared/api';
 import { ACTIONS, type EngineAgent, type EngineClaim } from './engine-types';
@@ -8,7 +9,7 @@ import { applyDelta, clamp } from './rules';
 /** Engine-only history. Never project truth, lineage or correction schedules to clients. */
 export interface NewsItem {
   id: string;
-  kind: EventType | 'leak';
+  kind: EventType | 'leak' | BusinessNewsKind;
   claimId: string;
   rootId: string;
   impact: number;
@@ -29,6 +30,7 @@ export interface FeedbackDelta {
   actual: { trust_mgmt: number; stress: number };
 }
 export interface PriceRecord {
+  operating?: { fundamentals: number; productiveUnits: number; capacity: number };
   tick: number;
   price: number;
   ret: number;
@@ -48,6 +50,7 @@ export interface PriceRecord {
   guards: { outputFloor: boolean; priceBound: 'min' | 'max' | null; rawLogPrice: number; logPrice: number };
 }
 export interface PriceInput {
+  operating?: { productiveUnits: number; capacity: number; fundamentals: number; news: Array<{ id: string; kind: BusinessNewsKind; isTrue: boolean }> };
   tick: number;
   events: Array<{ type: EventType; is_true: boolean; claim: string }>;
   leaks: Array<{ agent: string; claim: string }>;
@@ -77,7 +80,7 @@ export function validatePriceParams(p: PriceParams): void {
     if (p[key] < 0) throw new Error(`Invalid price ${key}`);
   }
   for (const action of ACTIONS) if (finite(p.productivity[action], action) < 0) throw new Error(`Invalid productivity ${action}`);
-  const kinds: Array<EventType | 'leak'> = ['merger', 'new_management', 'long_hours_policy', 'pr_scandal', 'layoffs_rumour', 'surprise_bonus', 'competitor_poaching', 'leak'];
+  const kinds: Array<EventType | 'leak' | BusinessNewsKind> = ['merger', 'new_management', 'long_hours_policy', 'pr_scandal', 'layoffs_rumour', 'surprise_bonus', 'competitor_poaching', 'leak', 'contract', 'security', 'operating_review', 'delivery'];
   for (const kind of kinds) finite(p.impacts[kind], kind);
 }
 export function createPriceState(p: PriceParams, seats: number): PriceState {
@@ -115,7 +118,7 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   for (const delta of input.feedbackDeltas) for (const d of [delta.requested, delta.actual]) {
     finite(d.stress, 'feedback stress'); finite(d.trust_mgmt, 'feedback trust');
   }
-  const rawOutput = finite(input.seats.reduce((sum, seat) => {
+  const rawOutput = finite(input.operating ? input.operating.productiveUnits/input.seats.length : input.seats.reduce((sum, seat) => {
     const b = clamp(finite(seat.burnout, 'burnout')) / 100;
     if (seat.action === null) return sum;
     return sum + finite(p.productivity[seat.action], 'productivity') + (seat.action === 'overwork' ? p.overworkBonus * (1 - b) : 0);
@@ -133,6 +136,7 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   };
   for (const event of input.events) add(event.claim, event.type, event.claim, event.is_true);
   for (const leak of input.leaks) add(`leak:${input.tick}:${leak.agent}:${leak.claim}`, 'leak', leak.claim);
+  for (const event of input.operating?.news ?? []) born.push({ id: event.id, kind: event.kind, claimId: event.id, rootId: event.id, impact: p.impacts[event.kind], bornTick: input.tick, isTrue: event.isTrue, correctionTick: event.isTrue ? null : input.tick+p.refuteDelay });
   const news = [...previous.news.map(item => ({ ...item })), ...born];
   if (new Set(news.map(n => n.id)).size !== news.length) throw new Error('Duplicate price news id');
   for (const item of news) {
@@ -150,12 +154,12 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   const effectiveOutput = Math.max(p.outputFloor, oEma);
   // Difference of logs avoids overflow/underflow in an otherwise valid output/reference ratio.
   const outputLog = Math.log(effectiveOutput) - Math.log(p.oRef);
-  const rawLogPrice = finite(Math.log(p.initialPrice) + outputLog + newsLevel + noise, 'raw log price');
+  const rawLogPrice = finite(Math.log(p.initialPrice) + outputLog + newsLevel + noise + (input.operating?.fundamentals ?? 0), 'raw log price');
   const logPrice = clamp(rawLogPrice, Math.log(p.minPrice), Math.log(p.maxPrice));
   const price = clamp(Math.exp(logPrice), p.minPrice, p.maxPrice);
   const ret = logPrice - Math.log(previous.price);
   const state: PriceState = { tick: input.tick, price, ret, oEma, news };
-  const record: PriceRecord = { tick: input.tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, contributions,
+  const record: PriceRecord = { ...(input.operating ? { operating: { fundamentals: input.operating.fundamentals, productiveUnits: input.operating.productiveUnits, capacity: input.operating.capacity } } : {}), tick: input.tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, contributions,
     bornIds: born.map(n => n.id), correctedIds, noise, ...workforceReport(input.postQuit), feedback: input.feedback,
     feedbackDeltas: structuredClone(input.feedbackDeltas),
     guards: { outputFloor: oEma < p.outputFloor, priceBound: rawLogPrice < Math.log(p.minPrice) ? 'min' : rawLogPrice > Math.log(p.maxPrice) ? 'max' : null, rawLogPrice, logPrice } };
@@ -179,7 +183,7 @@ export function applyPriceFeedback(previous: PriceState, agents: EngineAgent[], 
 /** Explicit allowlist projection; engine metadata stays on the server. */
 export function toPriceDTO(record: PriceRecord): PriceDTO {
   const { tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, noise, headcount, morale, feedback, guards } = record;
-  return { tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, noise, headcount, morale, feedback, guards: { ...guards },
+  return { ...(record.operating ? { operating: record.operating } : {}), tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, noise, headcount, morale, feedback, guards: { ...guards },
     markers: [
       ...record.contributions.filter(c => record.bornIds.includes(c.id)).map(c => ({ id: c.id, kind: c.kind, event: 'headline' as const })),
       ...record.contributions.filter(c => record.correctedIds.includes(c.id)).map(c => ({ id: c.id, kind: c.kind, event: 'correction' as const })),

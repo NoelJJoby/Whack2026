@@ -19,6 +19,7 @@ export const simParams = {
 /** Bias engine (docs/bias-engine-brief.md). */
 export const biasParams = {
   priors: {
+    review_work: 0.65, report_issue: 0.08, support_colleague: 0.08,
     work: 0.45,
     overwork: 0.08,
     slack_off: 0.1,
@@ -290,13 +291,15 @@ export const priceParams = {
   productivity: {
     work: 1, overwork: 1, verify: 0.6, complain: 0.5, gossip: 0.5,
     slack_off: 0.3, interview: 0.2, leak: 0.2,
+    review_work: 0.6, report_issue: 0.2, support_colleague: 0.4,
   } as Record<Action, number>,
   overworkBonus: 0.3,
   impacts: {
+    contract: 0.015, security: -0.035, operating_review: -0.01, delivery: 0.01,
     merger: -0.02, new_management: -0.01, long_hours_policy: 0.02,
     pr_scandal: -0.08, layoffs_rumour: -0.03, surprise_bonus: -0.01,
     competitor_poaching: -0.04, leak: -0.03,
-  } as Record<EventType | 'leak', number>,
+  } as Record<EventType | 'leak' | import('../shared/events').BusinessNewsKind, number>,
 };
 
 export type PriceParams = typeof priceParams;

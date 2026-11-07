@@ -57,7 +57,7 @@ export function applyEvent(
   const isTrue = ev.isTrue ?? e.isTrue;
   const ids = active(world);
 
-  for (const id of ids) {
+  for (const id of isTrue && !ev.custom ? ids : []) {
     const agent = world.agents[id];
     if (e.groups !== 'all' && !e.groups.includes(agent.profile.functionGroup)) continue;
     const { baselineWorkload, ...direct } = e.direct;
@@ -107,6 +107,10 @@ export function resolveAction(
   const target = decision.target ? world.agents[decision.target] : null;
 
   switch (decision.action) {
+    case 'review_work':
+    case 'report_issue':
+    case 'support_colleague':
+      return {};
     case 'work':
       applyDelta(agent, a.work, p);
       return {};

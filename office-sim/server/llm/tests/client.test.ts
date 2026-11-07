@@ -24,6 +24,8 @@ try {
       const body = await request.json();
       assert.equal(body.model, llmConfig.model);
       assert.equal(body.max_tokens, llmConfig.maxOutputTokens);
+      assert.deepEqual(body.thinking, { type: 'disabled' });
+      assert.deepEqual(body.output_config, { effort: 'low' });
       assert.deepEqual(body.messages, [{ role: 'user', content: 'test prompt' }]);
       assert.equal('temperature' in body, false);
       assert.equal('response_format' in body, false);

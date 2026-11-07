@@ -4,6 +4,9 @@ export const llmConfig = Object.freeze({
   maxOutputTokens: 1024,
   timeoutMs: 20_000,
   maxRetries: 0,
+  // Simulation turns are short structured choices, not extended reasoning jobs.
+  thinking: 'disabled' as const,
+  effort: 'low' as const,
   // Current models do not accept temperature; omit it from Messages requests.
   temperature: undefined,
 });

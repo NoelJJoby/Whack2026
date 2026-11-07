@@ -91,7 +91,7 @@ describe('bias engine: reference cases (Python port, 3 dp)', () => {
 
   it('Lena: leak masked, everything else available', () => {
     const { agent, world } = lenaWorld();
-    assert.deepEqual(availableActions(agent, world, {}, P).masked, ['leak']);
+    assert.deepEqual(availableActions(agent, world, {}, P).masked, ['leak', 'review_work', 'report_issue', 'support_colleague']);
   });
 
   it('Lena llm_bias', () => {
@@ -127,7 +127,7 @@ describe('bias engine: reference cases (Python port, 3 dp)', () => {
   it('logs the Lena decision like the brief', () => {
     const { agent, world } = lenaWorld();
     const d = decide({ agent, world, llm: lenaLlm, mode: 'llm_bias', rngs, params: P });
-    assert.deepEqual(d.log.masked, ['leak']);
+    assert.deepEqual(d.log.masked, ['leak', 'review_work', 'report_issue', 'support_colleague']);
     assert.equal(d.log.gain, 1.1);
     assert.equal(d.log.modifiers.interview, 5);
     assert.equal(d.log.fresh, true);
@@ -205,8 +205,8 @@ describe('bias engine: invariants', () => {
 describe('bias engine: masking', () => {
   it('no claims: gossip, verify and leak are masked; alone: complain too', () => {
     const a = makeAgent('a', {});
-    assert.deepEqual(availableActions(a, makeWorld([a, makeAgent('b', {})]), {}, P).masked, ['gossip', 'verify', 'leak']);
-    assert.deepEqual(availableActions(a, makeWorld([a]), {}, P).masked, ['complain', 'gossip', 'verify', 'leak']);
+    assert.deepEqual(availableActions(a, makeWorld([a, makeAgent('b', {})]), {}, P).masked, ['gossip', 'verify', 'leak', 'review_work', 'report_issue', 'support_colleague']);
+    assert.deepEqual(availableActions(a, makeWorld([a]), {}, P).masked, ['complain', 'gossip', 'verify', 'leak', 'review_work', 'report_issue', 'support_colleague']);
   });
 
   it('colleagues who quit do not count', () => {

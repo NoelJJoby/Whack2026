@@ -47,6 +47,8 @@ export async function api<T>(path: string, init: { method?: 'GET' | 'POST'; body
 export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 
 export interface Simulation {
+  runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
+  injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
   announcement: Announcement | null;
   dismissAnnouncement: () => void;
   cast: AgentProfile[];
@@ -89,12 +91,15 @@ export function useSimulation(): Simulation {
   useEffect(() => () => announcements.current?.dispose(), []);
   const lastTick = useRef(0);
   const currentTick = useRef(0);
+  const currentRun = useRef<string | undefined>();
 
   const applySnapshot = useCallback((next: SimResponse, force = false) => {
     // An HTTP reply can arrive after a newer SSE tick; never step backwards except on reset.
+    if (!force && currentRun.current && next.run_id && currentRun.current !== next.run_id) return;
     if (!force && next.state.tick < currentTick.current) return;
+    currentRun.current = next.run_id;
     currentTick.current = next.state.tick;
-    setSnapshot({ mode: next.mode, mode_reason: next.mode_reason, max_ticks: next.max_ticks, speed: next.speed, state: next.state, price: next.price, initial_price: next.initial_price, price_feedback: next.price_feedback });
+    setSnapshot(next);
   }, []);
 
   const replaceHistory = useCallback(
@@ -173,8 +178,10 @@ export function useSimulation(): Simulation {
 
   const running = snapshot?.state.running ?? false;
   return {
+    runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
+    injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
     announcement,
-    dismissAnnouncement: () => announcements.current?.clear(),
+    dismissAnnouncement: () => announcements.current?.dismiss(),
     cast: cast?.agents ?? [],
     speed: snapshot?.speed ?? 1,
     setSpeed: (speed) => post('/sim/speed', { speed }),

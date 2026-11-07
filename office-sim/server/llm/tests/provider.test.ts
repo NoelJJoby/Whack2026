@@ -58,7 +58,7 @@ try {
   assert.equal(metrics.length, 1);
   assert.deepEqual(metrics[0].usage, { promptTokens: 170, completionTokens: 55 });
   const prompt = prompts[0];
-  assert.ok(prompt.startsWith('You are not an assistant and you are not giving good advice. You are a tired person at work making a choice in the moment. People under pressure act on impulse, hold grudges and avoid confrontation.'));
+  assert.ok(prompt.startsWith('You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.'));
   assert.ok(prompt.includes("You're overwhelmed and close to snapping."));
   assert.ok(prompt.includes('"The office may close." (id: claim-6), from a2, heard 3 ticks ago. you generally trust them.'));
   assert.ok(prompt.includes('A new manager starts today.'));

@@ -8,8 +8,8 @@ import type { EventType } from '../shared/types';
 export const presets: Array<{ type: EventType; title: string; isTrue: boolean; icon: string }> = [
   { type: 'merger', title: 'Merger with a competitor', isTrue: true, icon: '&' },
   { type: 'new_management', title: 'New VP takes over', isTrue: true, icon: '↑' },
-  { type: 'long_hours_policy', title: '20-hour workday policy', isTrue: true, icon: '!' },
-  { type: 'pr_scandal', title: 'Customer data breach', isTrue: true, icon: '★' },
+  { type: 'long_hours_policy', title: 'Working-hours announcement', isTrue: true, icon: '!' },
+  { type: 'pr_scandal', title: 'Unverified press allegation', isTrue: true, icon: '★' },
   { type: 'layoffs_rumour', title: 'Layoffs rumour', isTrue: false, icon: '?' },
   { type: 'surprise_bonus', title: 'Surprise bonus', isTrue: true, icon: '+' },
   { type: 'competitor_poaching', title: 'Competitor poaching staff', isTrue: true, icon: '$' },
@@ -17,7 +17,8 @@ export const presets: Array<{ type: EventType; title: string; isTrue: boolean; i
 
 const iconFor = (kind: CustomEventKind) => presets.find(p => p.type === CUSTOM_EVENT_KINDS[kind].base)?.icon ?? '!';
 
-export function EventComposer({ onInject, onInjectCustom, label, error, disabled = false, nextTick }: {
+export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, label, error, disabled = false, nextTick }: {
+  onInjectBusiness?: (id: string, isTrue: boolean) => Promise<boolean>;
   onInject: (type: EventType, isTrue: boolean) => Promise<boolean>;
   onInjectCustom: (kind: CustomEventKind, text: string, isTrue: boolean) => Promise<boolean>;
   label: string;
@@ -26,6 +27,7 @@ export function EventComposer({ onInject, onInjectCustom, label, error, disabled
   disabled?: boolean;
   nextTick: number;
 }) {
+  const [businessTemplate,setBusinessTemplate] = useState('client_win');
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
   const [preset, setPreset] = useState(0);
   const [kind, setKind] = useState<CustomEventKind>(CUSTOM_EVENT_KIND_IDS[0]);
@@ -72,6 +74,7 @@ export function EventComposer({ onInject, onInjectCustom, label, error, disabled
       <h3 id="event-composer-title">{mode === 'preset' ? 'Choose an announcement' : 'Write an announcement'}</h3>
       <span className="event-preview-label">{label}</span>
     </div>
+    {onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || sending} onClick={async () => { setSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setFailed(!ok); setMessage(ok ? 'Business situation queued for the next tick.' : ''); } finally { setSending(false); } }}>Queue business situation</button><p role="status">{failed ? error : message}</p></section>}
     <div className="event-mode-tabs" role="tablist" aria-label="Announcement source">
       <button type="button" role="tab" aria-selected={mode === 'preset'} className={mode === 'preset' ? 'chosen' : ''} onClick={() => switchMode('preset')}>Presets</button>
       <button type="button" role="tab" aria-selected={mode === 'custom'} className={mode === 'custom' ? 'chosen' : ''} onClick={() => switchMode('custom')}>Write your own</button>
@@ -94,7 +97,7 @@ export function EventComposer({ onInject, onInjectCustom, label, error, disabled
         <fieldset className="event-truth-options"><legend>Behind the headline</legend><label className={isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={isTrue} onChange={() => setIsTrue(true)} /> True event</label><label className={!isTrue ? 'selected' : ''}><input type="radio" name="event-truth" checked={!isTrue} onChange={() => setIsTrue(false)} /> False rumour</label></fieldset>
         <button className="post-event" type="submit" disabled={disabled || sending || (mode === 'custom' && !check.ok)}>{sending ? (mode === 'custom' ? 'Checking…' : 'Posting…') : 'Post announcement'} <span aria-hidden="true">↗</span></button>
       </div>
-      <div className="event-form-note"><span>Truth stays hidden from employees.{mode === 'custom' && ' The kind decides how hard it hits.'}</span><p className="event-feedback" role="status">{failed && error ? <span className="coral">{error}</span> : message || 'Queued announcements arrive at the start of the next hour.'}</p></div>
+      <div className="event-form-note"><span>Truth stays hidden from employees.{mode === 'custom' && ' Custom text is informational; structured situations create business work.'}</span><p className="event-feedback" role="status">{failed && error ? <span className="coral">{error}</span> : message || 'Queued announcements arrive at the start of the next tick.'}</p></div>
     </form>
   </section>;
 }
