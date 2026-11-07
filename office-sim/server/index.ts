@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 
 import type { EventType, SimulationMode, SimulationState } from '../shared/types';
@@ -113,21 +114,35 @@ app.get('/api/events', async (request, reply) => {
 
 const port = Number(process.env.PORT ?? '3010');
 
-void (async () => {
-  try {
-    await app.listen({ port, host: '0.0.0.0' });
-    console.log(`Office sim server listening on http://localhost:${port}`);
-  } catch (error) {
-    console.error('Failed to start server', error);
-    process.exit(1);
-  }
-})();
+let tickLoop: NodeJS.Timeout | null = null;
 
-setInterval(() => {
-  if (!sim.state.running) {
-    return;
+export function startServer() {
+  if (tickLoop) {
+    return app;
   }
-  void sim.step();
-}, 2500);
+
+  tickLoop = setInterval(() => {
+    if (!sim.state.running) {
+      return;
+    }
+    void sim.step();
+  }, 2500);
+
+  void (async () => {
+    try {
+      await app.listen({ port, host: '0.0.0.0' });
+      console.log(`Office sim server listening on http://localhost:${port}`);
+    } catch (error) {
+      console.error('Failed to start server', error);
+      process.exit(1);
+    }
+  })();
+
+  return app;
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  startServer();
+}
 
 export { app };
