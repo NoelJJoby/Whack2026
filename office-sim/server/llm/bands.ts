@@ -9,7 +9,7 @@ type Table = readonly [Band, Band, Band];
 
 const STRESS: Table = [
   ['Your to-do list is under control.', 'You left on time yesterday.', 'Nothing on your desk is overdue.'],
-  ['You snapped at someone over something small this morning.', 'Three things on your list are already late.', 'You ate lunch at your desk again.'],
+  ['You snapped at someone over something small this morning.', "You're behind on most of what's on your list.", 'You ate lunch at your desk again.'],
   ["You've had a headache since this morning and can't get through your list.", 'You jump every time a message comes in.', "You haven't had a proper break in days."],
 ];
 

@@ -296,7 +296,11 @@ export async function runTick(
     }
     if (speechLogs?.logs[id]) decisions[id].log.speech = speechLogs.logs[id];
   }
-  if (speaking) recordRound(w, styles, order.map((id) => ({ agent: id, public_line: decisions[id].public_line })), params);
+  if (speaking) {
+    recordRound(w, styles, order.map((id) => ({
+      agent: id, public_line: decisions[id].public_line, inner_monologue: decisions[id].inner_monologue,
+    })), params);
+  }
 
   const seats = w.ids.map(id => ({ id, action: decisions[id]?.action ?? null, burnout: w.agents[id].state.burnout }));
 

@@ -159,7 +159,7 @@ export interface SpeechState {
   voices: Record<string, VoiceCard>;
   lastManner: Record<string, Manner>;
   /** Public lines of the last few rounds, for the prompt and the repetition check. */
-  recent: Array<{ tick: number; agent: string; line: string }>;
+  recent: Array<{ tick: number; agent: string; line: string; thought?: string }>;
   /** Example small-talk lines per agent; [] once tried and failed. Acts as the run's cache. */
   examples: Record<string, string[]>;
 }
@@ -175,8 +175,8 @@ export interface SpeechContext {
   examples: string[];
   /** Colleagues' recent public lines, by name. */
   recent: Array<{ name: string; line: string }>;
-  /** Set only on a regeneration. */
-  nudge: { line: string; against: string | null } | null;
+  /** Set only on a regeneration: the flagged public line and/or thought (null if that part passed). */
+  nudge: { line: string | null; against: string | null; thought: string | null } | null;
 }
 
 export interface SpeechLog extends TurnStyle {

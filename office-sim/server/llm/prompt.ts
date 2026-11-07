@@ -38,6 +38,17 @@ function roleLine(agent: EngineProfile): string {
   return `You work in ${agent.functionGroup}.`;
 }
 
+function nudgeText(n: NonNullable<NonNullable<TurnContext['speech']>['nudge']>): string {
+  return [
+    n.line !== null
+      ? `You were going to say: ${JSON.stringify(n.line)}. That's too close to what ${n.against ?? 'a colleague'} said, or breaks the rules above. Say it completely differently, in your own style.`
+      : '',
+    n.thought !== null
+      ? `Your thoughts were going to be: ${JSON.stringify(n.thought)}. That's too close to how others are thinking, or starts with the announcement. Think it completely differently, in your own words.`
+      : '',
+  ].filter(Boolean).join('\n');
+}
+
 const quoteList = (items: readonly string[]) => items.map((s) => `"${s}"`).join(', ');
 
 export function buildTurnPrompt(
@@ -92,11 +103,9 @@ export function buildTurnPrompt(
       `- Never use these: ${quoteList([...v.bannedSentences, ...v.bannedPhrases])}.`,
       '- Call colleagues by their name only.',
       `- About ${v.words.publicMax} words at most.${limit ? ` ${limit}` : ''}`,
-      `Your thoughts ("inner_monologue") are honest and direct, in the same voice, at most ${v.words.innerMax} words.`,
+      `Your thoughts ("inner_monologue") are honest and direct, in the same voice, at most ${v.words.innerMax} words. Start them from what's on your mind, not with the announcement, and don't copy the facts above.`,
     ].join('\n'),
-    speech?.nudge
-      ? `You were going to say: ${JSON.stringify(speech.nudge.line)}. That's too close to what ${speech.nudge.against ?? 'a colleague'} said, or breaks the rules above. Say it completely differently, in your own style.`
-      : '',
+    speech?.nudge ? nudgeText(speech.nudge) : '',
     `Respond with JSON only, in this shape: ${JSON.stringify(example)}\nGive 1 to 3 proposals, one per action, using only the available actions above. Weights are relative, non-negative and need not sum to one. Target and claim are optional or null; use only names and keys shown above. Public and inner lines express mood, without claiming an action has already happened, because the engine may select a different action. Write complete sentences that fit the limits; never cut off mid-thought. For each claim you've heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.`,
   ].filter(Boolean).join('\n\n');
 }

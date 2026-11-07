@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 
 import type { EngineTickLog, EventType, ScenarioEvent } from '../engine-types';
 import {
-  bannedHits, eventTerms, isEchoOpener, openerMatch, patternHits, trigramSimilarity,
+  bannedHits, eventTerms, isEchoOpener, openerMatch, patternHits, tokens, trigramSimilarity,
 } from '../llm/similarity';
 import { DEFAULT_PARAMS } from '../params';
 import { createRng } from '../rng';
@@ -85,6 +85,9 @@ interface Metrics {
   tickSaid: number;
   tickThought: number;
   manners: { min: number; mean: number; rounds: number } | null;
+  thoughtSameOpeners: number;
+  thoughtEcho: { hits: number; of: number };
+  thoughtTrigram: number;
 }
 
 function measure(run: RunFile, scope: 'llm' | 'all'): Metrics {
@@ -95,6 +98,10 @@ function measure(run: RunFile, scope: 'llm' | 'all'): Metrics {
   const sims = rounds.flatMap((r) => pairs(r).map(([a, b]) => trigramSimilarity(a.said, b.said)));
   const mannerRounds = byTick(linesOf(run).filter((l) => l.manner)).filter((r) => r.length >= 6);
   const distinct = mannerRounds.map((r) => new Set(r.map((l) => l.manner)).size);
+  const thinking = rounds.map((r) => r.filter((l) => l.thought));
+  const thoughtSims = thinking.flatMap((r) => pairs(r).map(([a, b]) => trigramSimilarity(a.thought, b.thought)));
+  const thoughtsOnEvent = onEvent.filter((l) => l.thought);
+  const lead = (t: string) => tokens(t).slice(0, V.speech.thoughtEchoWords).join(' ');
   return {
     lines: lines.length,
     echo: { hits: onEvent.filter((l) => terms.get(l.tick)!.some((t) => isEchoOpener(l.said, t, V.speech.echoWords))).length, of: onEvent.length },
@@ -108,6 +115,12 @@ function measure(run: RunFile, scope: 'llm' | 'all'): Metrics {
     manners: distinct.length
       ? { min: Math.min(...distinct), mean: distinct.reduce((a, b) => a + b, 0) / distinct.length, rounds: distinct.length }
       : null,
+    thoughtSameOpeners: thinking.reduce((n, r) => n + pairs(r).filter(([a, b]) => openerMatch(a.thought, b.thought, 3)).length, 0),
+    thoughtEcho: {
+      hits: thoughtsOnEvent.filter((l) => terms.get(l.tick)!.some((t) => isEchoOpener(lead(l.thought), t, V.speech.thoughtEchoWords))).length,
+      of: thoughtsOnEvent.length,
+    },
+    thoughtTrigram: thoughtSims.length ? thoughtSims.reduce((a, b) => a + b, 0) / thoughtSims.length : 0,
   };
 }
 
@@ -125,6 +138,11 @@ function table(base: RunFile | null, next: RunFile, scope: 'llm' | 'all'): strin
     ['Tick leaks: said / thought', '0 / 0', b ? `${b.tickSaid} / ${b.tickThought}` : '-', `${n.tickSaid} / ${n.tickThought}`, n.tickSaid + n.tickThought === 0],
     ['Distinct manners per round (6+ speakers)', 'min >= 4', b?.manners ? `min ${b.manners.min}` : 'n/a',
       n.manners ? `min ${n.manners.min}, mean ${n.manners.mean.toFixed(1)} over ${n.manners.rounds}` : 'n/a', n.manners ? n.manners.min >= 4 : null],
+    // Thoughts: not in the brief's targets; compared with the baseline.
+    ['Thoughts: same first 3 words (pairs)', '< baseline', b ? String(b.thoughtSameOpeners) : '-', String(n.thoughtSameOpeners), b ? n.thoughtSameOpeners < b.thoughtSameOpeners : null],
+    ['Thoughts: open with the event (3 words)', '< baseline', b ? pct(b.thoughtEcho.hits, b.thoughtEcho.of) : '-', pct(n.thoughtEcho.hits, n.thoughtEcho.of),
+      b && b.thoughtEcho.of && n.thoughtEcho.of ? n.thoughtEcho.hits / n.thoughtEcho.of < b.thoughtEcho.hits / b.thoughtEcho.of : null],
+    ['Thoughts: mean pairwise trigram similarity', '< baseline', b ? b.thoughtTrigram.toFixed(4) : '-', n.thoughtTrigram.toFixed(4), b ? n.thoughtTrigram < b.thoughtTrigram : null],
   ];
   const w = [42, 10, 22, 30];
   const fmt = (c: string[]) => c.map((x, i) => x.padEnd(w[i] ?? 0)).join(' ');

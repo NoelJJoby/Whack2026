@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import type { RunConfig, TurnContext, TurnProvider } from '../engine-types';
 import { DEFAULT_PARAMS as P } from '../params';
 import { buildScenario, fixtureCast } from '../scripts/fixture';
-import { checkLine, joinSpeech } from '../speech';
+import { checkLine, checkThought, joinSpeech } from '../speech';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, runSimulation, runTick } from '../tick';
 
@@ -89,6 +89,10 @@ describe('speech: repetition check and regeneration', () => {
     'The train sat outside town for ages.', 'Tomatoes finally came up this week.', 'Those gig tickets sold out fast.',
     'The school run took forever today.', 'Gym was heaving at six.',
   ];
+  const OWN_THOUGHTS = [
+    'Need a nap before anything else.', 'Rent first, then worry.', 'If Leon cracks, so do I.', 'Stay visible, stay ahead.',
+    'They have looked after us before.', 'Write it down or it did not happen.', 'The kids come first, always.', 'That recruiter email is still unread.',
+  ];
   const ORDER = fixtureCast(42).map((c) => c.profile.id);
 
   /** A fake model: every agent says the same thing first time, and something of their own when nudged. */
@@ -99,7 +103,7 @@ describe('speech: repetition check and regeneration', () => {
       return {
         proposals: [{ action: 'work', weight: nudged ? 0 : 1 }, { action: 'overwork', weight: nudged ? 5 : 0.1 }],
         public_line: nudged ? OWN_LINES[ORDER.indexOf(agent.id)] : 'Same old, same old, nothing new here.',
-        inner_monologue: nudged ? 'Fine.' : 'Hm.',
+        inner_monologue: nudged ? OWN_THOUGHTS[ORDER.indexOf(agent.id)] : 'Hm, same as everyone.',
         beliefs: {},
       };
     };
@@ -126,6 +130,65 @@ describe('speech: repetition check and regeneration', () => {
     assert.equal(nudges[0].speech!.nudge!.line, 'Same old, same old, nothing new here.');
     assert.equal(r.log.speech!.regenerated, decisions.length - 1);
     assert.equal(r.log.speech!.budget_left, decisions.length * (1 + P.bias.llmRetries) - decisions.length - (decisions.length - 1));
+  });
+
+  it('flags thoughts that open with the event, copy a colleague or leak', () => {
+    const v = P.voice;
+    const earlier = [{ agent: 'a', line: 'Two a.m. until launch, nobody asked me.' }];
+    const terms = [['hour', '2', 'two']];
+    assert.deepEqual(checkThought('b', 'Two a.m. until launch, and my kids?', earlier, [], terms, v), ['thought:opener', 'thought:echo']);
+    assert.deepEqual(checkThought('b', 'My kids are asleep by the time two a.m. comes.', earlier, [], terms, v), []);
+    assert.deepEqual(checkThought('b', 'The climber is loving this, nine ticks in.', [], [], [], v), ['thought:label', 'thought:tick']);
+  });
+
+  it('a thought-only flag regenerates the thought and keeps the public line', async () => {
+    const seen: TurnContext[] = [];
+    const provider: TurnProvider = async (agent, ctx) => {
+      seen.push(structuredClone(ctx));
+      const i = ORDER.indexOf(agent.id);
+      return {
+        proposals: [{ action: 'work', weight: 1 }], beliefs: {},
+        public_line: ctx.speech?.nudge ? 'Changed line.' : OWN_LINES[i],
+        inner_monologue: ctx.speech?.nudge ? OWN_THOUGHTS[i] : 'Same thought for everyone here.',
+      };
+    };
+    const r = await runTick(createWorld(fixtureCast(42), 42), provider, { mode: 'llm_raw', scenario: [], gossip: true, billboard: true });
+    const nudges = seen.filter((c) => c.speech?.nudge);
+    assert.equal(nudges.length, ORDER.length - 1);
+    assert.ok(nudges.every((c) => c.speech!.nudge!.line === null && c.speech!.nudge!.thought === 'Same thought for everyone here.'));
+    for (const l of r.log.lines) assert.equal(l.public_line, OWN_LINES[ORDER.indexOf(l.agent)], 'public line kept');
+    assert.equal(new Set(r.log.lines.map((l) => l.inner_monologue)).size, ORDER.length);
+  });
+
+  it('public-line flags take the budget before thought-only flags', async () => {
+    // Four agents share a public line, four share only a thought: 3 + 3 flagged turns.
+    // The thought group's first calls fail and are retried, using 4 of the 16
+    // requests' slack: 16 - (8 + 4) = 4 spare for 6 flagged turns.
+    const lineGroup = new Set(ORDER.slice(0, 4));
+    const attempts = new Map<string, number>();
+    const provider: TurnProvider = async (agent, ctx) => {
+      const i = ORDER.indexOf(agent.id);
+      const n = (attempts.get(agent.id) ?? 0) + 1;
+      attempts.set(agent.id, n);
+      if (!lineGroup.has(agent.id) && n === 1) return null;
+      if (ctx.speech?.nudge) {
+        return { proposals: [{ action: 'work', weight: 1 }], beliefs: {}, public_line: `${OWN_LINES[i]} Again.`, inner_monologue: OWN_THOUGHTS[i] };
+      }
+      return {
+        proposals: [{ action: 'work', weight: 1 }], beliefs: {},
+        public_line: lineGroup.has(agent.id) ? 'Same old, same old, nothing new here.' : OWN_LINES[i],
+        inner_monologue: lineGroup.has(agent.id) ? OWN_THOUGHTS[i] : 'Same thought for everyone here.',
+      };
+    };
+    const r = await runTick(createWorld(fixtureCast(42), 42), provider, { mode: 'llm_raw', scenario: [], gossip: true, billboard: true });
+    const speech = r.log.decisions.map((d) => d.speech!);
+    const lineFlagged = speech.filter((x) => x.flags.some((f) => !f.startsWith('thought:')));
+    const thoughtOnly = speech.filter((x) => x.flags.length > 0 && x.flags.every((f) => f.startsWith('thought:')));
+    assert.equal(lineFlagged.length, 3);
+    assert.equal(thoughtOnly.length, 3);
+    assert.ok(lineFlagged.every((x) => x.regenerated), 'every public-line flag is regenerated first');
+    assert.equal(thoughtOnly.filter((x) => x.regenerated).length, 1, 'one spare request left for thoughts');
+    assert.equal(r.log.speech!.budget_left, 0);
   });
 
   it('never exceeds the tick request budget', async () => {

@@ -50,7 +50,7 @@ assert.ok(prompt.includes('Colleagues still here: Rae'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
 assert.ok(prompt.includes("- Don't repeat, quote or name the announcement. Don't open with a question about it."));
 assert.ok(prompt.includes('- About 15 words at most.'));
-assert.ok(prompt.includes('at most 30 words.'));
+assert.ok(prompt.includes("at most 30 words. Start them from what's on your mind, not with the announcement, and don't copy the facts above."));
 assert.ok(prompt.includes('"running on fumes"') && prompt.includes('"Sure."'), 'banned phrases are listed');
 assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.'));
 assert.doesNotMatch(prompt, /\btick|claim-[abc]|\ba2\b|grapevine,? heard/i);
@@ -101,7 +101,7 @@ const voiced = buildTurnPrompt(agent, {
     voice: "You're clipped and terse.", manner: 'give a minimal reply, one to four words.', minimal: true,
     feelings: { stress: [0, 0, 0], burnout: [0, 0, 0], loyalty: [0, 0, 0], trust: [0, 0, 0] },
     examples: ['Rain again.'], recent: [{ name: 'Rae', line: 'Busy one.' }],
-    nudge: { line: 'Busy one, really.', against: 'Rae' },
+    nudge: { line: 'Busy one, really.', against: 'Rae', thought: 'Two a.m. again.' },
   },
 });
 let at = -1;
@@ -111,6 +111,7 @@ for (const part of [
   "Lines colleagues have already said. Don't reuse their wording or structure:\n- Rae: \"Busy one.\"",
   '- About 15 words at most. This time: one to four words.',
   'You were going to say: "Busy one, really.". That\'s too close to what Rae said',
+  'Your thoughts were going to be: "Two a.m. again.". That\'s too close to how others are thinking',
   'Respond with JSON only',
 ]) {
   const i = voiced.indexOf(part);

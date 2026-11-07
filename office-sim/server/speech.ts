@@ -9,7 +9,7 @@ import type {
 import { toLlmOutput } from './llm-adapter';
 import type { CallMetrics } from './llm/client';
 import {
-  bannedHits, eventTerms, isEchoOpener, openerMatch, patternHits, trigramSimilarity,
+  bannedHits, eventTerms, isEchoOpener, openerMatch, patternHits, tokens, trigramSimilarity,
 } from './llm/similarity';
 import { withRequestMetrics } from './llm/telemetry';
 import {
@@ -150,6 +150,26 @@ export function checkLine(
   return { flags, against };
 }
 
+/**
+ * Flags for one inner monologue, prefixed "thought:". Thoughts may be about
+ * the event, but not open with it; they are compared with other agents'
+ * thoughts, which no prompt ever shows.
+ */
+export function checkThought(
+  agent: string, thought: string, earlier: readonly Said[], recent: readonly Said[],
+  terms: readonly string[][], p: VoiceParams,
+): string[] {
+  const flags: string[] = [];
+  const others = (xs: readonly Said[]) => xs.filter((x) => x.agent !== agent);
+  if (others(earlier).some((o) => openerMatch(thought, o.line, p.speech.openerWords))) flags.push('thought:opener');
+  if (others([...earlier, ...recent]).some((o) => trigramSimilarity(thought, o.line) > p.speech.trigramThreshold)) flags.push('thought:similar');
+  if (patternHits(thought, p.labelPatterns).length) flags.push('thought:label');
+  if (patternHits(thought, p.tickPatterns).length) flags.push('thought:tick');
+  const lead = tokens(thought).slice(0, p.speech.thoughtEchoWords).join(' ');
+  if (terms.some((t) => isEchoOpener(lead, t, p.speech.thoughtEchoWords))) flags.push('thought:echo');
+  return flags;
+}
+
 export interface ReviewInput {
   world: World;
   order: readonly string[];
@@ -161,34 +181,54 @@ export interface ReviewInput {
   params: Params;
 }
 
+const isThoughtFlag = (f: string) => f.startsWith('thought:');
+
 /**
- * Check every LLM line in the round; give each flagged line one
- * regeneration, in turn order, within the requests the round's retries did
- * not use. A regeneration replaces only the spoken and inner lines; the
- * proposals and beliefs stay from the first call. Updates `llm` in place.
+ * Check every LLM line (and, if enabled, thought) in the round; give each
+ * flagged turn one regeneration within the requests the round's retries did
+ * not use, public-line flags first, then turn order. A regeneration replaces
+ * only the spoken and inner lines (only the inner line when just the thought
+ * was flagged); proposals and beliefs stay from the first call. Updates `llm`
+ * in place.
  */
 export async function reviewRound(input: ReviewInput): Promise<{ logs: Record<string, SpeechLog>; summary: SpeechTickLog }> {
   const { world, order, llm, contexts, provider, events, styles, params: p } = input;
   const v = p.voice;
   const terms = events.map((e) => eventTerms(e, v.eventKeyTerms));
   const recent = recentLines(world, p);
+  const recentThoughts = recentThoughtsOf(world, p);
   const lineOf = (id: string) => llm[id]?.output?.public_line?.trim() ?? '';
+  const thoughtOf = (id: string) => llm[id]?.output?.inner_monologue?.trim() ?? '';
   const speakers = order.filter((id) => lineOf(id));
-  const earlierThan = (id: string) => speakers.slice(0, speakers.indexOf(id)).map((a) => ({ agent: a, line: lineOf(a) }));
+  const before = (id: string) => speakers.slice(0, speakers.indexOf(id));
+  const flagsFor = (id: string): LineCheck => {
+    const line = checkLine(id, lineOf(id), before(id).map((a) => ({ agent: a, line: lineOf(a) })), recent, terms, v);
+    const thought = v.speech.checkThoughts && thoughtOf(id)
+      ? checkThought(id, thoughtOf(id), before(id).filter(thoughtOf).map((a) => ({ agent: a, line: thoughtOf(a) })), recentThoughts, terms, v)
+      : [];
+    return { flags: [...line.flags, ...thought], against: line.against };
+  };
 
   const first: Record<string, LineCheck> = {};
-  for (const id of speakers) first[id] = checkLine(id, lineOf(id), earlierThan(id), recent, terms, v);
+  for (const id of speakers) first[id] = flagsFor(id);
 
   const budget = order.length * (1 + p.bias.llmRetries);
   const used = order.reduce((n, id) => n + (llm[id]?.providerLog?.attempts ?? 0), 0);
   const spare = Math.max(0, budget - used);
+  const lineFlagged = (id: string) => first[id].flags.some((f) => !isThoughtFlag(f));
   const flagged = speakers.filter((id) => first[id].flags.length > 0);
-  const chosen = v.speech.regenerate ? flagged.slice(0, spare) : [];
+  const queue = [...flagged.filter(lineFlagged), ...flagged.filter((id) => !lineFlagged(id))];
+  const chosen = v.speech.regenerate ? queue.slice(0, spare) : [];
 
   const name = nameOf(world);
   const redo = await Promise.all(chosen.map(async (id) => {
     const ctx = contexts[id];
-    const nudge = { line: lineOf(id), against: first[id].against ? name(first[id].against!) : null };
+    const thoughtFlagged = first[id].flags.some(isThoughtFlag);
+    const nudge = {
+      line: lineFlagged(id) ? lineOf(id) : null,
+      against: lineFlagged(id) && first[id].against ? name(first[id].against!) : null,
+      thought: thoughtFlagged ? thoughtOf(id) : null,
+    };
     const metrics: CallMetrics[] = [];
     let output: LlmOutput | null = null;
     try {
@@ -211,10 +251,13 @@ export async function reviewRound(input: ReviewInput): Promise<{ logs: Record<st
     let regenFlags: string[] | null = null;
     let didRegen = false;
     const newLine = r?.output?.public_line?.trim();
-    if (r && newLine) {
-      const old = llm[id].output!;
-      llm[id].output = { ...old, public_line: newLine, inner_monologue: r.output!.inner_monologue || old.inner_monologue };
-      regenFlags = checkLine(id, newLine, earlierThan(id), recent, terms, v).flags;
+    const newThought = r?.output?.inner_monologue?.trim();
+    const old = llm[id]?.output;
+    if (r && old && (lineFlagged(id) ? newLine : newThought)) {
+      llm[id].output = lineFlagged(id)
+        ? { ...old, public_line: newLine!, inner_monologue: newThought || old.inner_monologue }
+        : { ...old, inner_monologue: newThought! };
+      regenFlags = flagsFor(id).flags;
       didRegen = true;
       regenerated++;
       if (regenFlags.length) still++;
@@ -238,14 +281,27 @@ export async function reviewRound(input: ReviewInput): Promise<{ logs: Record<st
   };
 }
 
-/** After the round: remember each agent's manner and what everyone said. */
+/** Other agents' thoughts from the rounds before this one (for the check only, never for prompts). */
+function recentThoughtsOf(world: World, p: Params): Said[] {
+  const from = world.tick - p.voice.speech.recentRounds;
+  return (world.speech?.recent ?? [])
+    .filter((r) => r.thought && r.tick >= from && r.tick < world.tick)
+    .map((r) => ({ agent: r.agent, line: r.thought! }));
+}
+
+/** After the round: remember each agent's manner and what everyone said and thought. */
 export function recordRound(
-  world: World, styles: Record<string, TurnStyle>, lines: ReadonlyArray<{ agent: string; public_line: string }>, p: Params,
+  world: World, styles: Record<string, TurnStyle>,
+  lines: ReadonlyArray<{ agent: string; public_line: string; inner_monologue?: string }>, p: Params,
 ): void {
   const speech = world.speech;
   if (!speech) return;
   for (const [id, style] of Object.entries(styles)) speech.lastManner[id] = style.manner;
-  for (const l of lines) if (l.public_line.trim()) speech.recent.push({ tick: world.tick, agent: l.agent, line: l.public_line.trim() });
+  for (const l of lines) {
+    if (!l.public_line.trim()) continue;
+    const thought = l.inner_monologue?.trim();
+    speech.recent.push({ tick: world.tick, agent: l.agent, line: l.public_line.trim(), ...(thought ? { thought } : {}) });
+  }
   const keepFrom = world.tick - p.voice.speech.recentRounds + 1;
   speech.recent = speech.recent.filter((r) => r.tick >= keepFrom);
 }

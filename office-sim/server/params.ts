@@ -471,6 +471,10 @@ export const voiceParams = {
     echoWords: 5,
     /** Flagged lines get one regeneration, within the tick's request budget. */
     regenerate: true,
+    /** Also check inner monologues (against other agents' thoughts; never shown in prompts). */
+    checkThoughts: true,
+    /** A thought that names the event within this many leading words is flagged. */
+    thoughtEchoWords: 3,
   },
   /** One call per agent for three small-talk lines used as style examples. */
   examples: { enabled: true, count: 3 },
