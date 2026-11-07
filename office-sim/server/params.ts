@@ -330,6 +330,8 @@ export interface HabitDef {
 }
 
 export const voiceParams = {
+  /** Master switch: off means no manners, briefs, checks or example calls (cards are still dealt). */
+  enabled: true,
   card: {
     register: {
       base: { casual: 1, plain: 1.5, corporate: 0.5, clipped: 0.5 },

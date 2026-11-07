@@ -10,6 +10,9 @@ export const NO_REGEN_PARAMS: Params = {
   ...DEFAULT_PARAMS,
   voice: { ...DEFAULT_PARAMS.voice, speech: { ...DEFAULT_PARAMS.voice.speech, regenerate: false } },
 };
+
+/** Default params with the voice system off: for tests of other layers that route on exact prompts. */
+export const VOICE_OFF_PARAMS: Params = { ...DEFAULT_PARAMS, voice: { ...DEFAULT_PARAMS.voice, enabled: false } };
 import type { AgentState } from '../../shared/types';
 
 export function makeAgent(

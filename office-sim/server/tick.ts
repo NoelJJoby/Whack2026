@@ -119,6 +119,7 @@ export function buildContext(
       .map((id) => ({
         id,
         name: world.agents[id].profile.name,
+        group: world.agents[id].profile.functionGroup,
         affinity: agent.state.affinity[id] ?? params.rules.defaultAffinity,
         source_trust: agent.state.source_trust[id] ?? params.rules.defaultSourceTrust,
       })),
@@ -243,7 +244,7 @@ export async function runTick(
 
   const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
   // Voice: manners are drawn in turn order before the calls (server/speech.ts).
-  const speaking = LLM_MODES.includes(config.mode) && Boolean(w.speech && params.voice);
+  const speaking = LLM_MODES.includes(config.mode) && Boolean(w.speech && params.voice?.enabled);
   const styles = speaking ? planRound(w, order, params) : {};
   let speechLogs: Awaited<ReturnType<typeof reviewRound>> | null = null;
   let examples: Awaited<ReturnType<typeof ensureExamples>> = { added: {}, requests: 0 };

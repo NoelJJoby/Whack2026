@@ -217,7 +217,8 @@ export interface TurnContext {
   mode: Mode;
   state: AgentState;
   available: Action[];
-  colleagues: Array<{ id: string; name: string; affinity: number; source_trust: number }>;
+  /** `group` is the colleague's function (department), shown beside their name. */
+  colleagues: Array<{ id: string; name: string; affinity: number; source_trust: number; group?: string }>;
   claims: Array<{ id: string; text: string; from: string; tick_heard: number; scandal: boolean }>;
   events: Array<{ type: EventType; text: string }>;
   /** Voice brief, set in LLM modes by server/speech.ts. */

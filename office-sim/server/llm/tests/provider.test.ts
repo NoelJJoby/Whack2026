@@ -14,7 +14,7 @@ const ctx: TurnContext = {
   tick: 9, mode: 'llm_bias',
   state: makeAgent('a1', { stress: 83, source_trust: { a2: 87 } }).state,
   available: ['work', 'complain', 'gossip'],
-  colleagues: [{ id: 'a2', name: 'PRIVATE_COLLEAGUE_LABEL', affinity: 91, source_trust: 87 }],
+  colleagues: [{ id: 'a2', name: 'Rae', affinity: 91, source_trust: 87 }],
   claims: [{ id: 'claim-6', text: 'The office may close.', from: 'a2', tick_heard: 6, scandal: false }],
   events: [{ type: 'new_management', text: 'A new manager starts today.' }],
 };
@@ -58,25 +58,36 @@ try {
   assert.equal(metrics.length, 1);
   assert.deepEqual(metrics[0].usage, { promptTokens: 170, completionTokens: 55 });
   const prompt = prompts[0];
-  assert.ok(prompt.startsWith('You are not an assistant and you are not giving good advice. You are a tired person at work making a choice in the moment. People under pressure act on impulse, hold grudges and avoid confrontation.'));
-  assert.ok(prompt.includes("You're overwhelmed and close to snapping."));
-  assert.ok(prompt.includes('"The office may close." (id: claim-6), from a2, heard 3 ticks ago. you generally trust them.'));
+  assert.ok(prompt.startsWith("You're not an assistant, and you're not here to give good advice. You're a person at work, reacting in the moment the way you really would."));
+  assert.ok(prompt.includes("You've had a headache since this morning and can't get through your list."));
+  assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, this afternoon. you generally trust them.'));
   assert.ok(prompt.includes('A new manager starts today.'));
-  assert.ok(prompt.includes('Colleagues still here: a2'));
+  assert.ok(prompt.includes('Colleagues still here: Rae'));
   const actions = prompt.split('What you can do:\n')[1].split('\n\n')[0]
     .split('\n').filter(line => line.startsWith('- ')).map(line => line.split(':')[0].slice(2));
   assert.deepEqual(actions, ctx.available);
   assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100'));
-  assert.ok(prompt.includes('Give one integer for every claim id.'));
-  for (const hidden of ['PRIVATE_ARCHETYPE', 'PRIVATE_COLLEAGUE_LABEL', 'is_true', 'source_trust', '83', '87', '91']) {
+  assert.ok(prompt.includes('Give one integer for every claim key.'));
+  // Names are shown; ids, claim ids, archetypes and ticks are not.
+  for (const hidden of ['PRIVATE_ARCHETYPE', 'a2', 'claim-6', 'tick', 'is_true', 'source_trust', '83', '87', '91']) {
     assert.equal(prompt.includes(hidden), false, `Unexpected prompt disclosure: ${hidden}`);
   }
   const noClaims = { ...ctx, claims: [], events: [], colleagues: [], available: ['work'] as TurnContext['available'] };
   assert.deepEqual(await provider(agent, noClaims), output);
   assert.equal(calls, 2, 'Each invocation calls the API once; no implicit cache');
   assert.ok(prompts[1].includes("You haven't heard anything new."));
-  assert.ok(prompts[1].includes('No new announcements.'));
+  assert.ok(prompts[1].includes('Nothing new has been announced.'));
   assert.ok(prompts[1].includes('Colleagues still here: None.'));
+
+  // A reply in the prompt's terms (names, claim keys) comes back in engine ids.
+  const named = createTurnProvider({ fetch: async () => Response.json(message(JSON.stringify({
+    proposals: [{ action: 'gossip', weight: 1, target: 'rae', claim: 'c1' }],
+    public_line: 'Rae, coffee?', inner_monologue: 'Need a break.', beliefs: { c1: 60 },
+  }))) });
+  assert.deepEqual(await named(agent, ctx), {
+    proposals: [{ action: 'gossip', weight: 1, target: 'a2', claim: 'claim-6' }],
+    public_line: 'Rae, coffee?', inner_monologue: 'Need a break.', beliefs: { 'claim-6': 60 },
+  });
 
   // Parseable objects are returned unchanged, even if strict validation would
   // reject them. The real engine adapter gets to normalize or reject them.
