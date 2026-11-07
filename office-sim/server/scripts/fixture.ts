@@ -1,6 +1,7 @@
-// Local cast and scenario fixture. data.ts (LLM and Data lane) still has every
-// trait at 0, so the engine uses this until it is filled in. Archetypes follow
-// office-sim/agent.md; impulsivity follows the bias brief.
+// Local cast and scenario fixture: the engine's tuned, seeded test cast.
+// Archetypes follow office-sim/agent.md; impulsivity follows the bias brief.
+// dataCast() wraps the LLM and Data lane's cast in data.ts for comparison runs.
+import { buildAgentState, cast } from '../data';
 import type { CastMember, EngineTraits, ScenarioEvent } from '../engine-types';
 import { DEFAULT_PARAMS, type Params } from '../params';
 import { stream } from '../rng';
@@ -64,6 +65,14 @@ export function fixtureCast(seed: number, params: Params = DEFAULT_PARAMS, jitte
       for (const k of NUMERIC_TRAITS) traits[k] = Math.min(100, Math.max(0, Math.round(traits[k] + (rng.next() * 2 - 1) * j)));
     }
     return { profile: { ...c.profile, traits }, start: structuredClone(c.start) };
+  });
+}
+
+/** The LLM and Data lane's cast (data.ts) as engine cast members. Not jittered. */
+export function dataCast(): CastMember[] {
+  return cast.map((profile) => {
+    const { affinity, source_trust, ...start } = buildAgentState(profile);
+    return { profile: structuredClone(profile), start: { ...start, affinity, source_trust } };
   });
 }
 
