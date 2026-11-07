@@ -1,3 +1,4 @@
+import { BURNOUT_STRESS_THRESHOLD, BURNOUT_RECOVERY_THRESHOLD } from '../shared/stressThresholds';
 import type { Action, EventType } from '../shared/types';
 
 export const simParams = {
@@ -198,12 +199,12 @@ export const ruleParams = {
     stressPerExcessWorkload: 1.0,
     stressRelax: 0.25,
     /** Burnout accumulates above this stress ... */
-    burnoutStressHigh: 60,
+    burnoutStressHigh: BURNOUT_STRESS_THRESHOLD,
     burnoutGain: 2,
     /** ... plus this per point of stress above burnoutStressHigh. */
     burnoutGainPerStress: 0.05,
     /** Burnout decays slowly below this stress. */
-    burnoutStressLow: 40,
+    burnoutStressLow: BURNOUT_RECOVERY_THRESHOLD,
     burnoutDecay: 1,
     /** Workload relaxes toward the agent's baseline by this fraction per tick. */
     workloadRelax: 0.15,
