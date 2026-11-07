@@ -1,6 +1,6 @@
 import { Events } from './Events';
 import { BusinessReport } from './BusinessReport';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { Office, lookFor, type Person } from './design/Office';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
@@ -14,6 +14,10 @@ import { RUN_LENGTHS, useSimulation } from './useSimulation';
 import { useDialogue } from './useDialogue';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import './index.css';
+
+/** VITE_VIEW=3d swaps the 2D office for the 3D diorama (loaded as a separate chunk). Default stays 2D. */
+const VIEW_3D = import.meta.env.VITE_VIEW === '3d';
+const Office3D = lazy(() => import('./three/Office3D'));
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company';
 type Menu = Tool | 'stock' | 'events';
@@ -95,7 +99,9 @@ export default function App() {
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
   return <main className="game-window" aria-label="The Daily Grind">
-    <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>
+    {VIEW_3D
+      ? <Suspense fallback={<div className="office-scene"/>}><Office3D people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/></Suspense>
+      : <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>}
     <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
