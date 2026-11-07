@@ -1,8 +1,8 @@
 // 3D isometric voxel office (VITE_VIEW=3d). Same props as the 2D <Office>; renders only what it is given.
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, type ElementRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Stats } from '@react-three/drei';
-import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial } from 'three';
+import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, type OrthographicCamera } from 'three';
 import type { Person } from '../design/Office';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
@@ -25,6 +25,7 @@ const glassMat = new MeshLambertMaterial({ vertexColors: true, transparent: true
 const screenOn = new MeshBasicMaterial({ color: '#8fd3f5' });
 const screenOff = new MeshBasicMaterial({ color: '#1c2028' });
 const bulb = new MeshBasicMaterial({ color: '#ffe08a' });
+const lampPool = new MeshBasicMaterial({ color: '#ffd36b', transparent: true, opacity: 0.35, depthWrite: false });
 
 const name = (people: Person[], id: string) => people.find(p => p.id === id)?.name ?? id;
 
@@ -88,6 +89,15 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
 }) {
   const layoutKey = people.map(p => `${p.id}:${p.role}`).join();
   const seats = useMemo(() => new Map(people.map((p, i) => [p.id, seatFor(p.role, i)])), [layoutKey]);
+  const controls = useRef<ElementRef<typeof OrbitControls>>(null);
+  const zoom = (factor: number) => {
+    const c = controls.current;
+    if (!c) return;
+    const cam = c.object as OrthographicCamera;
+    cam.zoom = Math.min(140, Math.max(12, cam.zoom * factor));
+    cam.updateProjectionMatrix();
+    c.update();
+  };
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
   return <div className="office-scene o3-scene">
     <Canvas orthographic shadows flat dpr={[1, 1.5]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
@@ -105,15 +115,23 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
           <mesh position={[seat.x + 0.4, FLOOR + 1.08, dz + 0.035]} scale={[0.58, 0.32, 0.01]} material={p.quit ? screenOff : screenOn}>
             <boxGeometry />
           </mesh>
-          {b.kind === 'overwork' && <mesh position={[seat.x + 0.85, FLOOR + 1.21, dz + 0.3]} scale={[0.14, 0.06, 0.14]} material={bulb}><boxGeometry /></mesh>}
+          {b.kind === 'overwork' && <>
+            <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
+            <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
+          </>}
           <Agent3D person={p} nav={nav} behaviour={b} phase={i} speed={speed} selected={selected === p.id} highlighted={highlight.includes(p.id)}
             line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={onSelect} />
         </group>;
       })}
-      <OrbitControls makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
+      <OrbitControls ref={controls} makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
       {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
+    <div className="o3-zoom">
+      <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>
+      <button onClick={() => zoom(0.8)} aria-label="Zoom out">−</button>
+    </div>
+    <p className="o3-hint">Drag to orbit · Scroll to zoom</p>
   </div>;
 }

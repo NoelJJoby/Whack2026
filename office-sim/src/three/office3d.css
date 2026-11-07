@@ -23,3 +23,49 @@
 .o3-tag.sofa, .o3-tag.idle { background: #b5bfb0; }
 .o3-tag.overwork { background: #e05b3b; color: #fff; }
 @keyframes o3-blink { 50% { opacity: .25; } }
+
+/* Pass 3: navy panels, thin gold border, small radius (3D view only). */
+.view-3d { --o3-panel: #13203aeb; --o3-edge: #d7b66c; background: #14203a; }
+.view-3d .office-wire, .view-3d .clock-hud, .view-3d .stock-ticker, .view-3d .game-tools button,
+.view-3d .tool-panel, .view-3d .employee-panel, .view-3d .announcement, .view-3d .connection-status, .view-3d .error-notice {
+  background: var(--o3-panel); border: 1px solid var(--o3-edge); border-radius: 6px; box-shadow: 0 6px 18px #070d1a80;
+}
+.view-3d .office-wire { overflow: hidden; }
+.view-3d .clock-hud { padding: 6px 14px 10px; text-shadow: none; }
+.view-3d .game-tools button { color: var(--o3-edge); }
+.view-3d .game-tools button:hover { background: #1d2d4f; }
+.view-3d .game-tools button[aria-expanded=true] { background: #2a3550; box-shadow: inset 0 0 0 1px var(--o3-edge); }
+.view-3d .stock-ticker:hover { background: #1d2d4f; border-color: var(--o3-edge); }
+.view-3d .announcement { color: #e3e5d5; }
+.view-3d .announcement span { color: var(--o3-edge); }
+.view-3d .dialogue-box { border-radius: 6px; }
+.view-3d .sparkline { display: block; width: 100%; height: 30px; margin-top: 8px; }
+.view-3d .sparkline.up polyline { stroke: #8fe0a8; }
+.view-3d .sparkline.down polyline { stroke: #f07a6a; }
+
+/* Zoom buttons and hint, bottom-right (above the dev fps meter). */
+.o3-zoom { position: absolute; right: 16px; bottom: 76px; display: flex; flex-direction: column; gap: 8px; }
+.o3-zoom button { width: 40px; height: 40px; font-size: 24px; line-height: 1; color: #d7b66c; background: #13203aeb; border: 1px solid #d7b66c; border-radius: 6px; }
+.o3-zoom button:hover { background: #1d2d4f; }
+.o3-hint { position: absolute; right: 16px; bottom: 56px; margin: 0; font-size: 11px; color: #b5bfb0; pointer-events: none; }
+
+/* People drawer cards and crack order. */
+.o3-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.o3-card { text-align: left; padding: 10px; background: #1b2a48; border: 1px solid #3b4a6b; border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
+.o3-card:hover { border-color: #d7b66c; }
+.o3-card.quit { opacity: .55; }
+.o3-card header strong { display: block; font-size: 14px; border-left: 4px solid; padding-left: 6px; }
+.o3-card header small { display: block; font-size: 10px; color: #b5bfb0; margin-top: 3px; }
+.o3-card .says { font-size: 11px; line-height: 1.4; }
+.o3-card .thinks { font-size: 11px; line-height: 1.4; font-style: italic; color: #aab3c9; }
+.o3-bar { display: grid; grid-template-columns: 52px 1fr 24px; align-items: center; gap: 6px; font-size: 10px; color: #b5bfb0; }
+.o3-bar i { height: 5px; background: #2c3a58; display: block; }
+.o3-bar b { display: block; height: 100%; }
+.o3-bar em { font-style: normal; text-align: right; }
+.o3-crack { margin-top: 24px; padding-top: 16px; border-top: 1px solid #53645777; }
+.o3-crack ol { margin: 10px 0 0; padding-left: 20px; font-size: 13px; line-height: 1.8; color: #e8947f; }
+@media (max-width: 700px) { .o3-people { grid-template-columns: 1fr; } }
+/* The dialogue bar would cover the hint on narrower screens. */
+@media (max-width: 1300px) { .o3-hint { display: none; } }
+.view-3d .game-tools button svg { width: 30px; height: 30px; }
+.view-3d .connection-status { top: 158px; }

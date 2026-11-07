@@ -13,17 +13,19 @@ import { quitParams } from '../server/params';
 import { RUN_LENGTHS, useSimulation } from './useSimulation';
 import { useDialogue } from './useDialogue';
 import { DialogueBar, type Speaker } from './DialogueBar';
+import { ChartDrawer, Icon3D, LABEL_3D, PeopleDrawer, TOOLS_3D } from './three/Hud3D';
 import './index.css';
 
 /** VITE_VIEW=3d swaps the 2D office for the 3D diorama (loaded as a separate chunk). Default stays 2D. */
 const VIEW_3D = import.meta.env.VITE_VIEW === '3d';
 const Office3D = lazy(() => import('./three/Office3D'));
 
-type Tool = 'simulation' | 'shake' | 'rumours' | 'company';
+type Tool = 'simulation' | 'shake' | 'rumours' | 'company' | 'people';
 type Menu = Tool | 'stock' | 'events';
-const MENU_LABEL: Record<Menu, string> = { events: 'Business events', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock' };
+const MENU_LABEL: Record<Menu, string> = { events: 'Business events', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock', people: 'People', ...(VIEW_3D ? LABEL_3D : {}) };
+const TOOLS: Tool[] = VIEW_3D ? TOOLS_3D : ['simulation', 'shake', 'rumours', 'company'];
 
-function ToolIcon({ tool }: { tool: Tool }) {
+function ToolIcon({ tool }: { tool: Exclude<Tool, 'people'> }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
     {tool === 'simulation' ? <path fill="currentColor" d="M6 7h12v2H6zm0 4h12v2H6zm0 4h12v2H6z"/>
       : tool === 'shake' ? <path fill="currentColor" d="M6 3h2v18H6zm2 1c4-3 6 4 12 1v11c-6 3-8-4-12-1z"/>
@@ -98,11 +100,11 @@ export default function App() {
   function openMenu(next: Menu) { setSelected(null); setHighlight([]); setMenu(next); }
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
-  return <main className="game-window" aria-label="The Daily Grind">
+  return <main className={`game-window${VIEW_3D ? ' view-3d' : ''}`} aria-label="The Daily Grind">
     {VIEW_3D
       ? <Suspense fallback={<div className="office-scene"/>}><Office3D people={people} selected={selected} onSelect={select} highlight={highlight} line={menu === null ? dialogue.line : null} showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed}/></Suspense>
       : <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>}
-    <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
+    <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')} sparkline={VIEW_3D}/>
     <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
     {sim.phase && <div className="management-phase" role="status">{sim.phase}…</div>}
@@ -122,10 +124,10 @@ export default function App() {
     <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null}
       onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onVoices={() => dialogue.setVoices(!dialogue.voices)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
-    <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
+    <nav className="game-tools" aria-label="Office tools">{TOOLS.map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}>{VIEW_3D ? <Icon3D tool={id as typeof TOOLS_3D[number]}/> : <ToolIcon tool={id as Exclude<Tool, 'people'>}/>}</button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'people' ? <PeopleDrawer people={people} onSelect={select}/> : VIEW_3D && menu === 'company' ? <ChartDrawer history={history} state={state} people={people} truth={truth} onTruth={setTruth}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>

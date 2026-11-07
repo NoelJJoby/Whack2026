@@ -15,7 +15,7 @@ const BASE: Record<string, P> = {
   lc: [-5.6, -2.5], meetIn: [-7, -2.5], meet: [-7, -4.4], meetBack: [-7, -6.2], meetCorner: [-10.2, -6.2], winMeet: [-10.4, -4.4],
   // Front aisle, lounge (sofa, window), front door, street.
   fL: [-10.2, AISLE_FRONT], fLounge: [-6.8, AISLE_FRONT], fCol: [-5.6, AISLE_FRONT], fDoor: [0.25, AISLE_FRONT], fR: [6.6, AISLE_FRONT],
-  sofaPathR: [-6.8, 1.0], sofaA: [-8.0, 0.4], sofaPathL: [-10.2, 1.0], sofaB: [-9.4, 0.4], winLounge: [-10.4, 2.3],
+  sofaPathR: [-6.8, 1.0], sofaA: [-8.0, 0.15], sofaPathL: [-10.2, 1.0], sofaB: [-9.4, 0.15], winLounge: [-10.4, 2.3],
   doorIn: [0, 4.6], doorOut: [0, 5.9], path: [0, 7.6], interview: [1.0, 7.6], pave: [0, 10.75], exit: [-17.5, 10.75],
   // CEO office: through the glass door, round the desk.
   ceoDoor: [7.5, -1.6], ceoA: [6.2, -2.6], ceoB: [6.2, -5.4], ceoBack: [8, -5.4],

@@ -9,7 +9,7 @@ import { FLOOR } from './layout';
 import { seatNode, type Nav } from './nav';
 import { mat, unitBox } from './voxel';
 
-const PANTS = '#2c3040', SHOES = '#1c1d22', EYES = '#241c22', SWEAT = '#9fd8ff', BOX = '#c08a4e';
+const PANTS = '#2c3040', SHOES = '#1c1d22', EYES = '#241c22', SWEAT = '#d6f1ff', BOX = '#c08a4e';
 const WALK = 2.6; // units per second at 1x
 /** Seconds (at 1x) an agent stays put before taking their newest behaviour, so moves stay readable. */
 const DWELL = 2;
@@ -163,8 +163,8 @@ export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected
       <Part p={[0.1, 0.9, 0.235]} s={[0.08, 0.08, 0.02]} c={EYES} />
     </group>
     <group ref={sweat} visible={false}>
-      <Part p={[-0.3, 1.7, 0.15]} s={[0.06, 0.1, 0.06]} c={SWEAT} />
-      <Part p={[0.32, 1.7, 0.1]} s={[0.06, 0.1, 0.06]} c={SWEAT} />
+      <Part p={[-0.34, 1.7, 0.15]} s={[0.09, 0.14, 0.09]} c={SWEAT} />
+      <Part p={[0.36, 1.7, 0.1]} s={[0.09, 0.14, 0.09]} c={SWEAT} />
     </group>
     {line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
       : behaviour.tag && <Html position={[0, 2.05, 0]} zIndexRange={[4, 0]} className="o3-anchor">
