@@ -39,7 +39,8 @@ This documents desired output using the existing Zod 3 dependency. It is not
 a provider-side validation gate. Weights are relative and need not sum to one;
 beliefs may be fractional despite the prompt requesting integers. New proposals
 use `claim`, not `claim_id`. Public and inner lines express mood rather than
-asserting that an action has occurred.
+asserting that an action has occurred, and are capped at 30 words each by
+prompt instruction (never truncated in code).
 
 ```json
 {

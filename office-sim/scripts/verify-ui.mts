@@ -27,7 +27,7 @@ await page.goto(process.env.UI_URL ?? 'http://127.0.0.1:5173/');
 await page.waitForFunction(() => (window as any).__stream?.onmessage);
 await page.evaluate(data => (window as any).__stream.onmessage({data: JSON.stringify(data)}), {type:'history', ...mockResponse, history:mockHistory});
 await page.waitForSelector('[data-employee]');
-for (const [width,height] of [[1440,900],[1366,768],[1280,720]]) {
+for (const [width,height] of [[1920,1080],[1440,900],[1366,768],[1280,720]]) {
   await page.setViewportSize({width,height});
   await page.screenshot({path:join(artifacts, `grind-${width}x${height}.png`)});
   const result = await page.evaluate(() => ({
@@ -64,6 +64,153 @@ for (const [width,height] of [[1440,900],[1366,768],[1280,720]]) {
     assert.ok(await dialog.locator('.tool-content').evaluate(el=>el.scrollWidth<=el.clientWidth));
     await page.keyboard.press('Escape');
   }
+}
+
+// Dialogue bar. The page clock is paused, so typing and Auto advance only with runFor.
+{
+  const base=mockHistory.at(-1)!;
+  const thirty=Array.from({length:30},(_,i)=>['Honestly','fine','staying','late','again','tonight'][i%6]).join(' ')+'.';
+  let hour=base.tick;
+  const frameWith=(edit:(r:any)=>any,running=false)=>{
+    const tick=++hour;
+    return {...base,tick,events:[],price:{...base.price,tick},state:{...base.state,tick,running},records:base.records.map(r=>edit({...r,tick}))};
+  };
+  const only=(lines:Record<string,string>)=>(r:any)=>({...r,public_line:lines[r.agent]??''});
+  const send=(frame:any)=>page.evaluate(data=>(window as any).__stream.onmessage({data:JSON.stringify(data)}),{...mockResponse,state:frame.state,price:frame.price,type:'tick',frame});
+  const bar=page.locator('.dialogue-bar');
+  const plate=page.locator('.dialogue-plate');
+  const speaking=()=>page.locator('.station.speaking [data-employee]').getAttribute('aria-label');
+  const untyped=()=>page.locator('.dialogue-untyped').evaluateAll(els=>els.map(el=>el.textContent).join(''));
+  const progress=()=>page.locator('.dialogue-progress').innerText();
+  // Wait for React to render a new round before pressing keys.
+  const showing=(name:string)=>page.locator('.dialogue-bar.open .dialogue-plate',{hasText:name}).waitFor();
+  await page.setViewportSize({width:1920,height:1080});
+  // Enter on a focused button keeps its native action, so start from the page body.
+  await page.evaluate(()=>(document.activeElement as HTMLElement|null)?.blur());
+  await send(frameWith(r=>({...r,quit:r.agent==='lena',action:r.agent==='tom'?'leak':r.action,public_line:r.agent==='jess'?'':r.agent==='tom'?thirty:r.public_line,inner_monologue:r.agent==='tom'?thirty:r.inner_monologue})));
+  await page.locator('.dialogue-bar.open').waitFor();
+  assert.ok((await plate.innerText()).includes('Lena'));
+  assert.ok((await plate.innerText()).includes('Left the company'));
+  assert.equal(await speaking(),'Inspect Lena');
+  assert.equal(await progress(),'1/5');
+  assert.ok((await untyped()).length>0,'text types out');
+  await page.clock.runFor(200);
+  const partly=(await untyped()).length;
+  await page.keyboard.press('n');
+  assert.equal(await untyped(),'','Next completes the line');
+  assert.ok(partly>0);
+  await page.keyboard.press('n');
+  assert.ok((await plate.innerText()).includes('Tom'),'leak ranks second');
+  assert.equal(await speaking(),'Inspect Tom');
+  await page.keyboard.press('Enter');
+  assert.equal(await untyped(),'');
+  for (const [width,height] of [[1920,1080],[1920,970],[1366,768],[1366,657]]) {
+    await page.setViewportSize({width,height});
+    const geometry=await page.evaluate(`(() => {
+      const r=el=>el&&el.getBoundingClientRect();
+      const barBox=r(document.querySelector('.dialogue-bar')), controls=r(document.querySelector('.dialogue-controls')), text=document.querySelector('.dialogue-text');
+      const hits=['.building','.stock-ticker','.clock-hud','.office-wire','.game-tools'].filter(sel=>{const b=r(document.querySelector(sel));return b&&b.left<barBox.right&&b.right>barBox.left&&b.top<barBox.bottom+0&&b.bottom>barBox.top-8;});
+      return {hits,inside:barBox.left>=0&&barBox.right<=innerWidth&&controls.bottom<=innerHeight,fits:text.scrollHeight<=text.clientHeight,page:[document.documentElement.scrollWidth,document.documentElement.scrollHeight],viewport:[innerWidth,innerHeight]};
+    })()`) as any;
+    console.log(JSON.stringify({dialogue:`${width}x${height}`,...geometry}));
+    assert.deepEqual(geometry.hits,[],`dialogue overlaps at ${width}x${height}`);
+    assert.ok(geometry.inside && geometry.fits,`dialogue clipped or overflowing at ${width}x${height}`);
+    assert.deepEqual(geometry.page,geometry.viewport);
+    await page.screenshot({path:join(artifacts,`grind-dialogue-${width}x${height}.png`)});
+    await page.getByRole('button',{name:'Inspect Tom',exact:true}).click();
+    const panel=await page.locator('.employee-panel').boundingBox(), barBox=await bar.boundingBox();
+    assert.ok(panel && barBox && panel.y+panel.height<=barBox.y,`employee panel overlaps dialogue at ${width}x${height}`);
+    await page.keyboard.press('Escape');
+  }
+  await page.setViewportSize({width:1440,height:900});
+  // Auto: the reading delay starts after typing and scales with words.
+  await page.clock.runFor(1500+60*250-200);
+  assert.ok((await plate.innerText()).includes('Tom'));
+  await page.clock.runFor(300);
+  assert.ok((await plate.innerText()).includes('Dan'),'auto advances after the reading delay');
+  // Auto on: a new round waits for the current line, then replaces the rest.
+  await send(frameWith(only({marcus:'New round line.'})));
+  await page.locator('.dialogue-new').waitFor();
+  await page.keyboard.press('n');
+  await page.clock.runFor(5100);
+  assert.ok((await plate.innerText()).includes('Marcus'));
+  assert.equal(await progress(),'1/1');
+  // Auto off: the player reads at their own pace and a chip shows the waiting round.
+  await page.keyboard.press('a');
+  assert.equal(await page.getByRole('button',{name:'Auto advance'}).getAttribute('aria-pressed'),'false');
+  await page.keyboard.press('n');
+  await send(frameWith(only({priya:'First.',sam:'Second.'})));
+  await page.locator('.dialogue-new').waitFor();
+  await page.clock.runFor(30000);
+  assert.ok((await plate.innerText()).includes('Marcus'),'manual mode never auto-advances');
+  await page.keyboard.press('n');
+  assert.ok((await plate.innerText()).includes('Priya'));
+  await send(frameWith(only({ravi:'Skipped to me.'})));
+  await page.locator('.dialogue-new').waitFor();
+  await page.keyboard.press('s');
+  await showing('Ravi');
+  assert.ok((await plate.innerText()).includes('Ravi'),'skip round jumps to the waiting round');
+  await page.keyboard.press('n'); await page.keyboard.press('n');
+  await page.locator('.dialogue-bar:not(.open)').waitFor({state:'attached'});
+  await page.getByRole('button',{name:'Auto advance'}).evaluate(el=>(el as HTMLElement).click());
+  // Keys do nothing while typing in a field.
+  await send(frameWith(only({dan:'Typing guard.',jess:'Second line.'})));
+  await showing('Dan');
+  await page.evaluate(()=>{const input=document.createElement('input');input.id='scratch-input';document.body.append(input);input.focus();});
+  await page.keyboard.type('nnss a');
+  assert.equal(await progress(),'1/2');
+  assert.ok((await untyped()).length>0);
+  await page.evaluate(()=>document.getElementById('scratch-input')!.remove());
+  // A menu hides the bar.
+  await page.getByRole('button',{name:'Simulation',exact:true}).click();
+  await page.locator('.dialogue-bar:not(.open)').waitFor({state:'attached'});
+  await page.keyboard.press('Escape');
+  await page.locator('.dialogue-bar.open').waitFor();
+  // An unknown agent (a replacement) still gets a portrait.
+  await page.keyboard.press('s');
+  await send({...frameWith(r=>r),records:[{...base.records[0],tick:hour,agent:'newhire',public_line:'First day here.'}]});
+  await showing('newhire');
+  assert.ok((await plate.innerText()).includes('newhire'));
+  assert.equal(await page.locator('.dialogue-portrait svg').count(),1);
+  // Reduced motion shows text at once.
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.keyboard.press('s');
+  await send(frameWith(only({lena:'No typing for me.'})));
+  await showing('Lena');
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('.dialogue-untyped')).every(el=>el.textContent===''));
+  await page.emulateMedia({reducedMotion:null});
+  // Every record of a round stays in the Office wire, beyond the five-line cap.
+  await page.getByRole('button',{name:'Expand Office wire history',exact:true}).click();
+  assert.equal(await page.locator('.feed-entry time',{hasText:/^Day 1, 16:00$/}).count(),base.records.length);
+  await page.getByRole('button',{name:'Collapse Office wire history',exact:true}).click();
+  // Space is pause/play; Hold for dialogue pauses until the round has played.
+  const calls:string[]=[];
+  const live=(running:boolean)=>({...mockResponse,state:{...mockResponse.state,tick:hour,running}});
+  await page.route('**/api/sim/pause',route=>{calls.push('pause');return route.fulfill({json:live(false)});});
+  await page.route('**/api/sim/play',route=>{calls.push('play');return route.fulfill({json:live(true)});});
+  await page.keyboard.press('Space');
+  await expectCalls(['play']);
+  await page.getByRole('button',{name:'Simulation',exact:true}).click();
+  await page.getByLabel('Hold for dialogue').check();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('s');
+  await send(frameWith(only({sam:'Hold on.'}),true));
+  await showing('Sam');
+  await expectCalls(['play','pause']);
+  await page.keyboard.press('n'); await page.keyboard.press('n');
+  await expectCalls(['play','pause','play']);
+  await page.getByRole('button',{name:'Simulation',exact:true}).click();
+  await page.getByLabel('Hold for dialogue').uncheck();
+  await page.keyboard.press('Escape');
+  await page.unroute('**/api/sim/pause'); await page.unroute('**/api/sim/play');
+  async function expectCalls(expected:string[]) {
+    for (let i=0;i<50&&calls.length<expected.length;i++) await page.waitForTimeout(20);
+    assert.deepEqual(calls,expected);
+  }
+  // A replaced history (reconnect, reset) clears the bar without replaying.
+  await page.evaluate(data=>(window as any).__stream.onmessage({data:JSON.stringify(data)}),{type:'history',...mockResponse,history:mockHistory});
+  await page.locator('.dialogue-bar:not(.open)').waitFor({state:'attached'});
+  console.log('Dialogue layout, typing, Next, Skip round, Auto, new-round, keyboard, portrait, reduced-motion, feed and hold checks passed');
 }
 
 await page.setViewportSize({width:1440,height:900});

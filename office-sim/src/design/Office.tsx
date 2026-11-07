@@ -1,5 +1,4 @@
-import { playerText } from '../hudModel';
-import { BURNOUT_STRESS_THRESHOLD } from '../../shared/stressThresholds';
+import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../../shared/stressThresholds';
 
 /** How each archetype looks and where they sit. Joined to the live cast on `archetype`. */
 export interface Look {
@@ -37,18 +36,29 @@ export interface Person extends Look {
     thinks: string;
     quit: boolean;
 }
-export function Sprite({ person, small = false, quit = false }: {
+/** Portrait expression by stress band. */
+export type Mood = 'calm' | 'stretched' | 'snapping';
+export const moodFor = (stress: number): Mood =>
+    stress > BURNOUT_STRESS_THRESHOLD ? 'snapping' : stress >= BURNOUT_RECOVERY_THRESHOLD ? 'stretched' : 'calm';
+const MOUTH: Record<Mood, string> = { calm: 'M9 7h1v1H9zM10 8h2v1h-2z', stretched: 'M9 8h3v1H9z', snapping: 'M9 8h1v1H9zM10 7h2v1h-2z' };
+export function Sprite({ person, small = false, quit = false, crop = false, mood }: {
     person: Pick<Look, 'color' | 'hair' | 'skin'>;
     small?: boolean;
     quit?: boolean;
+    /** Adds a mouth (and a frown and sweat when snapping). Office sprites leave it unset. */
+    mood?: Mood;
+    /** Head and shoulders only, for a square portrait. */
+    crop?: boolean;
 }) {
-    return <svg className={small ? 'sprite small' : 'sprite'} viewBox="0 0 16 24" shapeRendering="crispEdges" aria-hidden="true">
+    return <svg className={small ? 'sprite small' : 'sprite'} viewBox={crop ? '1 0 14 14' : '0 0 16 24'} shapeRendering="crispEdges" aria-hidden="true">
     <path fill="#252836" d="M4 17h8v5H9v-3H7v3H4zM3 22h4v2H3zM9 22h5v2H9z"/>
     <path fill={person.color} d="M4 9h8v9H4zM2 10h2v6H2zM12 10h2v6h-2z"/>
     <path fill={person.skin} d="M5 2h7v7H5zM3 15h2v3H3zM12 15h2v3h-2z"/>
     <path fill={person.hair} d="M4 1h8v2h1v3h-2V4H6v3H4z"/>
     <path fill="#302732" d="M9 5h1v1H9zM12 5h1v1h-1z"/>
     <path fill="#f0d3a0" d="M7 10h2v3H7z"/>
+    {mood && <path fill="#302732" d={MOUTH[mood]}/>}
+    {mood === 'snapping' && <path fill="#669fc6" d="M7 4h1v2H7z"/>}
     {quit && <><path fill="#b88953" d="M0 13h11v7H0z"/><path fill="#e1b574" d="M0 13h11v2H0zM5 15h2v3H5z"/></>}
   </svg>;
 }
@@ -60,11 +70,13 @@ function Landscape() {
   {Array.from({ length: 70 }, (_, i) => <rect key={i} x={i * 17} y={507 + (i % 3) * 9} width="5" height="4" fill="#46513e"/>)}
     </svg>;
 }
-export function Office({ people, selected, onSelect, highlight }: {
+export function Office({ people, selected, onSelect, highlight, speaking = null }: {
     people: Person[];
     selected: string | null;
     onSelect: (id: string) => void;
     highlight: string[];
+    /** The agent the dialogue bar is showing. */
+    speaking?: string | null;
 }) {
     return <div className="office-scene"><Landscape /><div className="building"><div className="roof"></div>
     {['EXECUTIVE', 'SALES & OPERATIONS', 'ENGINEERING'].map((floor, index) => <div className={`floor floor-${index}`} key={floor}>
@@ -73,11 +85,8 @@ export function Office({ people, selected, onSelect, highlight }: {
       {index === 1 && <div className="cooler"><i /><b /></div>}
       {index === 2 && <div className="exit"><span>EXIT →</span><i /></div>}
       {people.filter(p => p.floor === index).map(p => {
-        const thought = p.archetype === 'Flight risk';
-        const bubble = thought ? p.thinks : p.says;
-        return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : ''}`} style={{ left: `${p.x}%` }}>
+        return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : ''} ${speaking === p.id ? 'speaking' : ''}`} style={{ left: `${p.x}%` }}>
         <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" data-employee={p.id} aria-label={`Inspect ${p.name}`} aria-haspopup="dialog" aria-expanded={selected === p.id} onClick={() => onSelect(p.id)}><Sprite person={p} quit={p.quit}/><span className="name-label">{p.name}{p.stress > BURNOUT_STRESS_THRESHOLD && <b>!</b>}</span></button>
-        {((index === 0) || (p.archetype === 'Gossip hub') || thought) && bubble && <button onClick={() => onSelect(p.id)} className={`bubble ${thought ? 'thought' : ''}`}><small>{thought ? 'Thinking' : 'Saying'}</small><span>{playerText(bubble)}</span></button>}
       </div>;
       })}
     </div>)}

@@ -42,7 +42,9 @@ export function EmployeePanel({ person, threshold, anchor, onClose }: { person: 
       const { width, height } = panel.current.getBoundingClientRect();
       const room = window.innerWidth;
       const preferred = rect ? (rect.right + 16 + width <= room - 12 ? rect.right + 16 : rect.left - width - 16) : room - width - 12;
-      setPosition({ left: Math.max(12, Math.min(room - width - 12, preferred)), top: Math.max(12, Math.min(window.innerHeight - height - 12, (rect?.top ?? 120) - 100)) });
+      // Stay above the dialogue bar's reserved strip.
+      const reserve = parseFloat(getComputedStyle(panel.current).getPropertyValue('--dialogue-reserve')) || 0;
+      setPosition({ left: Math.max(12, Math.min(room - width - 12, preferred)), top: Math.max(12, Math.min(window.innerHeight - reserve - height - 12, (rect?.top ?? 120) - 100)) });
     }
     place();
     const observer = new ResizeObserver(place);
