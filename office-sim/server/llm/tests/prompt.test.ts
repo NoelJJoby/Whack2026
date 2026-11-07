@@ -47,6 +47,7 @@ assert.ok(prompt.includes("from grapevine, heard 1 ticks ago. you're not sure ho
 assert.ok(prompt.includes('A new manager arrives.'));
 assert.ok(prompt.includes('Colleagues still here: a2'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
+assert.ok(prompt.includes('30 words or fewer each'));
 assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs". Give one integer for every claim id.'));
 
 function example(text: string): unknown {
