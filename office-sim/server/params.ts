@@ -67,6 +67,8 @@ export const biasParams = {
   claimFreshBoost: 1.5,
   /** Added to affinity / source-trust weights when drawing a target, so 0 is still possible. */
   targetWeightEpsilon: 1,
+  /** Invalid LLM output is retried this many times before falling back to `rules`. */
+  llmRetries: 1,
   /** Explain line: minimum probability gain over the LLM weight worth calling a push. */
   explainMinGap: 0.05,
   /** Explain line: scaled state/trait level that counts as a driver. */
@@ -188,15 +190,18 @@ export const ruleParams = {
     leak: { trust_mgmt: -8, leakerStress: 5 },
   },
   passive: {
-    /** Stress gain per point of workload above comfortable. */
-    stressPerExcessWorkload: 0.25,
-    /** Stress fall per tick when workload is at or below comfortable. */
-    stressRecovery: 4,
+    /**
+     * Stress relaxes toward target = stressBase + stressPerExcessWorkload * max(0, workload - comfortable),
+     * by stressRelax of the gap per tick: it rises under excess workload and falls when workload is normal.
+     */
+    stressBase: 30,
+    stressPerExcessWorkload: 1.0,
+    stressRelax: 0.25,
     /** Burnout accumulates above this stress ... */
     burnoutStressHigh: 60,
-    burnoutGain: 3,
+    burnoutGain: 2,
     /** ... plus this per point of stress above burnoutStressHigh. */
-    burnoutGainPerStress: 0.1,
+    burnoutGainPerStress: 0.05,
     /** Burnout decays slowly below this stress. */
     burnoutStressLow: 40,
     burnoutDecay: 1,
