@@ -86,6 +86,8 @@ export interface TickFrame {
   day_report?: DayReport;
   /** Task inbox threads changed this hour, and new critical alerts (shared/inbox.ts). */
   inbox?: InboxDelta;
+  /** Stand-up chases and meetings with the boss this hour (shared/accountability.ts). */
+  accountability?: import('./accountability').AccountabilityFrame;
   price: PriceDTO;
   tick: number;
   records: TickRecord[];

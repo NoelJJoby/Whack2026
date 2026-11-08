@@ -143,6 +143,19 @@ export function render(code: ReasonCode, c: TemplateContext): Rendered {
       return { headline: `${task} lost its owner`, why: [`${name(d.agent)} ${d.how === 'laid_off' ? 'was laid off' : 'quit'} at ${at(c.turn)}; the task is blocked with no owner.`, ...stuckFor], unblock: `Reassign to someone in ${dept}${freeText}.` };
     case 'SAVINGS_TARGET_MISSED':
       return { headline: `${task} missed its savings target`, why: [`It needed ${money(Number(d.target))} a day off ${d.rate === 'dailyInfrastructure' ? 'infrastructure' : 'discretionary'} spend, which was only ${money(Number(d.available))} a day. It completed as blocked.`], unblock: 'The CEO picks another option at the next review.' };
+    case 'DEADLINE_INFEASIBLE':
+      return { headline: `${task} can't make its deadline, even at full effort`, why: [`It needs about ${plural(Number(d.needed), 'working hour')} along its dependency chain; only ${plural(Number(d.available), 'working hour')} remain before ${at(d.deadline)}.`], unblock: 'Management moves the deadline, adds people, or cuts scope.' };
+    case 'CHASED': {
+      const expect = Number(d.expectRemaining) > 0 ? `at most ${hours(Number(d.expectRemaining))} left on it` : 'the task finished';
+      return { headline: `${name(d.chaser)} chased ${name(d.owner)} about ${task}`, why: [`${d.why}.`, `Expected by ${at(d.dueBy)}: ${expect}.`], unblock: `${name(d.owner)} delivers by ${at(d.dueBy)}.` };
+    }
+    case 'CHASE_MISSED':
+      return { headline: `${name(d.owner)} missed the ${at(d.dueBy)} expectation on ${task}`, why: [`${d.ownTurns} of ${plural(Number(d.counted), 'counted hour')} were ${name(d.owner)}'s own choice; ${d.blockedTurns} were blocked${d.blocker ? ` (mostly ${d.blocker})` : ''}.`, d.fault === 'owner' ? `That is ${name(d.owner)}'s fault: the CEO calls them in.` : `Not ${name(d.owner)}'s fault: the manager fixes the blocker instead.`], unblock: null };
+    case 'BLOCKER_FIXED_BY_MANAGER':
+      return { headline: `${name(d.manager)} fixed what was holding up ${task}`, why: [`${d.fix}.`, `Nobody was punished: the delay wasn't ${name(d.owner) || 'the owner'}'s fault.`], unblock: null };
+    case 'MEETING_OUTCOME':
+      return { headline: d.outcome === 'fired' ? `${name(d.agent)} was fired over ${task}` : `${name(d.boss)} gave ${name(d.agent)} a warning over ${task}`,
+        why: [`${d.reason}.`, d.outcome === 'fired' ? `${name(d.agent)} has left; their work needs a new owner.` : `Another miss of their own making within ${plural(Number(d.warningDays), 'working day')} means dismissal.`, ...(Number(d.cutscene) ? [] : ['Summarised here only: a meeting already played today.'])], unblock: null };
     case 'COMPLETED': {
       const effects = [
         Number(d.revenue) > 0 ? `${money(Number(d.revenue))} revenue${d.client ? ` from ${d.client}` : ''}` : '',

@@ -454,6 +454,7 @@ export class OfficeSimManager {
       price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state(),
       ...(result.log.companyActivity ? { company_activity: result.log.companyActivity } : {}),
       ...(hasInboxChanges(inbox.delta) ? { inbox: inbox.delta } : {}),
+      ...(result.log.accountability ? { accountability: result.log.accountability } : {}),
     };
     frame.day_report = dayReport(this.world, [...this.frames, frame]);
     this.frames.push(frame);

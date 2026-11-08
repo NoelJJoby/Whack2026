@@ -14,6 +14,8 @@ import { prepareAnnouncements, rememberActions } from './announcements';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
+import { chaseSituation, planDeadlines, recordTurn, reviewChases, standup } from './accountability';
+import type { AccountabilityFrame } from '../shared/accountability';
 import { arrive, depart, isPresent } from './presence';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import type { BusinessEvent, BusinessNewsKind } from '../shared/events';
@@ -304,6 +306,7 @@ export async function runTick(
     : [];
 
   let attention: Record<string, number> | undefined;
+  const accountability: AccountabilityFrame = { chases: [], meetings: [] };
   if (config.business) {
     openBusinessTick(w);
     // Legacy scenario injections are informational overrides. Structured business injections
@@ -328,6 +331,8 @@ export async function runTick(
       const phase = (label: string) => { assertCurrent(); config.onPhase?.(label); };
       if (w.companyTasks) await prepareCompanyTask(w, provider, config.mode, phase, assertCurrent);
       await managementPhase(w,provider,config.mode,phase);
+      // Internal deadlines for new work, then the 09:00 stand-up chases what is behind.
+      if (params.accountability.enabled) { planDeadlines(w, params); accountability.chases.push(...standup(w, params)); }
     }
     assertCurrent();
     if (w.companyTasks) attention = await collaborate(w, provider, config.mode, assertCurrent);
@@ -391,7 +396,7 @@ export async function runTick(
       mode: config.mode,
       rngs: rngFactory(w.seed, t, id),
       params,
-      options: { gossip: config.gossip, fallbackReason: llm[id]?.reason ?? null },
+      options: { gossip: config.gossip, fallbackReason: llm[id]?.reason ?? null, situational: config.business ? chaseSituation(w, id, params) : null },
     });
     if (llm[id]?.providerLog) {
       decisions[id].log.provider = llm[id].providerLog;
@@ -422,6 +427,7 @@ export async function runTick(
     if (config.business) {
       const reserved = attention?.[id];
       if (reserved) w.business.used += reserved;
+      recordTurn(w, id, decisions[id]);
       executeWork(w,w.agents[id],decisions[id], reserved ? Number((w.business.positions[id].capacity - reserved).toFixed(2)) : undefined);
     }
   }
@@ -455,6 +461,12 @@ export async function runTick(
     }
   }
 
+  // 17:00: chases fall due. Fault -> a meeting with the CEO; otherwise the manager fixes the blocker.
+  if (config.business && params.accountability.enabled) {
+    const reviewed = await reviewChases(w, provider, config.mode, params);
+    assertCurrent();
+    accountability.chases.push(...reviewed.chases); accountability.meetings.push(...reviewed.meetings);
+  }
   if (config.business && w.companyTasks) observeCompanyTick(w, quits, config.endOfRun?.() ?? false);
   const presence = depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
@@ -520,6 +532,7 @@ export async function runTick(
     reach: claimReach(w),
   };
   if (presence) log.presence = presence;
+  if (accountability.chases.length || accountability.meetings.length) log.accountability = accountability;
   if (t === 1 && w.speech) log.voices = structuredClone(w.speech.voices);
   if (Object.keys(examples.added).length) log.examples = examples.added;
   if (speechLogs) log.speech = { ...speechLogs.summary, example_requests: examples.requests };

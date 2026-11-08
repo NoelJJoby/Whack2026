@@ -196,7 +196,7 @@ function Cars({ cars, boarded, speed, paused }: { cars: CarState[]; boarded: Set
   </group>)}</>;
 }
 
-export default function Office3D({ people: cast, tick, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, showDebug = false, fallback }: {
+export default function Office3D({ people: cast, tick, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, showDebug = false, fallback, onSkipMeeting }: {
   people: Person[];
   /** The same presented simulation tick as the workday clock and employee presence. */
   tick: number;
@@ -218,6 +218,8 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   fallback?: ReactNode;
   /** Placeholder reaction to a catastrophic event: everyone still employed runs about flailing. */
   panic?: boolean;
+  /** Skip the meeting cutscene now playing (its dialogue lines). */
+  onSkipMeeting?: () => void;
 }) {
   const [previewing, setPreviewing] = useState(false);
   const [showHint, setShowHint] = useState(true);
@@ -289,7 +291,16 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   // Follow mode works with both scene selection and Office wire selection.
   const [follow, setFollow] = useState<string | null>(null);
   useEffect(() => { if (selected) setFollow(selected); }, [selected]);
-  useEffect(() => { if (cutscene) setFollow(null); }, [cutscene]);
+  // Meeting cutscene: driven by the dialogue bar's current line, so skipping or finishing the lines ends it.
+  const meeting = !cutscene && line?.meeting ? line.meeting : null;
+  const called = meeting ? people.find(p => p.id === meeting.agent) : undefined;
+  useEffect(() => { if (cutscene || meeting) setFollow(null); }, [cutscene, meeting?.id]);
+  useEffect(() => {
+    if (!meeting || !onSkipMeeting) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onSkipMeeting(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [meeting?.id, onSkipMeeting]);
   useEffect(() => {
     if (!follow) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFollow(null); };
@@ -299,6 +310,7 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   const followed = people.find(p => p.id === follow);
   const focus: Focus | null = cutscene && !cutscene.ending
     ? { id: cutscene.id, zoom: 2.4, lowerThird: true, holdZoom: true, graceSeconds: 3 }
+    : meeting ? { id: meeting.agent, zoom: 2.2, lowerThird: true, holdZoom: true, graceSeconds: 3 }
     : follow && !cutscene ? { id: follow, zoom: 2.2, lowerThird: false, holdZoom: false, graceSeconds: 1 } : null;
   const controls = useRef<ElementRef<typeof OrbitControls>>(null);
   // Integrated GPUs: drop to 1x pixels if the frame rate falls.
@@ -339,7 +351,10 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
         const seat = seats.get(p.id)!;
         const isLeaving = departing.current.has(p.id);
         const announcing = announcement && p.id === ceo?.id && !p.quit && p.present !== false;
-        const b = announcing ? { goal: 'hall', face: 0.35, kind: 'announce' as const, tag: null, spread: null } : isLeaving ? leaving(p, i, people, nav, seats, cars.current.findIndex(c => c.owner === p.id))
+        // Called in: the agent walks into the CEO's glass office; the boss waits there (the CEO at their own desk).
+        const inMeeting = meeting && (p.id === meeting.agent || p.id === meeting.boss);
+        const b = inMeeting ? { goal: p.id === meeting!.agent ? 'ceoA' : p.role === 'CEO' ? seatNode(p.id) : 'ceoB', face: null, kind: 'meeting' as const, tag: p.id === meeting!.agent ? 'called in' : null, spread: null }
+          : announcing ? { goal: 'hall', face: 0.35, kind: 'announce' as const, tag: null, spread: null } : isLeaving ? leaving(p, i, people, nav, seats, cars.current.findIndex(c => c.owner === p.id))
           : behaviourFor(p, records[p.id], i, people, nav, seats, panicking);
         const dz = seat.z + DESK_OFFSET;
         return <group key={p.id}>
@@ -357,17 +372,23 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
             line={line?.kind === 'agent' && line.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={id => { if (!p.quit && p.present !== false) setFollow(id); onSelect(id); }} />
         </group>;
       })}
-      <OrbitControls ref={controls} makeDefault enabled={!cutscene} target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
+      <OrbitControls ref={controls} makeDefault enabled={!cutscene && !meeting} target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
-      <Director focus={focus} crowd={crowd} controls={controls} onLost={cutscene ? endCutscene : () => setFollow(null)} />
+      <Director focus={focus} crowd={crowd} controls={controls} onLost={cutscene ? endCutscene : meeting ? () => {} : () => setFollow(null)} />
       {import.meta.env.DEV && showDebug && <Stats className="o3-stats" />}
     </Canvas>
     {cutscene && <div className={`o3-cutscene ${cutscene.ending ? 'out' : ''}`} role="status">
       <i className="bar top" /><i className="bar bottom" />
       <div className="o3-headline"><span>Breaking news</span><strong>CEO resigns</strong><em>{cutscene.name} walks out of the office</em></div>
     </div>}
-    {followed && !cutscene && <div className="o3-follow" role="status">
+    {meeting && <div className="o3-cutscene o3-meeting" role="status">
+      <i className="bar top" /><i className="bar bottom" />
+      <div className="o3-called"><span>Called in</span><strong>{called?.name ?? 'Employee'}</strong></div>
+      {meeting.last && <div key={meeting.id} className={`o3-stamp ${meeting.stamp === 'Fired' ? 'fired' : ''}`}>{meeting.stamp}</div>}
+      {onSkipMeeting && <button className="o3-skip" onClick={onSkipMeeting} aria-label="Skip meeting cutscene">Skip ⏭</button>}
+    </div>}
+    {followed && !cutscene && !meeting && <div className="o3-follow" role="status">
       <span><i />Following <b>{followed.name}</b></span>
       <button onClick={() => setFollow(null)} aria-label={`Stop following ${followed.name}`}>Exit ✕</button>
     </div>}

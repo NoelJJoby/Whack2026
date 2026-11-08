@@ -98,3 +98,5 @@
 .objective-strip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .objective-strip small { color: var(--muted); white-space: nowrap; }
 .dialogue-tag.objective { color: var(--gold); }
+.dialogue-tag.meeting { color: var(--coral); }
+.dialogue-tag.chase { color: var(--gold); }

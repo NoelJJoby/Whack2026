@@ -22,6 +22,8 @@ export const REASON_CODES = [
   'OWNER_LEFT', 'SAVINGS_TARGET_MISSED',
   // completion
   'COMPLETED',
+  // accountability (server/accountability.ts): timeline entries, never blockers
+  'DEADLINE_INFEASIBLE', 'CHASED', 'CHASE_MISSED', 'BLOCKER_FIXED_BY_MANAGER', 'MEETING_OUTCOME',
 ] as const;
 export type ReasonCode = typeof REASON_CODES[number];
 

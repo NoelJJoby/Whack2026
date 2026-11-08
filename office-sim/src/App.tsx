@@ -24,6 +24,7 @@ import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
 import { isFastForward } from '../shared/playback';
 import { DialogueBar, type Speaker } from './DialogueBar';
+import { meetingLines } from './dialogueQueue';
 import { EMOTES, FEED_EMOJI } from './emotes';
 import { useBackgroundMusic } from './useBackgroundMusic';
 import './index.css';
@@ -175,6 +176,17 @@ export default function App() {
     setSelected(null); setHighlight([]); setCaseId(null); setThreadId(taskId); setMenu('inbox');
   }, []);
   const whyFor = useCallback((taskId: string) => Boolean(openThreadFor(threads, taskId)), [threads]);
+  // A meeting's thread links back to its cutscene, while that hour is still in the history.
+  const meetingFor = useCallback((thread: InboxThread) => {
+    const m = [...thread.messages].reverse().find(x => x.code === 'MEETING_OUTCOME');
+    return m ? history.find(f => f.tick === m.tick)?.accountability?.meetings.find(x => x.taskId === thread.taskId) : undefined;
+  }, [history]);
+  const replayMeeting = (thread: InboxThread) => {
+    const scene = meetingFor(thread);
+    if (!scene) return;
+    setMenu(null);
+    dialogue.insert(meetingLines(scene, id => state?.agents[id]?.stress ?? 0, `replay-${scene.id}-${Date.now()}`), hour);
+  };
   const jumpToTask = (thread: InboxThread) => thread.caseId && !thread.objectiveId ? openMenu('business', thread.caseId)
     : openMenu('business', null, thread.objectiveId ? 'objective' : 'staff');
   // Critical alerts: one toast at a time; alerts arriving while it is fresh merge into it.
@@ -220,7 +232,7 @@ export default function App() {
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null} showDebug={showSyncDebug}
-      announcement={presentation.frame?.events.find(e => e.official) ?? null}/>
+      announcement={presentation.frame?.events.find(e => e.official) ?? null} onSkipMeeting={dialogue.skipMeeting}/>
     <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
@@ -268,7 +280,7 @@ export default function App() {
     {toast && <InboxToastView toasts={toast.items} onOpen={() => { openThread(toast.items.length === 1 ? toast.items[0].threadId : null); setToast(null); }} onDismiss={() => setToast(null)}/>}
     {sim.error && !menu && <button className="error-notice" onClick={() => toggleRailMenu('settings')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation settings</span></button>}
     {railMenu && <RailPanel id="rail-panel" title={MENU_LABEL[railMenu]} onClose={() => setMenu(null)}>
-      {railMenu === 'inbox' ? <Inbox threads={threads} people={people} read={read} focusId={threadId} onRead={markRead} onJump={jumpToTask} onFocus={select}/> : railMenu === 'events' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : railMenu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : railMenu === 'leaderboard' ? <Leaderboard/> : railMenu === 'company' || railMenu === 'rumours' ? <Company history={history} view={railMenu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+      {railMenu === 'inbox' ? <Inbox threads={threads} people={people} read={read} focusId={threadId} onRead={markRead} onJump={jumpToTask} onFocus={select} canReplay={t => Boolean(meetingFor(t))} onReplay={replayMeeting}/> : railMenu === 'events' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : railMenu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : railMenu === 'leaderboard' ? <Leaderboard/> : railMenu === 'company' || railMenu === 'rumours' ? <Company history={history} view={railMenu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={running} complete={serverComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => { setPlaybackPaused(false); void sim.step(); }} onReset={() => { setPlaybackPaused(false); void sim.reset(); }} onNewSeed={() => { setPlaybackPaused(false); void sim.newSeed(); }}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>

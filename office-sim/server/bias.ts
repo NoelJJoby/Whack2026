@@ -359,6 +359,24 @@ export function explain(
   return `Leaned toward ${GERUND[lean]}; ${drivers(pushed)} pushed toward ${GERUND[pushed]}.`;
 }
 
+// --- Situational modifiers ----------------------------------------------------
+
+/** A temporary push from the agent's situation; `label` reads as the explain line's subject ("being chased"). */
+export interface Situational { source: string; label: string; modifiers: Partial<Record<Action, number>> }
+
+/** Raw modifiers times situational multipliers, then the usual clamp (before the impulsivity gain). */
+export function situate(raw: ActionMap, mult: Partial<Record<Action, number>>, p: Params): ActionMap {
+  const out = {} as ActionMap;
+  for (const a of ACTIONS) out[a] = clampModifier(raw[a] * (mult[a] ?? 1), p);
+  return out;
+}
+
+/** " Being chased pushed toward overworking." when the situation raised the chosen action. */
+function situationalClause(sit: Situational | null, action: Action, mode: Mode): string {
+  if (!sit || mode === 'random' || mode === 'llm_raw' || (sit.modifiers[action] ?? 1) <= 1) return '';
+  return ` ${capitalise(sit.label)} pushed toward ${GERUND[action]}.`;
+}
+
 // --- decide ----------------------------------------------------------------
 
 export interface DecideInput {
@@ -372,6 +390,8 @@ export interface DecideInput {
     /** Why llm is null, if it failed upstream (logged). */
     fallbackReason?: string | null;
     cacheHit?: boolean | null;
+    /** Situational multipliers on the modifier table, applied before the clamp (e.g. being chased). */
+    situational?: Situational | null;
   };
 }
 
@@ -407,7 +427,8 @@ export function decide(input: DecideInput): Decision {
   if (effective === 'rules' && fallback) weights = llmWeights(null, available, p);
 
   // 3-7. Weights, modifiers, gain, blend, sample.
-  const m = modifiers(s, fresh, p);
+  const situational = options.situational ?? null;
+  const m = situational ? situate(rawModifiers(s, fresh, p), situational.modifiers, p) : modifiers(s, fresh, p);
   const g = gain(s, p);
   const scores = scoreActions(effective, available, weights, m, g, p);
   if ((world as World & { businessEnabled?: boolean }).businessEnabled && effective === 'rules') for (const a of available) {
@@ -471,7 +492,8 @@ export function decide(input: DecideInput): Decision {
       probs: roundMap(probs),
       draw: round(draw),
       chosen: { action, target, claim, ...(taskProposal?.task_id ? { task_id: taskProposal.task_id, assignment_version: taskProposal.assignment_version } : {}), ...(evidenceId ? { evidence_id: evidenceId } : {}) },
-      explain: explain(effective, fallback, weights.raw, probs, s, fresh, p),
+      explain: explain(effective, fallback, weights.raw, probs, s, fresh, p) + situationalClause(situational, action, effective),
+      ...(situational ? { situational: { source: situational.source, modifiers: { ...situational.modifiers } } } : {}),
     },
   };
 }

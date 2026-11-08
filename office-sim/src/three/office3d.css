@@ -83,3 +83,14 @@
 /* Part B: the CEO's announcement bubble is pinned and larger. */
 .o3-bubble.speech.announce { max-width: 260px; font-size: 13px; border-color: #d7b66c; box-shadow: 4px 4px 0 #d7b66c; }
 .o3-bubble.speech.announce small { color: #a2802f; opacity: 1; }
+
+/* Meeting cutscene: the same letterbox as the CEO cutscene, a "Called in" banner and an outcome stamp. */
+.o3-meeting .o3-called { position: absolute; left: 50%; top: max(12%, 84px); transform: translateX(-50%); text-align: center; animation: o3-slam .45s .3s cubic-bezier(.2, 1.6, .4, 1) both; }
+.o3-called span { display: inline-block; padding: 3px 10px; background: var(--gold); color: #14203a; font-size: 15px; letter-spacing: .2em; text-transform: uppercase; }
+.o3-called strong { display: block; margin-top: 6px; padding: 4px 22px 8px; background: #fbf7ec; color: #14203a; border: 3px solid #14203a; box-shadow: 6px 6px 0 var(--gold); font: 400 clamp(30px, 4.5vw, 60px)/1 'VT323', monospace; white-space: nowrap; }
+.o3-stamp { position: absolute; left: 50%; top: 38%; padding: 6px 22px; border: 5px double var(--coral); color: var(--coral); background: #13203acc; font: 400 clamp(36px, 6vw, 76px)/1 'VT323', monospace; letter-spacing: .08em; text-transform: uppercase; transform: translateX(-50%) rotate(-8deg); animation: o3-stamp .35s 1.2s cubic-bezier(.2, 1.6, .4, 1) both; }
+.o3-stamp.fired { border-color: #d8352a; color: #fff; background: #d8352aee; }
+.o3-skip { position: absolute; right: 24px; top: calc(9vh + 12px); pointer-events: auto; padding: 6px 12px; color: #14203a; background: var(--gold); border-radius: 4px; font-size: 14px; }
+.o3-skip:hover:not(:disabled) { color: #14203a; background: #eed38f; }
+@keyframes o3-stamp { from { opacity: 0; transform: translateX(-50%) rotate(-8deg) scale(2.4); } }
+@media (prefers-reduced-motion: reduce) { .o3-meeting .o3-called, .o3-stamp { animation: none; } }

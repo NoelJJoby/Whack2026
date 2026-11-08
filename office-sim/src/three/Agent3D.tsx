@@ -24,7 +24,7 @@ const GOODBYE = 1.8; // seconds spent waving goodbye before heading out
 /** Shared live positions so walkers can avoid each other. */
 export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
 
-export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave' | 'announce';
+export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave' | 'announce' | 'meeting';
 /** Where an agent should be and what they do there, derived from their latest TickRecord. */
 export interface Behaviour {
   goal: string;
@@ -102,7 +102,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
   useEffect(() => {
-    if (latest.kind === 'quit' || latest.kind === 'panic' || latest.kind === 'announce' || behaviour.kind === 'panic' || behaviour.kind === 'announce') setBehaviour(latest);
+    // Being called into (or released from) a meeting interrupts at once, like an announcement.
+    if (latest.kind === 'quit' || latest.kind === 'panic' || latest.kind === 'announce' || latest.kind === 'meeting' || behaviour.kind === 'panic' || behaviour.kind === 'announce' || behaviour.kind === 'meeting') setBehaviour(latest);
   }, [latest.kind]);
   useEffect(() => () => { crowd.delete(person.id); }, [crowd, person.id]);
 

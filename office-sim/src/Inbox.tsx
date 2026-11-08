@@ -12,6 +12,7 @@ const CODE_LABEL: Partial<Record<ReasonCode, string>> = {
   NO_TIME_AFTER_COORDINATION: 'Out of time', PARTIAL_PROGRESS: 'Moving slowly', AWAITING_REVIEWER: 'Needs a reviewer',
   REWORK_AFTER_REVIEW: 'Sent back by review', AT_RISK: 'At risk', OVERDUE: 'Overdue', CASE_FAILED: 'Case failed',
   OWNER_LEFT: 'Owner left', SAVINGS_TARGET_MISSED: 'Savings missed',
+  DEADLINE_INFEASIBLE: 'Deadline impossible', CHASED: 'Chased', CHASE_MISSED: 'Missed a chase', BLOCKER_FIXED_BY_MANAGER: 'Blocker fixed', MEETING_OUTCOME: 'Meeting',
 };
 const SEVERITY_TONE = { info: 'mint', warning: 'gold', critical: 'coral' } as const;
 const SEVERITY_TEXT = { info: 'Info', warning: 'Warning', critical: 'Critical' } as const;
@@ -21,9 +22,11 @@ function lead(t: InboxThread) {
   return (t.primary && [...t.messages].reverse().find(m => m.code === t.primary!.code)) || t.messages.at(-1);
 }
 
-function Thread({ thread, people, open, unread, onToggle, onJump, onFocus }: {
+function Thread({ thread, people, open, unread, onToggle, onJump, onFocus, onReplay }: {
   thread: InboxThread; people: Person[]; open: boolean; unread: boolean;
   onToggle: () => void; onJump: () => void; onFocus: (id: string) => void;
+  /** Present when the thread's meeting can be replayed. */
+  onReplay?: () => void;
 }) {
   const message = lead(thread);
   const owner = people.find(p => p.id === (thread.ownerId ?? thread.agentIds[0]));
@@ -54,6 +57,7 @@ function Thread({ thread, people, open, unread, onToggle, onJump, onFocus }: {
       </details>
       <div className="inbox-actions">
         <button className="link" onClick={onJump}>Jump to task</button>
+        {onReplay && <button className="link" onClick={onReplay}>Replay meeting</button>}
         {thread.agentIds.map(id => { const p = people.find(x => x.id === id); return p ? <button key={id} className="link" onClick={() => onFocus(id)}>Focus {p.name}</button> : null; })}
       </div>
     </div>}
@@ -61,9 +65,10 @@ function Thread({ thread, people, open, unread, onToggle, onJump, onFocus }: {
 }
 
 /** Task inbox: one thread per task explaining why it isn't progressing, who it's on, and what unblocks it. */
-export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus }: {
+export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus, canReplay, onReplay }: {
   threads: InboxThread[]; people: Person[]; read: ReadonlySet<string>; focusId: string | null;
   onRead: (thread: InboxThread[]) => void; onJump: (thread: InboxThread) => void; onFocus: (agentId: string) => void;
+  canReplay?: (thread: InboxThread) => boolean; onReplay?: (thread: InboxThread) => void;
 }) {
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [open, setOpen] = useState<string | null>(focusId);
@@ -78,7 +83,8 @@ export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus 
       <button key={f} role="tab" aria-selected={filter === f} className={`event-panel-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>{FILTER_LABEL[f]} {counts[f]}</button>)}</div>
     {unread.length > 0 && <button className="link inbox-mark" onClick={() => onRead(unread)}>Mark all read</button>}
     {shown.length ? <ul className="inbox-list">{shown.map(t => <Thread key={t.id} thread={t} people={people} open={open === t.id} unread={isUnread(t, read)}
-      onToggle={() => setOpen(open === t.id ? null : t.id)} onJump={() => onJump(t)} onFocus={onFocus}/>)}</ul>
+      onToggle={() => setOpen(open === t.id ? null : t.id)} onJump={() => onJump(t)} onFocus={onFocus}
+      onReplay={onReplay && canReplay?.(t) ? () => onReplay(t) : undefined}/>)}</ul>
       : <p className="empty-state">{filter === 'all' ? 'Nothing is stuck. Tasks that stop progressing show up here with the reason.' : `No ${FILTER_LABEL[filter].toLowerCase()} tasks.`}</p>}
   </div>;
 }

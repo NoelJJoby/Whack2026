@@ -3,7 +3,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { DEFAULT_PARAMS } from '../server/params';
 import type { TickFrame } from '../shared/api';
 import { FAST_TICK_MS, isFastForward } from '../shared/playback';
-import { buildRound, current, idle, playerReducer, readingDelay, typeDelay } from './dialogueQueue';
+import { buildRound, current, idle, playerReducer, readingDelay, typeDelay, type DialogueLine } from './dialogueQueue';
 import { useBabble } from './voice/useBabble';
 
 const typing = (target: EventTarget | null) =>
@@ -79,7 +79,7 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
   const typingPhase = state.phase === 'public' || state.phase === 'inner';
   useEffect(() => {
     if (!line || paused || !typingPhase) return;
-    if (fastForward || reduced || (state.phase === 'inner' && !showThoughts)) { dispatch({ type: 'complete' }); return; }
+    if (fastForward || reduced || (state.phase === 'inner' && !showThoughts && !line.revealInner)) { dispatch({ type: 'complete' }); return; }
     const text = state.phase === 'public' ? line.publicLine : line.inner;
     const shown = state.phase === 'public' ? state.shownPublic : state.shownInner;
     const timer = setTimeout(() => dispatch({ type: 'type', showThoughts }), typeDelay(text, shown) / speed);
@@ -97,6 +97,9 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
 
   const next = useCallback(() => dispatch({ type: 'next', auto: latest.current.auto }), []);
   const skip = useCallback(() => dispatch({ type: 'skip' }), []);
+  const skipMeeting = useCallback(() => dispatch({ type: 'skipMeeting' }), []);
+  /** Play lines now (a replayed meeting), then carry on with the current round. */
+  const insert = useCallback((lines: DialogueLine[], tick: number) => dispatch({ type: 'insert', lines, tick }), []);
 
   // Space pause/play, Enter or N next, S skip round, A auto, M voices. Ignored while typing, with modifiers, or under a menu.
   useEffect(() => {
@@ -126,5 +129,5 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
   }, [next, skip]);
 
-  return { state, line, auto, setAuto, showThoughts, setShowThoughts, voices, setVoices, next, skip };
+  return { state, line, auto, setAuto, showThoughts, setShowThoughts, voices, setVoices, next, skip, skipMeeting, insert };
 }

@@ -38,7 +38,8 @@ const TURN = new Set<ReasonCode>(['CHOSE_OTHER_ACTION', 'WORK_NOT_OFFERED', 'STA
 const STICKY = new Set<ReasonCode>(['ON_HOLD', 'OWNER_LEFT', 'REWORK_AFTER_REVIEW', 'CASE_FAILED', 'SAVINGS_TARGET_MISSED',
   'REJECTED_NO_CAPABILITY', 'REJECTED_OVER_CAPACITY', 'REJECTED_SELF_REVIEW', 'REJECTED_DEPS_NOT_DONE', 'REJECTED_INVALID']);
 /** Shown once in the timeline, never a blocker. */
-const ONE_SHOT = new Set<ReasonCode>(['HIGH_DEFECT_RISK', 'COMPLETED', 'DEFECT_SURFACED']);
+const ONE_SHOT = new Set<ReasonCode>(['HIGH_DEFECT_RISK', 'COMPLETED', 'DEFECT_SURFACED',
+  'DEADLINE_INFEASIBLE', 'CHASED', 'CHASE_MISSED', 'BLOCKER_FIXED_BY_MANAGER', 'MEETING_OUTCOME']);
 const isRejection = (code: ReasonCode) => code.startsWith('REJECTED_');
 
 const assigned = (t: Task) => t.status === 'review' ? Boolean(t.reviewer) : Boolean(t.owner) && t.status === 'active';

@@ -1,5 +1,6 @@
 import { buildCompanyTaskPrompt } from './llm/company-task-prompt';
 import { buildManagementPrompt } from './llm/management-prompt';
+import { buildMeetingPrompt } from './llm/meeting-prompt';
 import type { EngineProfile, TurnProvider } from './engine-types';
 import { createMessageClient } from './llm/client';
 import { parseReply } from './llm/parse';
@@ -24,6 +25,11 @@ export function createTurnProvider(
         const result = await request(buildCompanyTaskPrompt(agent, ctx, turn), {
           purpose: `company-${turn.kind}`, maxTokens: turn.kind === 'brief' ? 2200 : 120,
         });
+        return result ? parseReply(result.message) : null;
+      }
+      if (ctx.meeting) {
+        // Lines only: the outcome was decided by rules; server/accountability.ts validates and falls back.
+        const result = await request(buildMeetingPrompt(ctx.meeting), { purpose: 'meeting', maxTokens: 300 });
         return result ? parseReply(result.message) : null;
       }
       const prompt = ctx.management ? buildManagementPrompt(ctx.management, ctx.companySchedule) : buildTurnPrompt(agent, ctx, options.personaFor?.(agent));
