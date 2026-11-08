@@ -259,7 +259,7 @@ export function settleTarget(
 
 // --- Explain line ------------------------------------------------------------
 
-const GERUND: Record<Action, string> = {
+export const GERUND: Record<Action, string> = {
   review_work: 'reviewing work', report_issue: 'reporting an issue', support_colleague: 'supporting a colleague',
   work: 'working',
   overwork: 'overworking',
@@ -321,6 +321,12 @@ function argmax(map: PartialActionMap): Action {
   return best;
 }
 
+/** The explain line's drivers that are active for `action` (e.g. ['stress', 'burnout']). */
+export function actionDrivers(action: Action, s: Scaled, fresh: boolean, p: Params): string[] {
+  const P = pressure(s, p);
+  return DRIVERS[action].filter(([, on]) => on(s, fresh, P, p.bias.explainHigh, p.bias.explainLow)).map(([label]) => label);
+}
+
 export function explain(
   mode: Mode,
   fallback: string | null,
@@ -330,11 +336,7 @@ export function explain(
   fresh: boolean,
   p: Params,
 ): string {
-  const P = pressure(s, p);
-  const drivers = (a: Action) =>
-    joinList(
-      DRIVERS[a].filter(([, on]) => on(s, fresh, P, p.bias.explainHigh, p.bias.explainLow)).map(([label]) => label),
-    );
+  const drivers = (a: Action) => joinList(actionDrivers(a, s, fresh, p));
   const prefix = fallback ? `LLM fallback (${fallback}). ` : '';
   if (mode === 'random') return `${prefix}Uniform random choice.`;
   if (mode === 'llm_raw') return `${prefix}Took the LLM's lean toward ${GERUND[argmax(raw)]} as given.`;

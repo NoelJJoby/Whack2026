@@ -2,6 +2,7 @@
 // PENDING TEAM SIGN-OFF (integration plan item S2). Additive only: nothing in
 // shared/types.ts changes.
 import type { CompanyActivity, CompanyTaskSummary } from './companyTasks';
+import type { InboxDelta, InboxThread } from './inbox';
 import type { AgentProfile, EventType, SimulationMode, SimulationState, TickRecord } from './types';
 
 /** Why the server runs in its current mode. */
@@ -83,6 +84,8 @@ export interface TickFrame {
   company_activity?: CompanyActivity[];
   /** Factual close-of-day narration, generated only at 23:00. */
   day_report?: DayReport;
+  /** Task inbox threads changed this hour, and new critical alerts (shared/inbox.ts). */
+  inbox?: InboxDelta;
   price: PriceDTO;
   tick: number;
   records: TickRecord[];
@@ -105,6 +108,8 @@ export interface PresentedRequest {
 
 export interface HistoryResponse extends SimResponse {
   history: TickFrame[];
+  /** Inbox threads as of the hour before the first frame in `history` (after a restart with no frames). */
+  inbox_base?: InboxThread[];
 }
 
 export interface CastResponse {

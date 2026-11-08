@@ -543,6 +543,19 @@ export const DEFAULT_PARAMS = {
   voice: voiceParams,
   cadence: cadenceParams,
   scorecard: scorecardParams,
+  /** Task inbox (server/diagnostics). Read only by diagnostics, never by the simulation. */
+  diagnostics: {
+    /** Work rate for the deadline projection: share of the owner's last N turns spent working. */
+    workRateTurns: 8,
+    /** Defect risk at or above this, when work finishes, raises HIGH_DEFECT_RISK. */
+    defectRiskWarn: 0.08,
+    /** PARTIAL_PROGRESS when more than this many full allocations remain. */
+    partialTurnsWarn: 4,
+    /** CHOSE_OTHER_ACTION becomes a warning at this many non-work turns of the last `choiceWindow`. */
+    choiceWarnTurns: 3,
+    choiceWindow: 4,
+    maxMessagesPerThread: 30,
+  },
   playback: { quietDwellMs: 1200, ackRetryMs: 1000, tickIntervalMs: 800, dialogueCap: 5, charsPerSecond: 70, punctuationPauseMs: 100, autoBaseMs: 1500, autoPerWordMs: 250, stressJump: 10 },
 };
 

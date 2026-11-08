@@ -43,6 +43,9 @@ import { applyPriceFeedback, createPriceState, updatePrice, workforceReport } fr
 import { rngFactory, stream } from './rng';
 import { applyDelta, applyEvent, checkQuit, passiveUpdate, resolveAction, type ResolveResult } from './rules';
 import { ensureExamples, initSpeech, planRound, recordRound, reviewRound, speechContext } from './speech';
+import { beginDiagnostics, takeDiagnostics } from './diagnostics/collector';
+import { scanTasks } from './diagnostics/details';
+import type { TaskEvent } from '../shared/inbox';
 
 export function createInitialSimulation(seed = 42): SimulationState {
   return {
@@ -261,9 +264,11 @@ export interface TickResult {
   world: World;
   records: TickRecord[];
   log: EngineTickLog;
+  /** Task diagnostics for the inbox, when `config.diagnostics` is on. Never read by the simulation. */
+  taskEvents?: TaskEvent[];
 }
 
-export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>> & { business?: boolean; onPhase?: (phase: string) => void; isCurrent?: () => boolean; endOfRun?: () => boolean };
+export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>> & { business?: boolean; diagnostics?: boolean; onPhase?: (phase: string) => void; isCurrent?: () => boolean; endOfRun?: () => boolean };
 
 /**
  * One tick: previous-return feedback -> apply event -> agent turns (LLM, all on the start-of-tick
@@ -280,6 +285,7 @@ export async function runTick(
   w.tick += 1;
   const t = w.tick;
   (w as World & { businessEnabled?: boolean }).businessEnabled = config.business ?? false;
+  if (config.diagnostics) beginDiagnostics(w, params);
   const assertCurrent = () => { if (config.isCurrent && !config.isCurrent()) throw new Error('run_changed'); };
   assertCurrent();
   arrive(w);
@@ -518,7 +524,9 @@ export async function runTick(
   if (Object.keys(examples.added).length) log.examples = examples.added;
   if (speechLogs) log.speech = { ...speechLogs.summary, example_requests: examples.requests };
 
-  return { world: w, records, log };
+  if (config.diagnostics && config.business) scanTasks(w);
+  const taskEvents = config.diagnostics ? takeDiagnostics(w) : undefined;
+  return { world: w, records, log, ...(taskEvents ? { taskEvents } : {}) };
 }
 
 export interface RunSummary {

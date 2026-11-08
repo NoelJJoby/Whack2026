@@ -1,6 +1,8 @@
 import type { Business, LedgerEntry, Task } from '../shared/business';
 import type { World, EngineAgent } from './engine-types';
 import { calendarSpan, dayIndexOf, days, isDayStart, isOfficeHour, workdayTime } from '../shared/workday';
+import { collecting } from './diagnostics/collector';
+import { noteOwnerLost } from './diagnostics/details';
 
 export const BUSINESS_PARAMS = {
   currency: 'GBP', salesTarget: 100_000_000, startingCash: 50_000_000,
@@ -96,6 +98,7 @@ export function openBusinessTick(w: World) {
     if (b.opportunities.filter(o => o.stage === 'qualified').length < 4) b.opportunities.push({ id: `op-${w.tick}`, client: `Client ${w.tick}`, value: 4_000_000, stage: 'qualified', owner: null });
   }
   for (const t of b.tasks) if (t.owner && w.agents[t.owner]?.status !== 'active' && !['done','cancelled'].includes(t.status)) {
+    if (collecting(w)) noteOwnerLost(w, t, t.owner);
     t.owner = null; t.status = 'blocked'; t.version++;
   }
   // Only people in the office this hour count as capacity (after 17:00, the ones working late).
