@@ -11,9 +11,12 @@ export interface Presentation {
 }
 export const initialPresentation: Presentation = { epoch: -1, tick: 0, active: false, baseline: null };
 
-export function reconcilePresentation(p: Presentation, history: TickFrame[], epoch: number, live: SimulationState | null): Presentation {
+export function reconcilePresentation(p: Presentation, history: TickFrame[], epoch: number, live: SimulationState | null, fastForward = false): Presentation {
   // Reconnect/reset: show the latest committed snapshot without replaying it.
   if (epoch !== p.epoch || !p.baseline && live) return { epoch, tick: history.at(-1)?.tick ?? live?.tick ?? 0, active: false, baseline: live };
+  // Fast-forward follows the latest committed frame even if dialogue is still playing.
+  const latest = history.at(-1);
+  if (fastForward && latest && latest.tick > p.tick) return { ...p, tick: latest.tick, active: true };
   if (p.active) return p;
   const next = history.find(f => f.tick > p.tick);
   return next ? { ...p, tick: next.tick, active: true } : p;

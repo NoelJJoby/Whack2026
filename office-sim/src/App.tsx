@@ -1,3 +1,4 @@
+import { QuarterReport } from './QuarterReport';
 import { BusinessPage } from './BusinessPage';
 import { OBJECTIVE_STATUS, dueIn, isActiveObjective, objectiveWorkPrefix } from './companyModel';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,14 +19,15 @@ import { useDialogue } from './useDialogue';
 import { usePresentation } from './usePresentation';
 import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
+import { isFastForward } from '../shared/playback';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import { EMOTES, FEED_EMOJI } from './emotes';
 import { useBackgroundMusic } from './useBackgroundMusic';
 import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company' | 'scorecard' | 'leaderboard';
-type Menu = Tool | 'stock' | 'events';
-const MENU_LABEL: Record<Menu, string> = { events: 'Business', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss' };
+type Menu = Tool | 'stock' | 'events' | 'quarter';
+const MENU_LABEL: Record<Menu, string> = { quarter: 'End of Quarter', events: 'Business', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss' };
 
 function ToolIcon({ tool }: { tool: Tool }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -43,15 +45,29 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string[]>([]);
   const [menu, setMenu] = useState<Menu | null>(null);
+  const [businessTab, setBusinessTab] = useState<'objective' | 'report'>('objective');
+  const openedCompletions = useRef(new Set<string>());
+  const previousRun = useRef(sim.runId);
   const [expanded, setExpanded] = useState(false);
   const [truth, setTruth] = useState(false);
   const [showSyncDebug, setShowSyncDebug] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [playbackPaused, setPlaybackPaused] = useState(false);
-  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused);
+  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused, isFastForward(sim.speed));
   const { state, history } = presentation;
   const hour = presentation.tick;
   const complete = hour >= sim.maxTicks && !presentation.playing;
+  useEffect(() => {
+    if (previousRun.current !== sim.runId) {
+      previousRun.current = sim.runId;
+      setMenu(current => current === 'quarter' ? null : current);
+      return;
+    }
+    if (!complete) { setMenu(current => current === 'quarter' ? null : current); return; }
+    const key = `${sim.runId}:${sim.maxTicks}`;
+    if (!sim.runId || menu || selected || openedCompletions.current.has(key)) return;
+    openedCompletions.current.add(key); setMenu('quarter');
+  },[complete,sim.runId,sim.maxTicks,menu,selected]);
   const serverComplete = (sim.state?.tick ?? 0) >= sim.maxTicks;
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
@@ -128,11 +144,11 @@ export default function App() {
     const target = previous?.isConnected ? previous : id ? document.querySelector<HTMLElement>(`[data-employee="${CSS.escape(id)}"]`) : null;
     target?.focus({ preventScroll: true });
   }, []);
-  function openMenu(next: Menu, businessCase: string | null = null) { setSelected(null); setHighlight([]); setCaseId(businessCase); setMenu(next); }
+  function openMenu(next: Menu, businessCase: string | null = null, report = false) { setBusinessTab(report ? 'report' : 'objective'); setSelected(null); setHighlight([]); setCaseId(businessCase); setMenu(next); }
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = engineLabel(sim.mode, sim.modeReason);
   return <main className="game-window" aria-label="The Daily Grind">
-    <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
+    <OfficeView key={sim.historyEpoch} people={people} tick={hour} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}
@@ -153,7 +169,7 @@ export default function App() {
       <button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss business event">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
       <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
-      {complete && <button className="report-entry" onClick={() => openMenu('events')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
+      {complete && <button className="report-entry" onClick={() => openMenu('quarter')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
       {objective && <button className="objective-strip" onClick={() => openMenu('events')} aria-label={`Objective: ${objective.objective}. Open Business`}>
         <b>Objective</b><span>{objective.objective}</span>
         <small>{objectiveWork.length ? `${objectiveWork.filter(t => t.status === 'done').length}/${objectiveWork.length} · ` : ''}{objective.deadlineTick !== undefined ? dueIn(objective.deadlineTick, hour) : OBJECTIVE_STATUS[objective.status].text}</small>
@@ -171,8 +187,8 @@ export default function App() {
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company', 'scorecard', 'leaderboard'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
-    {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'events' ? <BusinessPage state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId}
+    {menu && <MenuPanel key={menu} wide={menu === 'quarter'} title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
+      {menu === 'quarter' && sim.runId ? <QuarterReport key={sim.runId} runId={sim.runId} status={sim.reportStatus} onClose={() => setMenu(null)} onFullReport={() => openMenu('events',null,true)} onNewRun={() => { setMenu(null); setPlaybackPaused(false); void sim.newSeed(); }}/> : menu === 'events' ? <BusinessPage initialTab={businessTab} state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId}
         companyTasks={sim.companyTasks} onSubmitObjective={sim.submitObjective} objectiveDisabled={!live || serverComplete} runId={sim.runId} reportStatus={sim.reportStatus}/> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : menu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : menu === 'leaderboard' ? <Leaderboard/> : menu === 'stock' ? <StockChart history={history} current={price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={running} complete={serverComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => { setPlaybackPaused(false); void sim.step(); }} onReset={() => { setPlaybackPaused(false); void sim.reset(); }} onNewSeed={() => { setPlaybackPaused(false); void sim.newSeed(); }}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>

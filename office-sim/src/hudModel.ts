@@ -110,6 +110,7 @@ export function feedEntries(history: TickFrame[], voices?: FeedVoices): FeedEntr
 
 /** The engine label shown to players: which decision-maker is driving the office. */
 export function engineLabel(mode: string | null, reason: string | null): string {
+  if (reason === 'fast_forward') return 'Fast-forward · Rules mode';
   if (mode === 'llm_bias') return 'LLM + bias engine';
   if (reason === 'no_api_key') return 'Rules mode · No API key';
   if (reason === 'llm_failed') return 'Rules mode · LLM unavailable';

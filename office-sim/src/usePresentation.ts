@@ -4,11 +4,11 @@ import type { TickFrame } from '../shared/api';
 import type { SimulationState } from '../shared/types';
 import { finishPresentation, initialPresentation, reconcilePresentation } from './presentation';
 
-export function usePresentation(history: TickFrame[], epoch: number, live: SimulationState | null, acknowledge: (tick: number) => Promise<boolean>, paused: boolean) {
+export function usePresentation(history: TickFrame[], epoch: number, live: SimulationState | null, acknowledge: (tick: number) => Promise<boolean>, paused: boolean, fastForward = false) {
   const [cursor, setCursor] = useState(initialPresentation);
   useEffect(() => {
-    setCursor(p => paused && p.epoch === epoch ? p : reconcilePresentation(p, history, epoch, live));
-  }, [history, epoch, live, cursor.active, paused]);
+    setCursor(p => paused && p.epoch === epoch ? p : reconcilePresentation(p, history, epoch, live, fastForward));
+  }, [history, epoch, live, cursor.active, paused, fastForward]);
   const frame = history.find(f => f.tick === cursor.tick);
   const previous = history.find(f => f.tick === cursor.tick - 1);
   const visibleHistory = useMemo(() => history.filter(f => f.tick <= cursor.tick), [history, cursor.tick]);

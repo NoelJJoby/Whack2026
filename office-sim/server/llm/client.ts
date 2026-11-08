@@ -49,7 +49,7 @@ export function createMessageClient(options: ClientOptions = {}) {
     }
   }
 
-  return async function requestMessage(prompt: string, requestOptions: { purpose?: string; maxTokens?: number } = {}): Promise<MessageResult | null> {
+  return async function requestMessage(prompt: string, requestOptions: { purpose?: string; maxTokens?: number; signal?: AbortSignal } = {}): Promise<MessageResult | null> {
     const started = performance.now();
     try {
       const message = await client.messages.create({
@@ -58,7 +58,7 @@ export function createMessageClient(options: ClientOptions = {}) {
         thinking: { type: llmConfig.thinking },
         output_config: { effort: llmConfig.effort },
         messages: [{ role: 'user', content: prompt }],
-      });
+      }, { signal: requestOptions.signal });
       const metrics: CallMetrics = {
         purpose: requestOptions.purpose,
         latencyMs: performance.now() - started,
