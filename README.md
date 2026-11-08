@@ -68,6 +68,18 @@ See [backend implementation and measured acceptance](docs/share-price-implementa
 
 Each tick represents one hour ending at the displayed time. Hours ending at 18:00 through 24:00 are overtime; the next simulated day resumes at 08:00 (the overnight interval is skipped). Every active employee receives +2 stress and +1 burnout per overtime hour, in addition to their chosen action, before passive updates and the quit check. Values are clamped to the existing 0–100 limits. The separate `overwork` action means taking on extra work and retains its own effects; the long-hours policy remains a separate workload and trust shock. The model assumes everyone active is still on shift, even when their action is an interview or other non-work activity. There is currently no leaving-early or overnight recovery mechanic. These values are initial tuning parameters in `server/params.ts`.
 
+## Demo run
+
+All commands run from `office-sim/`.
+
+- **Development** (hot reload): `pnpm dev`, then open http://localhost:5173. The API runs on port 3010.
+- **Production** (one server, built UI): `pnpm build && pnpm start`, then open http://localhost:3010.
+
+Settings:
+
+- `ANTHROPIC_API_KEY` in `office-sim/.env` runs the CEO and ops through the LLM. Without it the app runs on rules, and the HUD badge says so.
+- `SIM_SEED=<number>` replays a fixed company. Without it, each server start picks a new random seed, so set it for a repeatable run.
+
 ## Autonomous business demo
 
 Run `pnpm dev` from `office-sim` and open http://localhost:5173. The API runs on port 3010. For a built single-server deployment, use `pnpm build && pnpm start` (port 3010 by default). See [implementation and run notes](docs/events-implementation-status.md) for event stories, durable reports, configuration and measured verification.
