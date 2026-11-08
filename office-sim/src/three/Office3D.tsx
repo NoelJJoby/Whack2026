@@ -9,6 +9,7 @@ import type { TickRecord } from '../../shared/types';
 import type { TickEvent } from '../../shared/api';
 import { Agent3D, type Behaviour, type Crowd, type Emote } from './Agent3D';
 import { EMOTES, FOCUS_PRIORITY } from '../emotes';
+import { playCeoResignSting } from '../sfx';
 import { DESK_OFFSET, FLOOR, SEAT_LIST, seatFor, type Seat } from './layout';
 import { accessNode, buildNav, seatNode, type Nav } from './nav';
 import { carBoxes, glass, glow, solid } from './world';
@@ -281,6 +282,13 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
     if (ceoWasQuit.current === false && ceo.quit && ceo.action === 'Resigned') setCutscene({ id: ceo.id, name: ceo.name, ending: false });
     ceoWasQuit.current = ceo.quit;
   }, [ceo?.id, ceo?.quit, ceo?.action]);
+  // The sting lands with the headline, which slams in 1.4 s into the cutscene.
+  const cutsceneId = cutscene && !cutscene.ending ? cutscene.id : null;
+  useEffect(() => {
+    if (!cutsceneId) return;
+    const id = setTimeout(playCeoResignSting, 1400);
+    return () => clearTimeout(id);
+  }, [cutsceneId]);
   const cutsceneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (cutsceneTimer.current) clearTimeout(cutsceneTimer.current); }, []);
   const endCutscene = () => {

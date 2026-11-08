@@ -247,8 +247,6 @@ a:focus-visible, select:focus-visible { outline: 2px solid #ffe2a2; outline-offs
 @media (max-width: 680px) { .quarter-headlines { grid-template-columns: 1fr; } .quarter-headline { padding: 14px; } }
 
 @media (max-width: 700px) { .tool-panel.quarter-panel { width: calc(100% - 24px); } }
-/* "CEO resign": a small red one-way button under the stock ticker; the first click arms it. */
+/* "CEO resign": a small red one-way button under the stock ticker. */
 .ceo-resign { position: absolute; top: 108px; right: 24px; width: 204px; padding: 7px 10px; font-size: 13px; color: #ffd8cf; background: #5a1f1b; border: 1px solid #b0453a; text-align: center; }
 .ceo-resign:hover:not(:disabled) { color: #fff; background: #7a2b26; }
-.ceo-resign.armed { color: #fff; background: #d8352a; border-color: #ffb3a8; animation: ceo-resign-pulse .6s steps(2) infinite; }
-@keyframes ceo-resign-pulse { 50% { opacity: .7; } }
