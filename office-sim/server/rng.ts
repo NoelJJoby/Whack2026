@@ -26,7 +26,9 @@ export type Purpose =
   | 'price'
   | 'text'
   | 'voice'
-  | 'manner';
+  | 'manner'
+  /** "CEO resign" collapse: each person's pace of burnout. */
+  | 'collapse';
 
 /** FNV-1a over the joined key parts, finished with the murmur3 fmix32 avalanche. */
 export function hashKey(...parts: Array<string | number>): number {

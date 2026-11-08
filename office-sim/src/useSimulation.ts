@@ -50,6 +50,8 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
   injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
+  /** "CEO resign": the CEO walks out and the office collapses until everyone has resigned. */
+  ceoResign: () => Promise<boolean>;
   /** The company's objectives this run (the CEO's task), newest last. */
   companyTasks: CompanyTaskSummary[];
   /** Give the CEO an objective; resolves to an error message, or null when accepted. */
@@ -199,6 +201,7 @@ export function useSimulation(): Simulation {
   return {
     runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
     injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
+    ceoResign: () => post('/sim/ceo-resign'),
     companyTasks: snapshot?.company_tasks ?? [],
     submitObjective: async (objective, deadlineTicks) => {
       if (USE_MOCKS) return 'Mock data mode: the simulation is not connected.';

@@ -1,6 +1,7 @@
 // Looping background music. Browsers block autoplay, so it starts on the first click or key press.
 // The on/off choice is remembered per browser.
 import { useEffect, useRef, useState } from 'react';
+import { SFX_END, SFX_START } from './sfx';
 
 const SRC = '/sounds/background-music.mp3';
 const VOLUME = 0.25;
@@ -13,6 +14,17 @@ function stored(): boolean {
 export function useBackgroundMusic() {
   const [enabled, setEnabled] = useState(stored);
   const audio = useRef<HTMLAudioElement | null>(null);
+  // A sound effect (the CEO-resigns sting) pauses the music; it resumes when the effect ends.
+  const effect = useRef(false);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  useEffect(() => {
+    const pause = () => { effect.current = true; audio.current?.pause(); };
+    const resume = () => { effect.current = false; if (enabledRef.current) void audio.current?.play().catch(() => undefined); };
+    window.addEventListener(SFX_START, pause);
+    window.addEventListener(SFX_END, resume);
+    return () => { window.removeEventListener(SFX_START, pause); window.removeEventListener(SFX_END, resume); };
+  }, []);
 
   useEffect(() => {
     const track = new Audio(SRC);
@@ -27,7 +39,7 @@ export function useBackgroundMusic() {
     const track = audio.current;
     if (!track) return;
     if (!enabled) { track.pause(); return; }
-    const start = () => { void track.play().catch(() => undefined); };
+    const start = () => { if (!effect.current) void track.play().catch(() => undefined); };
     start();
     // If autoplay was blocked, the first interaction starts it.
     window.addEventListener('pointerdown', start, { once: true });
