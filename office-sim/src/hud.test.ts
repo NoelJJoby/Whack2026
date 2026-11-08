@@ -166,6 +166,7 @@ test('the engine badge names the decision-maker for each mode and reason', async
   assert.equal(engineLabel('rules', 'no_api_key'), 'Rules mode · No API key');
   assert.equal(engineLabel('rules', 'llm_failed'), 'Rules mode · LLM unavailable');
   assert.equal(engineLabel('rules', 'configured'), 'Rules mode');
+  assert.equal(engineLabel('rules', 'fast_forward'), 'Fast-forward · Rules mode');
 });
 
 test('a failed case shows its reason in the event detail, not just the status word', async () => {

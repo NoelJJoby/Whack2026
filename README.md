@@ -80,6 +80,18 @@ Settings:
 - `ANTHROPIC_API_KEY` in `office-sim/.env` runs the CEO and ops through the LLM. Without it the app runs on rules, and the HUD badge says so.
 - `SIM_SEED=<number>` replays a fixed company. Without it, each server start picks a new random seed, so set it for a repeatable run.
 
+### Two-minute quarter
+
+Select **2 min / quarter** beside the playback speeds, then **Start**. The default quarter is 240 work periods across 90 calendar days. Fast-forward targets 96 seconds (400 ms per work period), leaving headroom within two minutes for local processing. Pauses and time spent with playback paused extend the run.
+
+Fast-forward uses the deterministic rules engine for employees and management, with brief dialogue highlights instead of waiting for every line. It retains all 240 committed snapshots, business events, stock prices, scores and daily reports, and saves a factual final report without waiting for AI. The HUD says **Fast-forward · Rules mode**. Select an ordinary playback speed to return to the configured AI/rules mode and full dialogue. Changing speeds during an AI turn takes effect after that turn finishes.
+
+API: `POST /api/sim/speed` with `{ "speed": 8 }` selects this mode. Ordinary playback speeds remain `0.5`, `1`, `2`, and `4`.
+
+Run `pnpm benchmark:quarter` from `office-sim` to time a complete paced quarter, including disk commits, stream serialization and the factual report. It uses a temporary run directory and makes no AI requests. `pnpm benchmark:quarter --unpaced` measures computation/storage throughput without pacing. Both verify 240 committed ticks and fail if execution exceeds two minutes.
+
+Measured locally on 2026-11-08: seed 42 completed all 240 ticks and the factual report in **96.22 seconds**, with no viewer acknowledgements or AI calls. The production build and all 360 automated tests passed. Browser verification covered the fast-forward control, live clock/price updates and pause.
+
 ## Autonomous business demo
 
 Run `pnpm dev` from `office-sim` and open http://localhost:5173. The API runs on port 3010. For a built single-server deployment, use `pnpm build && pnpm start` (port 3010 by default). See [implementation and run notes](docs/events-implementation-status.md) for event stories, durable reports, configuration and measured verification.

@@ -5,7 +5,7 @@ import type { CompanyActivity, CompanyTaskSummary } from './companyTasks';
 import type { AgentProfile, EventType, SimulationMode, SimulationState, TickRecord } from './types';
 
 /** Why the server runs in its current mode. */
-export type ModeReason = 'configured' | 'no_api_key' | 'llm_failed';
+export type ModeReason = 'configured' | 'no_api_key' | 'llm_failed' | 'fast_forward';
 
 /** Public price decomposition. No truth, lineage, claim details or future corrections. */
 export interface PriceDTO {

@@ -28,6 +28,17 @@ test('reconnect skips historical playback and reset discards queued hours', () =
   assert.equal(p.tick, 0); assert.equal(p.active, false);
 });
 
+test('fast-forward follows the latest committed hour and can return to ordinary dialogue', () => {
+  let p = reconcilePresentation(initialPresentation, [], 1, frame(0).state);
+  p = reconcilePresentation(p, [frame(1)], 1, frame(1).state);
+  p = reconcilePresentation(p, [frame(1), frame(2), frame(3)], 1, frame(3).state, true);
+  assert.equal(p.tick, 3);
+  assert.equal(p.active, true);
+  assert.equal(reconcilePresentation(p, [frame(4)], 1, frame(4).state), p);
+  p = reconcilePresentation(finishPresentation(p, 3), [frame(4)], 1, frame(4).state);
+  assert.equal(p.tick, 4);
+});
+
 test('17:00 leavers remain visible through the round; late workers leave before the report and return at 09:00', () => {
   const [id] = Object.keys(mockHistory[0].state.agents);
   const prev = frame(4), close = frame(5), end = frame(8), morning = frame(9);

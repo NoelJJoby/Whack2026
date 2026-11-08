@@ -262,6 +262,8 @@ describe('durable history and grounded reports', () => {
     const path = join(store.directory,`${run.id}.journal.jsonl`); const contents = readFileSync(path,'utf8');
     writeFileSync(path,contents.replace('"seed":42','"seed":43'));
     assert.throws(() => store.read(run.id),/Invalid journal/);
+    assert.throws(() => store.metadata(run.id),/Invalid journal/, 'External edits invalidate cached journal metadata');
+    assert.throws(() => store.commit(run.id,w,'complete',{}),/Invalid journal/, 'A cached tail cannot hide corruption on append');
   });
   it('retains early evidence beyond the frame window and validates all narrative, figures and references', async () => {
     const store = new RunStore(temp()); let w = world(); openEvent(w,'client_win'); const run = store.create(w);

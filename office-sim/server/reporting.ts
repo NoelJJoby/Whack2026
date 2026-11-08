@@ -97,7 +97,7 @@ export type ReportProvider = (prompt: string) => Promise<unknown>;
 export class Reporting {
   private jobs = new Map<string,Promise<BusinessReport>>();
   constructor(private store: RunStore, private provider?: ReportProvider) {}
-  generate(runId: string, regenerate = false): Promise<BusinessReport> {
+  generate(runId: string, regenerate = false, factualOnly = false): Promise<BusinessReport> {
     const facts = factsFor(this.store,runId);
     const key = `${runId}:${facts.cutoff}:${facts.hash}`;
     if (this.jobs.has(key)) return this.jobs.get(key)!;
@@ -105,14 +105,14 @@ export class Reporting {
     const current = [...existing].reverse().find(r => r.cutoff === facts.cutoff && r.facts.hash === facts.hash);
     if (current && !regenerate) return Promise.resolve(current);
     const version = Math.max(0,...existing.map(r => r.version))+1;
-    const job = this.build(facts,version).then(report => { this.store.saveReport(report); return report; }).finally(() => this.jobs.delete(key));
+    const job = this.build(facts,version,factualOnly).then(report => { this.store.saveReport(report); return report; }).finally(() => this.jobs.delete(key));
     this.jobs.set(key,job); return job;
   }
   pending(runId: string) { return [...this.jobs.keys()].some(k => k.startsWith(`${runId}:`)); }
-  private async build(facts: ReportFacts, version: number): Promise<BusinessReport> {
+  private async build(facts: ReportFacts, version: number, factualOnly: boolean): Promise<BusinessReport> {
     let sections: ReportSection[] | null = null; const telemetry: unknown[] = [];
-    let provider = this.provider;
-    if (!provider && process.env.ANTHROPIC_API_KEY?.trim()) {
+    let provider = factualOnly ? undefined : this.provider;
+    if (!factualOnly && !provider && process.env.ANTHROPIC_API_KEY?.trim()) {
       const request = createMessageClient({ onMetrics: m => telemetry.push(m) });
       provider = async prompt => { const result = await request(prompt,{ purpose: 'report', maxTokens: 4000 }); return result ? parseReply(result.message) : null; };
     }
@@ -121,7 +121,7 @@ export class Reporting {
       catch { telemetry.push({ attempt: attempt+1, outcome: 'invalid_or_unavailable' }); }
     }
     return { id: randomUUID(), runId: facts.runId, version, cutoff: facts.cutoff, tick: facts.tick, generatedAt: new Date().toISOString(),
-      status: sections ? 'ready' : 'factual_fallback', limitation: sections ? null : 'AI analysis unavailable. This factual report uses committed evidence; retry is available.',
+      status: sections ? 'ready' : 'factual_fallback', limitation: sections ? null : factualOnly ? 'Fast-forward factual report from committed evidence. Generate AI analysis with the report retry control.' : 'AI analysis unavailable. This factual report uses committed evidence; retry is available.',
       facts, sections: sections ?? factualSections(facts), schemaVersion: 1, promptVersion: 1, model: sections ? llmConfig.model : null, telemetry };
   }
 }

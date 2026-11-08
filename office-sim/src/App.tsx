@@ -18,6 +18,7 @@ import { useDialogue } from './useDialogue';
 import { usePresentation } from './usePresentation';
 import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
+import { isFastForward } from '../shared/playback';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import { EMOTES, FEED_EMOJI } from './emotes';
 import './index.css';
@@ -47,7 +48,7 @@ export default function App() {
   const [showSyncDebug, setShowSyncDebug] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [playbackPaused, setPlaybackPaused] = useState(false);
-  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused);
+  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused, isFastForward(sim.speed));
   const { state, history } = presentation;
   const hour = presentation.tick;
   const complete = hour >= sim.maxTicks && !presentation.playing;
