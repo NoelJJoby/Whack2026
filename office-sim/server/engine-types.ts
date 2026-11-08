@@ -111,6 +111,8 @@ export interface EngineAgent {
   /** Workload the agent drifts back to; policies move it. */
   baselineWorkload: number;
   claims: HeldClaim[];
+  /** In the office this hour (server/presence.ts). Undefined counts as present. */
+  present?: boolean;
 }
 
 // --- Claims and events ------------------------------------------------------
@@ -174,6 +176,7 @@ export interface World {
 export interface SpeechState {
   voices: Record<string, VoiceCard>;
   lastManner: Record<string, Manner>;
+  workSeen?: Record<string, { signature: string; tick: number }>;
   /** Public lines of the last few rounds, for the prompt and the repetition check. */
   recent: Array<{ tick: number; agent: string; line: string; thought?: string }>;
   /** Example small-talk lines per agent; [] once tried and failed. Acts as the run's cache. */
@@ -182,6 +185,7 @@ export interface SpeechState {
 
 /** The style brief the prompt builder renders. */
 export interface SpeechContext {
+  news?: string[];
   /** "How you talk" brief, without the label. */
   voice: string;
   /** "This time" instruction, without the label. */
@@ -333,6 +337,8 @@ export interface EngineTickLog {
   quits: string[];
   states: Record<string, AgentState & { status: AgentStatus }>;
   reach: { true_holders: number; false_holders: number };
+  /** Who stayed late and who went home after this hour (17:00 to 23:00 only). */
+  presence?: import('./presence').PresenceLog;
   /** Voice cards created this tick (tick 1, or a newcomer's). */
   voices?: Record<string, VoiceCard>;
   /** Example lines fetched this tick. */

@@ -31,7 +31,7 @@ const ctx: TurnContext = {
 const prompt = buildTurnPrompt(agent, ctx, 'You remember favours and broken promises.');
 const sections = [
   'You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.',
-  'Who you are:', 'It is day 2, 13:00.', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.",
+  'Who you are:', 'It is day 1, 23:00. The current hour is overtime.', 'How you feel right now:', "These describe how you feel. Don't reuse their wording.",
   "What you've heard:", 'Just announced:', 'Colleagues still here:', 'What you can do:', 'What you say out loud ("public_line"):',
   'Respond with JSON only, in this shape:',
 ];
@@ -42,15 +42,15 @@ for (const section of sections) {
   previous = index;
 }
 assert.ok(prompt.includes("Who you are: You're A1. You work in Engineering. You remember favours and broken promises."));
-assert.ok(prompt.includes('(key: c1), from Rae, yesterday afternoon. you generally trust them. This is a scandal claim.'));
+assert.ok(prompt.includes('(key: c1), from Rae, this afternoon. you generally trust them. This is a scandal claim.'));
 assert.ok(prompt.includes("(key: c2), from management, just now. you don't believe much of what they say."));
 assert.ok(prompt.includes("(key: c3), from the grapevine, a couple of hours ago. you're not sure how far to trust them."));
 assert.ok(prompt.includes('A new manager arrives.'));
 assert.ok(prompt.includes('Colleagues still here: Rae'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
-assert.ok(prompt.includes("- Don't repeat, quote or name the announcement. Don't open with a question about it."));
+assert.ok(prompt.includes("React to the news in your own words"));
 assert.ok(prompt.includes('- About 15 words at most.'));
-assert.ok(prompt.includes("at most 30 words. Start them from what's on your mind, not with the announcement, and don't copy the facts above."));
+assert.ok(prompt.includes('at most 30 words: what you really make of the news'));
 assert.ok(prompt.includes('"running on fumes"') && prompt.includes('"Sure."'), 'banned phrases are listed');
 assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.'));
 assert.doesNotMatch(prompt, /\btick|claim-[abc]|\ba2\b|grapevine,? heard/i);

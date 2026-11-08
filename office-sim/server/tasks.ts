@@ -1,6 +1,7 @@
 import type { Decision, EngineAgent, Proposal, TurnContext, World } from './engine-types';
 import type { Task } from '../shared/business';
 import { BUSINESS_PARAMS, post, signContract } from './business';
+import { days } from '../shared/workday';
 import { addEvidence, managementOwners, openEvent } from './events/lifecycle';
 import { consumeSlot } from './events/scheduler';
 import { stream } from './rng';
@@ -13,7 +14,7 @@ export function workContext(w: World, agent: EngineAgent): NonNullable<TurnConte
   const eventIds = new Set([...assignments,...reviewable].map(t => t.eventId));
   return { schemaVersion: 1, revision: w.tick, supervisor: managementOwners(w).ops, role: w.business.positions[agent.id].role,
     assignments: structuredClone(assignments), reviewable: structuredClone(reviewable), supportable,
-    evidence: structuredClone(w.eventState.evidence.filter(e => e.deliveryTick <= w.tick && e.recipients.includes(agent.id) && (w.eventState.cases.some(c => c.id === e.eventId && !['resolved','failed','cancelled','superseded'].includes(c.status)) || w.tick-e.tick <= 5))),
+    evidence: structuredClone(w.eventState.evidence.filter(e => e.deliveryTick <= w.tick && e.recipients.includes(agent.id) && (w.eventState.cases.some(c => c.id === e.eventId && !['resolved','failed','cancelled','superseded'].includes(c.status)) || w.tick-e.tick <= days(1)))),
     directives: structuredClone(w.eventState.directives.filter(d => d.active && eventIds.has(d.eventId))) };
 }
 export function validEmployeeOutput(raw: unknown, ctx: TurnContext): unknown {
@@ -43,7 +44,7 @@ function completeTask(w: World, t: Task) {
   const contract = b.contracts.find(c => c.id === t.contractId);
   if (contract && contract.recognised === 0) {
     const amount = contract.value; post(w,{ id: `${contract.id}-revenue`, tick: w.tick, category: 'revenue', amount, source: t.eventId ?? t.id });
-    contract.recognised = amount; contract.status = 'earned'; contract.paymentTick = w.tick + 5;
+    contract.recognised = amount; contract.status = 'earned'; contract.paymentTick = w.tick + days(1);
   }
   if (t.kind === 'collection' && b.receivables > 0 && !b.contracts.some(c => c.status === 'earned')) {
     post(w,{ id: `${t.id}-cash`, tick: w.tick, category: 'collection', amount: Math.min(b.receivables,3_000_000), source: t.eventId ?? t.id });
@@ -68,7 +69,7 @@ function completeTask(w: World, t: Task) {
   if (event && ['partnership','major_renewal','company_adoption','expansion','renewal'].includes(event.templateId) && !b.contracts.some(c => c.id === `contract-${event.id}`)) {
     const id = signContract(w,event.id,event.entityId);
     if (id) {
-      const delivery: Task = { ...t, id: `delivery-${event.id}`, kind: 'delivery', department: 'Engineering', title: 'Deliver signed client obligations', contractId: id, owner: null, status: 'pending', effort: 5, remaining: 5, reviewed: false, reviewRequired: true, error: false, allocated: 1, deadline: w.tick+18, dependencies: [], version: 1 };
+      const delivery: Task = { ...t, id: `delivery-${event.id}`, kind: 'delivery', department: 'Engineering', title: 'Deliver signed client obligations', contractId: id, owner: null, status: 'pending', effort: 5, remaining: 5, reviewed: false, reviewRequired: true, error: false, allocated: 1, deadline: w.tick+days(3.6), dependencies: [], version: 1 };
       b.tasks.push(delivery); event.tasks.push(delivery.id); event.deadline = Math.max(event.deadline,delivery.deadline);
       event.value = b.contracts.find(c => c.id === id)!.value;
     }

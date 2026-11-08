@@ -32,3 +32,14 @@ export function heardWhen(now: number, then: number, c: Clock): string {
   if (days === 1) return `yesterday ${part}`;
   return days <= 10 ? `${WORDS[days]} days ago` : 'weeks ago';
 }
+
+/** A deadline in the same workday calendar used by the employee's clock. */
+export function dueWhen(now: number, then: number): string {
+  const a = clockAt(now), b = clockAt(then);
+  const time = `${String(b.hour).padStart(2, '0')}:00`;
+  if (then < now) return `overdue since day ${b.day}, ${time}`;
+  if (a.day === b.day) return `by ${time} today`;
+  if (b.day === a.day + 1) return `by tomorrow ${time}`;
+  const days = b.day - a.day;
+  return `in ${WORDS[days] ?? days} days, by ${time}`;
+}

@@ -1,15 +1,15 @@
 // The one way the client talks to the server: `api()` for requests and
 // `useSimulation()` for the SSE stream and the controls.
+import { TICKS_PER_MONTH, TICKS_PER_QUARTER, TICKS_PER_WEEK } from '../shared/workday';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
-import { createAnnouncements, type Announcement } from './announcement';
 import { playerText } from './hudModel';
 
-/** Run lengths offered in the UI: 1 week (25), 1 month (50), 2 months (100), 1 quarter (150). */
-export const RUN_LENGTHS = [25, 50, 100, 150];
+/** Run lengths offered in the UI: 1 workweek, 1 month, 2 months, 1 quarter (40, 80, 160, 240 ticks). */
+export const RUN_LENGTHS = [TICKS_PER_WEEK, TICKS_PER_MONTH, TICKS_PER_MONTH * 2, TICKS_PER_QUARTER];
 
 /** Dev only: `VITE_USE_MOCKS=true` renders the design mock data instead of the server. */
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
@@ -48,8 +48,8 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
   injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
-  announcement: Announcement | null;
-  dismissAnnouncement: () => void;
+  historyEpoch: number;
+  acknowledge: (tick: number) => Promise<boolean>;
   cast: AgentProfile[];
   maxTicks: number;
   price: PriceDTO | null;
@@ -84,10 +84,7 @@ export function useSimulation(): Simulation {
   const [connection, setConnection] = useState<Connection>(USE_MOCKS ? 'mock' : 'connecting');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const announcements = useRef<ReturnType<typeof createAnnouncements>>();
-  if (!announcements.current) announcements.current = createAnnouncements(setAnnouncement);
-  useEffect(() => () => announcements.current?.dispose(), []);
+  const [historyEpoch, setHistoryEpoch] = useState(0);
   const lastTick = useRef(0);
   const currentTick = useRef(0);
   const currentRun = useRef<string | undefined>();
@@ -103,8 +100,8 @@ export function useSimulation(): Simulation {
 
   const replaceHistory = useCallback(
     (next: HistoryResponse) => {
-      if (next.state.tick === 0) announcements.current?.clear();
-      lastTick.current = next.history.at(-1)?.tick ?? 0;
+      setHistoryEpoch(epoch => epoch + 1);
+      lastTick.current = next.history.at(-1)?.tick ?? next.state.tick;
       setHistory(next.history);
       applySnapshot(next, true);
     },
@@ -136,7 +133,6 @@ export function useSimulation(): Simulation {
         if (frame.tick === lastTick.current + 1) {
           lastTick.current = frame.tick;
           setHistory((h) => [...h, frame]);
-          announcements.current?.receive(frame.events);
           applySnapshot(message);
         } else if (frame.tick > lastTick.current) {
           void resync();
@@ -163,7 +159,7 @@ export function useSimulation(): Simulation {
       setError(null);
       try {
         applySnapshot(await api<SimResponse>(path, { method: 'POST', body }), path === '/sim/reset' || path === '/sim/new-seed');
-        if (path === '/sim/reset' || path === '/sim/new-seed') announcements.current?.clear();
+
         return true;
       } catch (e) {
         setError(errorText(e));
@@ -175,12 +171,18 @@ export function useSimulation(): Simulation {
     [applySnapshot],
   );
 
+  const acknowledge = useCallback(async (tick: number) => {
+    if (USE_MOCKS) return true;
+    try { await api('/sim/presented', { method: 'POST', body: { tick, run_id: currentRun.current } }); return true; }
+    catch { return false; }
+  }, []);
+
   const running = snapshot?.state.running ?? false;
   return {
     runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
     injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
-    announcement,
-    dismissAnnouncement: () => announcements.current?.dismiss(),
+    historyEpoch,
+    acknowledge,
     cast: cast?.agents ?? [],
     speed: snapshot?.speed ?? 1,
     setSpeed: (speed) => post('/sim/speed', { speed }),

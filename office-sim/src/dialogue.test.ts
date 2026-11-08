@@ -24,7 +24,7 @@ const typeAll = (state: PlayerState, showThoughts = true) => {
   return state;
 };
 const line = (agent: string, publicLine = 'Hi.', inner = 'Hm.'): DialogueLine =>
-  ({ key: agent, tick: 1, agent, publicLine, inner, quit: false, action: 'work', emotion: 'normal', tier: 6, stress: 50, stressDelta: 0 });
+  ({ kind: 'agent', key: agent, tick: 1, agent, publicLine, inner, quit: false, action: 'work', emotion: 'normal', tier: 6, stress: 50, stressDelta: 0 });
 
 test('round skips empty lines and orders quit > leak > gossip > stress jump > other', () => {
   const prev = frame(1, []);
@@ -39,7 +39,8 @@ test('round skips empty lines and orders quit > leak > gossip > stress jump > ot
 });
 test('event ticks rank every speaker as a reaction, ordered by stress change', () => {
   const round = buildRound(frame(2, [{ agent: 'marcus' }, { agent: 'sam' }, { agent: 'tom', action: 'leak' }], { sam: 65, marcus: 55 }, true), frame(1, []));
-  assert.deepEqual(round.map(l => [l.agent, l.tier]), [['tom', 2], ['sam', 3], ['marcus', 3]]);
+  assert.equal(round[0].kind, 'narrator');
+  assert.deepEqual(round.slice(1).map(l => [l.agent, l.tier]), [['tom', 2], ['sam', 3], ['marcus', 3]]);
 });
 test('round is capped and keeps the most dramatic lines', () => {
   const ids = Object.keys(base.state.agents);
@@ -79,18 +80,25 @@ test('hidden thoughts skip the inner phase; auto fires only while reading', () =
   assert.equal(s.shownInner, 0);
   assert.equal(current(run(s, { type: 'auto' }))?.agent, 'b');
 });
-test('new round mid-queue: auto jumps after the current line, manual waits for the end', () => {
-  const first = run(idle, { type: 'round', lines: [line('a'), line('b'), line('c')] });
-  const queued = run(first, { type: 'round', lines: [line('x')] }, { type: 'round', lines: [line('y')] });
-  assert.equal(current(queued)?.agent, 'a');
-  assert.equal(queued.pending?.[0].agent, 'y');
-  assert.equal(current(run(typeAll(queued), { type: 'auto' }))?.agent, 'y');
-  let manual = run(typeAll(queued), { type: 'next', auto: false });
-  assert.equal(current(manual)?.agent, 'b');
-  manual = run(typeAll(manual), { type: 'next', auto: false }, { type: 'complete' }, { type: 'next', auto: false });
-  assert.equal(current(manual)?.agent, 'y');
-  assert.equal(current(run(queued, { type: 'skip' }))?.agent, 'y');
+test('finishing or skipping a round never jumps to another hour', () => {
+  const first = run(idle, { type: 'round', tick: 1, lines: [line('a'), line('b')] });
+  const secondLine = run(typeAll(first), { type: 'auto' });
+  assert.equal(current(secondLine)?.agent, 'b');
+  const finished = run(typeAll(secondLine), { type: 'next', auto: false });
+  assert.equal(finished.phase, 'idle');
+  assert.equal(finished.tick, 1);
   assert.equal(run(first, { type: 'skip' }).phase, 'idle');
-  assert.equal(run(queued, { type: 'round', lines: [] }), queued);
-  assert.equal(run(queued, { type: 'clear' }), idle);
+  assert.equal(run(first, { type: 'skip' }).tick, 1);
+  assert.equal(run(first, { type: 'clear' }), idle);
+});
+
+test('announcements lead the round; daily report and filler days finish it', () => {
+  const f = frame(8, [{ agent: 'marcus' }], {}, true);
+  f.day_report = { day: 1, lines: ['No announcements today.', 'Everyone has gone home.'], fillerDays: [2, 3] };
+  const round = buildRound(f);
+  assert.equal(round[0].kind, 'narrator');
+  assert.equal(round[1].kind, 'agent');
+  assert.ok(round.slice(2).every(l => l.kind === 'narrator' && l.report && !l.inner));
+  assert.deepEqual(round.slice(-2).map(l => l.calendarDay), [2, 3]);
+  assert.match(round.at(-1)!.publicLine, /Day 3: a routine day/);
 });

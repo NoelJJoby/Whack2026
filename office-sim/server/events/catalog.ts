@@ -1,14 +1,16 @@
 import type { EventDomain, Rarity, Valence } from '../../shared/events';
 import type { Task } from '../../shared/business';
 import type { World } from '../engine-types';
+import { days } from '../../shared/workday';
 export interface EventDefinition {
   id: string; headline: string; rarity: Rarity; valence: Valence; domain: EventDomain;
   department: Task['department']; kind: Task['kind']; effort: number; deadline: number; cooldown: number;
   cost: number; benefit: number; evidence: string; acceptance: string;
 }
 function definition(id: string, headline: string, rarity: Rarity, valence: Valence, domain: EventDomain, department: Task['department'], kind: Task['kind'], benefit = 0): EventDefinition {
+  // Durations are in workdays (they were calibrated at 5 ticks a day: 20/14 ticks, cooldowns 150/80/25).
   return { id, headline, rarity, valence, domain, department, kind, effort: rarity === 'rare' ? 5 : 3,
-    deadline: rarity === 'rare' ? 20 : 14, cooldown: id === 'release_success' ? 150 : rarity === 'rare' ? 80 : 25,
+    deadline: rarity === 'rare' ? days(4) : days(2.8), cooldown: id === 'release_success' ? days(30) : rarity === 'rare' ? days(16) : days(5),
     cost: valence === 'negative' ? 100_000 : 50_000, benefit,
     evidence: 'Recorded operating evidence; response and acceptance work are required.',
     acceptance: 'Required work completes, review passes, and linked business conditions hold.' };
