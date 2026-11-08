@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
-import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type OrthographicCamera } from 'three';
+import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type Group, type OrthographicCamera } from 'three';
 import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
 import { Agent3D, type Behaviour, type Crowd } from './Agent3D';
 import { DESK_OFFSET, FLOOR, SEAT_LIST, seatFor, type Seat } from './layout';
 import { accessNode, buildNav, seatNode, type Nav } from './nav';
-import { glass, glow, solid } from './world';
+import { carBoxes, glass, glow, solid } from './world';
 import { bake } from './voxel';
 import './office3d.css';
 
@@ -29,10 +29,27 @@ const lampPool = new MeshBasicMaterial({ color: '#ffd36b', transparent: true, op
 
 const name = (people: Person[], id: string) => people.find(p => p.id === id)?.name ?? id;
 
-/** Dev only: `?preview=panic` or `?preview=ceo-quit` plays that animation 3 s after load, without engine data. */
+/** Dev only: `?preview=panic`, `?preview=ceo-quit` or `?preview=home-time` plays that animation 3 s after load, without engine data. */
 const PREVIEW = import.meta.env.DEV ? new URLSearchParams(location.search).get('preview') : null;
 
 /** Action -> where to go and what to show. Only reads the record; invents nothing. */
+/** Staggered pack-up times (seconds at 1x) so people don't all rush out at once. */
+const LEAVE_DELAYS = [0.4, 2.6, 1.2, 4.2, 0.8, 3.4, 5.2, 1.8];
+
+/** Going home: pack up, every other person says goodbye at a colleague's desk who is staying, then out the door or to their car. */
+function leaving(p: Person, i: number, people: Person[], nav: Nav, seats: Map<string, Seat>, car: number): Behaviour {
+  const staying = people.filter(q => q.id !== p.id && !q.quit && q.present !== false);
+  const friend = i % 2 === 0 && staying.length ? staying[i % staying.length] : null;
+  let via: string | null = null, viaFace: number | null = null;
+  if (friend) {
+    via = accessNode(friend.id, friend.role === 'CEO');
+    const [ax, az] = nav.pos.get(via)!, seat = seats.get(friend.id)!;
+    viaFace = Math.atan2(seat.x - ax, seat.z - az);
+  }
+  return { goal: car >= 0 ? `car${car}` : 'exit', face: null, kind: 'leave', tag: car >= 0 ? 'driving home' : 'heading home',
+    spread: null, delay: LEAVE_DELAYS[i % LEAVE_DELAYS.length], via, viaFace };
+}
+
 function behaviourFor(p: Person, rec: TickRecord | undefined, i: number, people: Person[], nav: Nav, seats: Map<string, Seat>, panic: boolean): Behaviour {
   const desk: Behaviour = { goal: seatNode(p.id), face: 0, kind: 'desk', tag: null, spread: null };
   if (p.quit) return { goal: 'exit', face: null, kind: 'quit', tag: p.action === 'Laid off' ? 'laid off' : p.role === 'CEO' ? 'CEO resigns' : 'resigned', spread: null };
@@ -130,6 +147,51 @@ function Director({ focus, crowd, controls, onLost }: {
   return null;
 }
 
+/** The two parked cars: they wait for their driver, pull forward, turn left into the near (left-hand) lane and drive off east. */
+const CARS = [{ x: 10.2, colour: '#e6e6e6' }, { x: 12.8, colour: '#cf4436' }];
+const PARK_Z = 8.2, KERB_Z = 10.2, LANE_Z = 12.25, TURN = LANE_Z - KERB_Z, ROAD_END = 19, CAR_SPEED = 3.5;
+interface CarState { owner: string | null; stage: 'parked' | 'waiting' | 'driving' | 'gone'; t: number; s: number }
+
+/** Polyline for one car: straight out of the bay, a quarter-circle left turn, then along the lane. */
+function carPath(x0: number) {
+  const pts: Array<[number, number]> = [[x0, PARK_Z], [x0, KERB_Z]];
+  for (let k = 1; k <= 12; k++) { const a = Math.PI - (k / 12) * (Math.PI / 2); pts.push([x0 + TURN + Math.cos(a) * TURN, KERB_Z + Math.sin(a) * TURN]); }
+  pts.push([ROAD_END, LANE_Z]);
+  const lengths = [0];
+  for (let k = 1; k < pts.length; k++) lengths.push(lengths[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+  return { pts, lengths, total: lengths.at(-1)! };
+}
+
+function Cars({ cars, boarded, speed, paused }: { cars: CarState[]; boarded: Set<string>; speed: number; paused: boolean }) {
+  const models = useMemo(() => CARS.map(c => { const b = carBoxes(c.colour); return { solid: bake(b.solid), glow: bake(b.glow), path: carPath(c.x) }; }), []);
+  const groups = [useRef<Group>(null), useRef<Group>(null)];
+  useFrame((_, delta) => {
+    // Cars speed up with playback only to 2x, so the turn out of the bay stays readable.
+    const dt = paused ? 0 : Math.min(delta, 0.1) * Math.min(speed, 2);
+    cars.forEach((c, i) => {
+      const g = groups[i].current;
+      if (!g) return;
+      if (!c.owner) { c.stage = 'parked'; c.s = 0; c.t = 0; }
+      else if (c.stage === 'parked' && boarded.has(c.owner)) c.stage = 'waiting';
+      // A short beat after the door shuts; only one car pulls out at a time.
+      if (c.stage === 'waiting') { c.t += dt; if (c.t > 0.8 && cars[1 - i].stage !== 'driving') c.stage = 'driving'; }
+      if (c.stage === 'driving') { c.s += dt * CAR_SPEED; if (c.s >= models[i].path.total) c.stage = 'gone'; }
+      const { pts, lengths } = models[i].path;
+      let k = 1;
+      while (k < pts.length - 1 && lengths[k] < c.s) k++;
+      const f = Math.min(1, Math.max(0, (c.s - lengths[k - 1]) / (lengths[k] - lengths[k - 1])));
+      const [ax, az] = pts[k - 1], [bx, bz] = pts[k];
+      g.position.set(ax + (bx - ax) * f, 0, az + (bz - az) * f);
+      g.rotation.y = Math.atan2(-(bz - az), bx - ax);
+      g.visible = c.stage !== 'gone';
+    });
+  });
+  return <>{models.map((m, i) => <group key={i} ref={groups[i]}>
+    <mesh geometry={m.solid} material={solidMat} castShadow receiveShadow />
+    <mesh geometry={m.glow} material={glowMat} />
+  </group>)}</>;
+}
+
 export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, panic = false, paused = false, fallback }: {
   people: Person[];
   selected: string | null;
@@ -150,7 +212,9 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
   const [previewing, setPreviewing] = useState(false);
   useEffect(() => { if (PREVIEW) { const id = setTimeout(() => setPreviewing(true), 3000); return () => clearTimeout(id); } }, []);
   // The CEO preview seats the CEO first (even if they already quit this run), then makes them resign.
-  const people = useMemo(() => PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: previewing, present: true, action: previewing ? 'Resigned' : p.action } : p) : cast, [cast, previewing]);
+  // Home-time preview: everyone in, then all but two (who stay late) go home.
+  const people = useMemo(() => PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: previewing, present: true, action: previewing ? 'Resigned' : p.action } : p)
+    : PREVIEW === 'home-time' ? cast.map((p, i) => p.quit ? p : { ...p, present: !previewing || i % 4 === 1, late: previewing && i % 4 === 1 }) : cast, [cast, previewing]);
   const panicking = panic || (previewing && PREVIEW === 'panic');
   const layoutKey = people.map(p => `${p.id}:${p.role}`).join();
   // One desk each, even if two people share an archetype.
@@ -164,6 +228,25 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     }));
   }, [layoutKey]);
   const crowd = useMemo<Crowd>(() => new Map(), []);
+  // Going home: anyone seen in the office who is now marked as left walks out (absent on load: already gone).
+  // The first two to leave each day take the parked cars; a car is back in its bay once its driver returns.
+  const presence = useRef(new Map(people.map(p => [p.id, p.present !== false])));
+  const departing = useRef(new Set<string>());
+  const cars = useRef<CarState[]>(CARS.map(() => ({ owner: null, stage: 'parked', t: 0, s: 0 })));
+  const boarded = useMemo(() => new Set<string>(), []);
+  for (const p of people) {
+    if (presence.current.get(p.id) && p.present === false && !p.quit && !departing.current.has(p.id)) {
+      departing.current.add(p.id);
+      const free = cars.current.find(c => !c.owner && c.stage === 'parked');
+      if (free && !cars.current.some(c => c.owner === p.id)) free.owner = p.id;
+    }
+    if (p.present !== false || p.quit) departing.current.delete(p.id);
+  }
+  for (const c of cars.current) {
+    const owner = c.owner && people.find(p => p.id === c.owner);
+    if (c.owner && (!owner || owner.present !== false)) { boarded.delete(c.owner); c.owner = null; }
+  }
+  useEffect(() => { for (const p of people) presence.current.set(p.id, p.present !== false); });
   // The CEO resigning mid-session (not already gone when the view loads) triggers the cutscene.
   const [cutscene, setCutscene] = useState<Cutscene | null>(null);
   const ceo = people.find(p => p.role === 'CEO');
@@ -216,9 +299,12 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
         shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.03}
         shadow-camera-left={-22} shadow-camera-right={22} shadow-camera-top={22} shadow-camera-bottom={-22} shadow-camera-far={90} />
       <World />
+      <Cars cars={cars.current} boarded={boarded} speed={speed} paused={paused} />
       {people.map((p, i) => {
         const seat = seats.get(p.id)!;
-        const b = behaviourFor(p, records[p.id], i, people, nav, seats, panicking);
+        const isLeaving = departing.current.has(p.id);
+        const b = isLeaving ? leaving(p, i, people, nav, seats, cars.current.findIndex(c => c.owner === p.id))
+          : behaviourFor(p, records[p.id], i, people, nav, seats, panicking);
         const dz = seat.z + DESK_OFFSET;
         return <group key={p.id}>
           <mesh position={[seat.x + 0.4, FLOOR + 1.08, dz + 0.035]} scale={[0.58, 0.32, 0.01]} material={p.quit || p.present === false ? screenOff : screenOn}>
@@ -228,7 +314,7 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
             <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
-          <Agent3D key={`${p.id}:${p.present !== false || p.quit}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} selected={selected === p.id} highlighted={highlight.includes(p.id)}
+          <Agent3D key={`${p.id}:${p.present !== false || p.quit}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} onExit={() => boarded.add(p.id)} selected={selected === p.id} highlighted={highlight.includes(p.id)}
             line={line?.kind === 'agent' && line.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={id => { if (!p.quit && p.present !== false) setFollow(id); onSelect(id); }} />
         </group>;
       })}
