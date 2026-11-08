@@ -8,6 +8,7 @@ import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
 import { arrive, depart, isPresent } from './presence';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
+import type { BusinessEvent, BusinessNewsKind } from '../shared/events';
 import { availableActions, decide } from './bias';
 import { claimReach } from './claims';
 import {
@@ -218,6 +219,32 @@ function summarise(world: World, d: Decision, agentId: string, r: ResolveResult,
   return quit ? `${s} ${me} quits.` : s;
 }
 
+/** Sign follows the case's valence; the domain only picks which kind of good or bad news it is. */
+function newsKind(e: BusinessEvent, good: boolean): BusinessNewsKind {
+  if (good) return e.domain === 'sales' ? 'contract' : 'delivery';
+  return e.domain === 'security' ? 'security' : 'operating_review';
+}
+
+/**
+ * Business cases reach the market once each. A management public disclosure prices the case
+ * on its publicTick. Otherwise a true case is priced when its outcome is verified: a resolved
+ * positive case as good news, a failed case (deadline missed) as bad news. Archived false
+ * information and successfully handled problems are not news. `previous` is the start-of-tick
+ * world, whose price history holds every id already priced.
+ */
+function businessNews(previous: World, w: World, t: number): Array<{ id: string; kind: BusinessNewsKind; isTrue: boolean }> {
+  const priced = new Set(previous.price.news.map(n => n.id));
+  const out: Array<{ id: string; kind: BusinessNewsKind; isTrue: boolean }> = [];
+  for (const e of w.eventState.cases) {
+    const disclosed = `public-${e.id}`, outcome = `case-${e.id}`;
+    if (priced.has(disclosed) || priced.has(outcome)) continue;
+    if (e.publicTick === t) out.push({ id: disclosed, kind: newsKind(e, e.valence === 'positive'), isTrue: e.truth });
+    else if (e.publicTick === undefined && e.truth && e.status === 'resolved' && e.valence === 'positive') out.push({ id: outcome, kind: newsKind(e, true), isTrue: true });
+    else if (e.publicTick === undefined && e.truth && e.status === 'failed') out.push({ id: outcome, kind: newsKind(e, false), isTrue: true });
+  }
+  return out;
+}
+
 export interface TickResult {
   world: World;
   records: TickRecord[];
@@ -385,13 +412,15 @@ export async function runTick(
 
   const presence = depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
-  const activeBusinessSeats = Math.max(1, w.ids.filter(id => w.agents[id].status === 'active' && w.agents[id].present !== false).length);
   const valuation = updatePrice(world.price, {
     ...(config.business ? { operating: {
-      productiveUnits: (w.business.work.filter(r => r.tick === t).reduce((n,r) => n + Math.min(1,r.progress),0) + w.eventState.decisions.filter(d => d.tick === t).length * 0.5) / activeBusinessSeats,
+      // Only employee seats produce work records, so only they are in the denominator.
+      seats: Object.values(w.business.positions).filter(p => p.role === 'employee').length,
+      // Actual task-hours advanced, including the overwork increment (1.2).
+      productiveUnits: w.business.work.filter(r => r.tick === t).reduce((n,r) => n + r.progress,0),
       capacity: w.business.available,
       fundamentals: Math.max(-0.5,Math.min(0.5,(w.business.cash-w.business.startingCash)/w.business.startingCash*0.08)),
-      news: w.eventState.cases.filter(e => e.publicTick === t).map(e => ({ id: `public-${e.id}`, kind: (e.domain === 'security' ? 'security' : e.domain === 'sales' ? 'contract' : e.domain === 'people' ? 'operating_review' : 'delivery') as import('../shared/events').BusinessNewsKind, isTrue: e.truth })),
+      news: businessNews(world, w, t),
     } } : {}),
     tick: t, events, leaks, claims: w.claims, seats,
     // After 17:00 most desks are empty by design; output holds rather than crashing overnight.

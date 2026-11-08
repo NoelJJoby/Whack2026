@@ -296,8 +296,8 @@ export const setupParams = {
 
 /** Synthetic valuation assumptions; impacts and returns are in log-price units. */
 export const priceParams = {
-  initialPrice: 100, rho: 0.95, sigma: 0.005, oRef: 0.48,
-  outputAlpha: 0.2, outputFloor: 0.001, minPrice: 0.000001, maxPrice: 1000000000,
+  initialPrice: 100, rho: 0.95, sigma: 0.005, oRef: 0.902724,
+  outputAlpha: 0.3, outputFloor: 0.001, minPrice: 0.000001, maxPrice: 1000000000,
   refuteDelay: 6,
   trustCoefficient: 0.25, trustNegativeCap: 2, trustPositiveCap: 2,
   stressCoefficient: 0.3, stressCap: 1.5,
@@ -308,9 +308,11 @@ export const priceParams = {
   } as Record<Action, number>,
   overworkBonus: 0.3,
   impacts: {
-    contract: 0.022, security: -0.035, operating_review: -0.01, delivery: 0.018,
+    contract: 0.015, security: -0.035, operating_review: -0.01, delivery: 0.01,
     merger: -0.02, new_management: -0.01, long_hours_policy: 0.02,
-    pr_scandal: -0.08, layoffs_rumour: -0.03, surprise_bonus: 0.02,
+    pr_scandal: -0.08, layoffs_rumour: -0.03,
+    // Announced as profit-sharing after a record quarter: a signal of strength, so positive (was -0.01).
+    surprise_bonus: 0.01,
     competitor_poaching: -0.04, leak: -0.03,
   } as Record<EventType | 'leak' | import('../shared/events').BusinessNewsKind, number>,
 };

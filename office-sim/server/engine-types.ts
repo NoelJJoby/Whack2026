@@ -153,6 +153,17 @@ export interface ScenarioEvent {
 
 export type QueuedEvent = Omit<ScenarioEvent, 'tick'>;
 
+/** Price-relevant effects of a player-written event; priced by updatePrice, never by mutating price. */
+export interface CustomPriceEffect {
+  /** Log-price headline impact; replaces the base type's params.price.impacts entry. */
+  impact?: number;
+  /** Percent shift in output while the event lasts. */
+  productivity?: number;
+  /** Ticks the productivity shift lasts, from the tick it is announced. */
+  duration: number;
+}
+export interface AppliedEvent { type: EventType; is_true: boolean; claim: string; custom?: CustomPriceEffect }
+
 export interface World {
   business: Business;
   eventState: EventState;
@@ -327,7 +338,7 @@ export interface EngineTickLog {
   business?: { decisions: string[]; work: string[]; events: string[]; ledger: string[] };
   price: PriceRecord;
   tick: number;
-  events: Array<{ type: EventType; is_true: boolean; claim: string }>;
+  events: AppliedEvent[];
   order: string[];
   decisions: DecisionLog[];
   lines: Array<{ agent: string; public_line: string; inner_monologue: string }>;

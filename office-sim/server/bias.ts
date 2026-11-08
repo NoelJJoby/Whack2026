@@ -423,8 +423,13 @@ export function decide(input: DecideInput): Decision {
   const claim = settleClaim(action, selectedLlm, agent, world, beliefs, rngs('claim'), p);
   let target = settleTarget(action, claim, selectedLlm, agent, world, rngs('target'), p);
   const fallbackTask = fallbackWork(world,agent);
-  const taskProposal = proposal ?? (fallbackTask?.action === action || ['work','overwork'].includes(action) ? fallbackTask : null);
-  if (action === 'support_colleague') target = proposal?.target ?? null;
+  // Without an LLM proposal (rules/random, or a fallback), support needs a concrete colleague and task;
+  // otherwise the sampled turn is rejected by executeWork and wasted.
+  const supportable = action === 'support_colleague' && !proposal ? workContext(world,agent).supportable : [];
+  const supportPick = supportable.length ? supportable[rngs('target').int(supportable.length)] : null;
+  const taskProposal = proposal ?? (supportPick ? { action, weight: 1, task_id: supportPick.taskId, assignment_version: supportPick.version } as NonNullable<typeof fallbackTask>
+    : fallbackTask?.action === action || ['work','overwork'].includes(action) ? fallbackTask : null);
+  if (action === 'support_colleague') target = proposal?.target ?? supportPick?.colleagueId ?? null;
   if (action === 'report_issue') target = proposal?.target ?? world.business.positions[agent.id]?.supervisor ?? null;
   const evidenceId = proposal?.evidence_id ?? (action === 'report_issue' ? workContext(world,agent).evidence[0]?.id : undefined);
   const useLlmText = !fallback && llm && (llm.public_line || llm.inner_monologue);
