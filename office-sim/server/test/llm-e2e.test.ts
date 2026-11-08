@@ -11,7 +11,7 @@ import { createTurnProvider } from '../llm';
 import { DEFAULT_PARAMS as P } from '../params';
 import { FEELING_TABLES } from '../llm/bands';
 import { buildTurnPrompt, claimKeys } from '../llm/prompt';
-import { buildScenario, fixtureCast } from '../scripts/fixture';
+import { fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
 import { NO_REGEN_PARAMS } from './helpers';
 
@@ -127,7 +127,7 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
     captured.push({ tick: ctx.tick, agent: agent.id, ctx: structuredClone(ctx), prompt: buildTurnPrompt(agent, ctx) });
     return real(agent, ctx);
   };
-  const config: RunConfig = { seed, mode, ticks: 16, scenario: buildScenario(seed, 16), gossip: true, billboard: true, priceFeedback: false };
+  const config: RunConfig = { seed, mode, ticks: 16, scenario: [{ tick: 2, type: 'pr_scandal', isTrue: true }], gossip: true, billboard: true, priceFeedback: false };
   const originalKey = process.env.ANTHROPIC_API_KEY;
   const originalInfo = console.info;
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';
@@ -233,14 +233,15 @@ describe('LLM provider x engine: full run through the real provider chain', () =
       assert.ok(r.logs.some((l) => l.hops.length > 0) || r.logs.some((l) => l.events.length > 0), 'at least one live event or gossip step happened');
       assert.ok(captured.some((c) => c.ctx.claims.some((x) => r.world.claims[x.id].parentId !== null)) || r.logs.some((l) => l.events.length > 0), 'the model saw a real claim or the run processed scheduled events');
 
-      // Beliefs from the model are stored on every held, unverified claim the
-      // agent has had a turn since hearing (gossip on the last tick lands after the last turn).
-      const lastHops = new Set(r.logs.at(-1)!.hops.map((h) => `${h.to}:${h.delivered}`));
+      // Beliefs from the model are stored on every held, unverified claim the agent has
+      // had a turn since hearing. Gossip lands after the hour's turns, and people who go
+      // home at 17:00 have no turn until the next morning.
+      const turnedAfter = (id: string, tick: number) => r.logs.some((l) => l.tick > tick && l.order.includes(id));
       for (const id of r.world.ids) {
         const a = r.world.agents[id];
         if (a.status !== 'active') continue;
         for (const h of a.claims) {
-          if (h.verified || lastHops.has(`${id}:${h.claimId}`)) continue;
+          if (h.verified || !turnedAfter(id, h.tickHeard)) continue;
           assert.notEqual(h.belief, null, `${id} ${h.claimId}`);
         }
       }

@@ -84,13 +84,21 @@ fix.
 
 ## Design implemented
 
-The client keeps an ordered, tick-deduplicated presentation queue. A single
-`presentedTick` selects the `TickFrame` used by the HUD, agent visuals, dialogue
-and visible wire. The next frame becomes presented only after the current
-round's dialogue completes or is skipped; empty rounds advance immediately.
-When more than two future rounds wait, the oldest waiting rounds are skipped
-from the bar but remain in the wire/history. On initial history/reconnect the
-queue resumes at the latest completed frame without replaying old dialogue.
+The merged reactive-day implementation uses a stronger version of the proposed
+presentation queue: `usePresentation` owns one cursor and every HUD, agent
+visual, dialogue line and visible-wire entry comes from that cursor's
+`TickFrame`. The client de-duplicates replayed history by tick. On reconnect it
+resumes at the newest committed frame without replaying dialogue; reset starts
+a new cursor epoch.
+
+Rather than allowing a large frontend backlog and then dropping its dialogue,
+the server's presentation acknowledgement gate permits at most one computed
+hour ahead of the acknowledged cursor. This preserves every round and prevents
+the drift condition before it can accumulate. Completing/skipping a round (or
+the short dwell for an empty round) acknowledges that tick and releases the
+next one. This is more conservative than the requested two-round catch-up
+limit, but is preferable here because it preserves all business-event and CEO
+decision context while keeping the simulation and presentation synchronized.
 
 `TickRecord` is not changed: it already carries `tick`, and `DialogueLine`
 already copies the frame tick. The change ensures that stamp is preserved and

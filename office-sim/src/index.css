@@ -499,3 +499,9 @@ button.feed-entry:hover, button.feed-entry:focus-visible { background: #40504488
 .structured-injection { display: grid; gap: 10px; padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
 a:focus-visible, select:focus-visible { outline: 2px solid #ffe2a2; outline-offset: 3px; }
 @media (max-width: 600px) { .business-numbers { grid-template-columns: repeat(2,minmax(0,1fr)); } .wire-heading { flex-wrap: wrap; gap: 8px; } .event-story { font-size: 13px; } }
+
+.station.off-shift .sprite { filter: grayscale(1); opacity: .35; }
+.station.off-shift .monitor { opacity: .35; }
+.presence-label { display: block; position: absolute; top: calc(100% + 19px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; line-height: 1.2; color: #d0cbbd; }
+.dialogue-bar.narrator .dialogue-plate { color: #e2ad58; }
+.dialogue-bar.narrator .dialogue-text { padding-left: 12px; }

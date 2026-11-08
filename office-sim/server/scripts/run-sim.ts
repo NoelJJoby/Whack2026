@@ -106,7 +106,7 @@ export function configFromArgs(args: Record<string, string | boolean>): RunConfi
     seed,
     mode,
     ticks,
-    scenario: [],
+    scenario: args.calm ? CALM_SCENARIO : buildScenario(seed, ticks),
     business: true,
     gossip: !args['no-gossip'],
     billboard: !args['no-billboard'] && !args.calm,

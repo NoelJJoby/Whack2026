@@ -4,6 +4,7 @@ import { ceoSchema, opsSchema } from './llm/schemas';
 import { CATALOG } from './events/catalog';
 import { addEvidence, ensureResponseTasks, managementOwners, terminal } from './events/lifecycle';
 import { post } from './business';
+import { days } from '../shared/workday';
 import { withRequestMetrics } from './llm/telemetry';
 import type { CallMetrics } from './llm/client';
 
@@ -53,7 +54,7 @@ export function fallbackCeo(ctx: ManagementContext) {
       const option = options.find(o => !['layoff','monitor'].includes(o.kind) && o.cost <= cash) ?? options.find(o => o.kind === 'monitor')!;
       cash -= option.cost;
       return { eventId: e.id, optionId: option.id, priority: e.domain === 'security' ? 1 : e.valence === 'negative' ? 2 : 3, budget: option.cost,
-        deadline: Math.max(ctx.revision+1,e.deadline), acceptance: 'Completed acceptance work and verified business conditions.', communicate: [] as string[], reviewTick: Math.max(ctx.revision+1,Math.min(e.deadline,ctx.revision+5)) };
+        deadline: Math.max(ctx.revision+1,e.deadline), acceptance: 'Completed acceptance work and verified business conditions.', communicate: [] as string[], reviewTick: Math.max(ctx.revision+1,Math.min(e.deadline,ctx.revision+days(1))) };
     }), rationale: 'Preserve delivery, address urgent risks and use feasible non-layoff measures.' };
 }
 export function fallbackOps(ctx: ManagementContext) {

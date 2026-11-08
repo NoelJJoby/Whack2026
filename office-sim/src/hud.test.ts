@@ -7,15 +7,16 @@ import { clockAt } from '../server/llm/clock';
 import { StockPrice, stockSeries } from './StockPrice';
 import { mockHistory } from './mocks';
 
-test('workday maps 5 ticks per day across 30-day calendar months (with 2 routine filler days after 17:00) in a 150-tick quarter', () => {
+test('workday maps 8 ticks per day (09:00 to 23:00) across 30-day calendar months (2 routine filler days after 23:00) in a 240-tick quarter', () => {
   assert.deepEqual(workdayTime(0), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [], hour: 8, progress: 0 });
-  assert.deepEqual(workdayTime(1), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [], hour: 9, progress: 20 });
+  assert.deepEqual(workdayTime(1), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [], hour: 9, progress: 12.5 });
   assert.equal(workdayTime(3).hour, 13);
-  assert.deepEqual(workdayTime(5), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [2, 3], hour: 17, progress: 100 });
-  assert.deepEqual(workdayTime(6), { quarter: 1, month: 1, week: 1, day: 2, dayOfMonth: 4, fillerDays: [], hour: 9, progress: 20 });
-  assert.deepEqual(workdayTime(50), { quarter: 1, month: 1, week: 2, day: 10, dayOfMonth: 28, fillerDays: [29, 30], hour: 17, progress: 100 });
-  assert.deepEqual(workdayTime(51), { quarter: 1, month: 2, week: 3, day: 11, dayOfMonth: 1, fillerDays: [], hour: 9, progress: 20 });
-  assert.deepEqual(workdayTime(150), { quarter: 1, month: 3, week: 6, day: 30, dayOfMonth: 28, fillerDays: [29, 30], hour: 17, progress: 100 });
+  assert.deepEqual(workdayTime(5), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [], hour: 17, progress: 62.5 });
+  assert.deepEqual(workdayTime(8), { quarter: 1, month: 1, week: 1, day: 1, dayOfMonth: 1, fillerDays: [2, 3], hour: 23, progress: 100 });
+  assert.deepEqual(workdayTime(9), { quarter: 1, month: 1, week: 1, day: 2, dayOfMonth: 4, fillerDays: [], hour: 9, progress: 12.5 });
+  assert.deepEqual(workdayTime(80), { quarter: 1, month: 1, week: 2, day: 10, dayOfMonth: 28, fillerDays: [29, 30], hour: 23, progress: 100 });
+  assert.deepEqual(workdayTime(81), { quarter: 1, month: 2, week: 3, day: 11, dayOfMonth: 1, fillerDays: [], hour: 9, progress: 12.5 });
+  assert.deepEqual(workdayTime(240), { quarter: 1, month: 3, week: 6, day: 30, dayOfMonth: 28, fillerDays: [29, 30], hour: 23, progress: 100 });
 });
 test('frontend HUD and backend prompt clock share the same tick conversion through day rollover', () => {
   for (const tick of [0, 1, 5, 6, 50, 51, 150]) {
@@ -151,7 +152,8 @@ test('metric states use strict simulation boundaries and trust has the favourabl
 
 test('display adapters remove engine hour terminology from errors and accessible metric text', () => {
   assert.equal(playerText('A tick is running. Try again in 2 ticks. max_ticks'), 'A work period is running. Try again in 2 work periods. duration');
-  assert.equal(timeLabel(6), 'Day 4 (M1), 09:00');
+  assert.equal(timeLabel(9), 'Day 4 (M1), 09:00');
+  assert.equal(timeLabel(6), 'Day 1 (M1), 19:00');
   const markup = renderToStaticMarkup(createElement(MetricBar, { label: 'Trust in management', value: 82, threshold: 80 }));
   assert.ok(markup.includes('82 out of 100, Outside low-trust range'));
   assert.ok(markup.includes('Trust in management'));

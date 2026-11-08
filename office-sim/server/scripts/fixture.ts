@@ -3,9 +3,9 @@
 // dataCast() wraps the LLM and Data lane's cast in data.ts for comparison runs.
 import { buildAgentState, cast } from '../data';
 import type { EventType } from '../../shared/types';
-import { TICKS_PER_QUARTER } from '../../shared/workday';
+import { OFFICE_TICKS_PER_DAY, TICKS_PER_DAY, TICKS_PER_QUARTER } from '../../shared/workday';
 import type { CastMember, EngineTraits, ScenarioEvent } from '../engine-types';
-import { DEFAULT_PARAMS, eventParams, type Params } from '../params';
+import { DEFAULT_PARAMS, cadenceParams, eventParams, type Params } from '../params';
 import { placeholderPersonas } from '../llm/personas';
 import { stream } from '../rng';
 
@@ -167,9 +167,9 @@ export const RUMOUR_FALSE_CHANCE = 0.5;
 export const OFFICIAL_FALSE_CHANCE = 0.15;
 
 /**
- * A seeded billboard schedule: the first event lands on Day 1 (ticks 1-4) and
- * subsequent events land 22-26 ticks apart (~1 per workweek, 2 per month,
- * 6-7 per 150-tick quarter), types dealt from a reshuffled deck so none repeats
+ * A seeded billboard schedule: one shock in each period of
+ * params.cadence.shockPeriodDays workdays, on a random workday and office hour
+ * inside it (2-3 per 240-tick quarter), types dealt from a reshuffled deck so none repeats
  * until all have run, truth drawn per event, and each rumour starting from a
  * random colleague or the grapevine. Its first hearer is left to the event
  * stream at apply time. Extending maxTicks keeps the earlier events unchanged.
@@ -179,10 +179,11 @@ export function buildScenario(seed: number, maxTicks: number, ids: readonly stri
   const events: ScenarioEvent[] = [];
   const sources = ['grapevine', ...ids];
   let deck: EventType[] = [];
-  let tick = 0;
+  const periodDays = cadenceParams.shockPeriodDays;
 
-  while (true) {
-    tick += tick === 0 ? 1 + rng.int(4) : 22 + rng.int(5);
+  // One shock per period, on a random workday and office hour inside it.
+  for (let start = 0; ; start += periodDays * TICKS_PER_DAY) {
+    const tick = start + rng.int(periodDays) * TICKS_PER_DAY + 1 + rng.int(OFFICE_TICKS_PER_DAY);
     if (deck.length === 0) deck = rng.shuffle(CURATED_EVENT_TYPES);
     const type = deck.pop()!;
     const base = eventParams[type];
@@ -195,7 +196,7 @@ export function buildScenario(seed: number, maxTicks: number, ids: readonly stri
   return events;
 }
 
-/** Default seeded shock schedule for the checkpoint and ablations (1 quarter = 150 ticks). */
+/** Default seeded shock schedule for the checkpoint and ablations (1 quarter = 240 ticks). */
 export const SHOCK_SCENARIO: ScenarioEvent[] = buildScenario(42, TICKS_PER_QUARTER);
 
 /** No billboard events: the calm baseline. */

@@ -5,7 +5,8 @@ import { scheduleEvents } from './events/scheduler';
 import { managementPhase } from './management';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
-import { isOvertime, TICKS_PER_DAY } from '../shared/workday';
+import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
+import { arrive, depart, isPresent } from './presence';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import { availableActions, decide } from './bias';
 import { claimReach } from './claims';
@@ -95,6 +96,7 @@ export function createWorld(cast: CastMember[], seed: number, params: Params = D
       interviewTicks: [],
       baselineWorkload: rest.workload,
       claims: [],
+      present: true,
     };
   }
   const world: World = { business: initialiseBusiness(agents), eventState: initialEvents(seed), seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
@@ -124,7 +126,7 @@ export function buildContext(
     ...((world as World & { businessEnabled?: boolean }).businessEnabled ? { work: workContext(world,agent) } : {}),
     available: availableActions(agent, world, beliefs, params, { gossip: config.gossip }).available,
     colleagues: world.ids
-      .filter((id) => id !== agent.id && world.agents[id].status === 'active')
+      .filter((id) => id !== agent.id && isPresent(world, id))
       .map((id) => ({
         id,
         name: world.agents[id].profile.name,
@@ -241,6 +243,7 @@ export async function runTick(
   (w as World & { businessEnabled?: boolean }).businessEnabled = config.business ?? false;
   const assertCurrent = () => { if (config.isCurrent && !config.isCurrent()) throw new Error('run_changed'); };
   assertCurrent();
+  arrive(w);
   const feedbackDeltas = config.priceFeedback ? applyPriceFeedback(world.price, w.ids.map(id => w.agents[id]), params) : [];
 
   // 1. Apply events: scripted for this tick, then anything the judges queued.
@@ -271,12 +274,14 @@ export async function runTick(
       }
     }
     detectIncidents(w);
-    if (config.billboard) scheduleEvents(w);
-    await managementPhase(w,provider,config.mode,phase => { assertCurrent(); config.onPhase?.(phase); });
+    // New cases open and management meets in office hours only.
+    if (config.billboard && isOfficeHour(t)) scheduleEvents(w);
+    if (isOfficeHour(t)) await managementPhase(w,provider,config.mode,phase => { assertCurrent(); config.onPhase?.(phase); });
     assertCurrent(); config.onPhase?.('Employees working');
   }
   // 2. Agent turns in seeded random order.
-  const activeIds = w.ids.filter((id) => w.agents[id].status === 'active' && (!config.business || w.business.positions[id].role === 'employee'));
+  // After 17:00 only people who stayed late are in.
+  const activeIds = w.ids.filter((id) => isPresent(w, id) && (!config.business || w.business.positions[id].role === 'employee'));
   const order = stream(w.seed, t, '*', 'order').shuffle(activeIds);
 
   const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
@@ -354,8 +359,9 @@ export async function runTick(
       // Finite assigned capacity sets load; normal off-shift recovery makes healthy operation sustainable.
       const allocation = w.business.tasks.filter(task => task.owner === id && task.status === 'active').reduce((n,task) => n+task.allocated,0);
       a.baselineWorkload = Math.min(100,35+allocation*20);
-      if (t % TICKS_PER_DAY === 0) applyDelta(a,{ stress: -8, burnout: -4, trust_mgmt: 1 },params);
     }
+    // Off-shift recovery once a day, for everyone, when the office closes at 23:00.
+    if (isDayEnd(t)) for (const id of w.ids) if (w.agents[id].status === 'active') applyDelta(w.agents[id],{ stress: -8, burnout: -4, trust_mgmt: 1 },params);
     w.business.idle += Math.max(0,w.business.available-w.business.used);
     updateLifecycle(w);
   }
@@ -377,6 +383,7 @@ export async function runTick(
     }
   }
 
+  const presence = depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
   const valuation = updatePrice(world.price, {
     ...(config.business ? { operating: {
@@ -386,6 +393,8 @@ export async function runTick(
       news: w.eventState.cases.filter(e => e.publicTick === t).map(e => ({ id: `public-${e.id}`, kind: (e.domain === 'security' ? 'security' : e.domain === 'sales' ? 'contract' : e.domain === 'people' ? 'operating_review' : 'delivery') as import('../shared/events').BusinessNewsKind, isTrue: e.truth })),
     } } : {}),
     tick: t, events, leaks, claims: w.claims, seats,
+    // After 17:00 most desks are empty by design; output holds rather than crashing overnight.
+    officeClosed: isOvertime(t),
     postQuit: w.ids.map(id => ({ id, active: w.agents[id].status === 'active', state: w.agents[id].state })),
     feedback: config.priceFeedback ?? false, feedbackDeltas,
   }, params.price, stream(w.seed, t, '*', 'price'));
@@ -425,6 +434,7 @@ export async function runTick(
     states,
     reach: claimReach(w),
   };
+  if (presence) log.presence = presence;
   if (t === 1 && w.speech) log.voices = structuredClone(w.speech.voices);
   if (Object.keys(examples.added).length) log.examples = examples.added;
   if (speechLogs) log.speech = { ...speechLogs.summary, example_requests: examples.requests };
@@ -511,6 +521,7 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
       ...structuredClone(agent.state),
       status: agent.status,
       quit_tick: agent.quitTick,
+      present: agent.status === 'active' && agent.present !== false,
     };
   }
   const reach = claimReach(world);

@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { RunStore } from './run-store';
 import { Reporting, reportMarkdown } from './reporting';
+import { dayReport } from './day-report';
 import { CATALOG, eligible } from './events/catalog';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -50,13 +51,13 @@ loadEnv({
 const randomSeed = () => Math.floor(Math.random() * 1_000_000) + 1;
 const envSeed = Number(process.env.SIM_SEED);
 const DEFAULT_SEED = Number.isInteger(envSeed) && envSeed > 0 ? envSeed : randomSeed();
-/** Default run length (1 quarter = 30 days = 150 ticks), and the most ticks a run may be set to (2 quarters = 300 ticks). */
+/** Default run length (1 quarter = 30 workdays = 240 ticks), and the most ticks a run may be set to (2 quarters = 480 ticks). */
 export const DEFAULT_TICKS = TICKS_PER_QUARTER;
 export const TICK_LIMIT = TICKS_PER_QUARTER * 2;
-/** 150 ticks × 800ms = 120,000ms (2 minutes of real-life time at 1× speed). */
-const TICK_INTERVAL_MS = 800;
+/** Minimum gap between tick starts at 1× speed. */
+const TICK_INTERVAL_MS = DEFAULT_PARAMS.playback.tickIntervalMs;
 const HEARTBEAT_MS = 15_000;
-const MAX_HISTORY = 300;
+const MAX_HISTORY = TICK_LIMIT;
 const FEED_LINES = 20;
 const EVENT_TYPES = Object.keys(eventParams) as [EventType, ...EventType[]];
 /** Events of any kind waiting for the next tick; injecting more is refused. */
@@ -149,6 +150,7 @@ export class OfficeSimManager {
   private inFlight: Promise<void> | null = null;
   /** Bumped on reset so a tick that was in flight is discarded. */
   private generation = 0;
+  private presented = 0;
 
   constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider } = {}) {
     this.store = new RunStore(directory);
@@ -196,6 +198,7 @@ export class OfficeSimManager {
     }
     this.cast = fixtureCast(seed);
     this.world = recoverId ? this.store.recover(recoverId) : createWorld(this.cast, seed);
+    this.presented = this.world.tick;
     this.seed = seed;
     this.runId = recoverId ?? this.store.create(this.world).id;
     this.phase = null; this.storageError = null;
@@ -229,7 +232,7 @@ export class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: [], gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
+    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
   }
 
   state(): SimulationState {
@@ -276,7 +279,7 @@ export class OfficeSimManager {
   }
 
   private schedule(delayMs: number) {
-    if (this.timer || !this.running) return;
+    if (this.timer || !this.running || this.world.tick - this.presented >= 1) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.loop();
@@ -289,7 +292,7 @@ export class OfficeSimManager {
   }
 
   private async loop() {
-    if (!this.running) return;
+    if (!this.running || this.world.tick - this.presented >= 1) return;
     const started = performance.now();
     try {
       await this.runOne();
@@ -335,7 +338,18 @@ export class OfficeSimManager {
       text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
       ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
     }));
-    events.push(...result.world.eventState.cases.filter(e => e.openedTick === result.world.tick).map(e => ({ type: 'new_management' as const, is_true: e.truth, text: e.headline, business_id: e.id, custom: e.origin === 'injection' })));
+    // The office banner follows disclosure, not the spectator's private case list.
+    const shared = result.world.eventState.decisions.filter(d => d.tick === result.world.tick)
+      .flatMap(d => d.choices.filter(c => c.communicate.length).map(c => ({ choice: c, author: d.author })));
+    for (const e of result.world.eventState.cases) {
+      const disclosure = shared.find(s => s.choice.eventId === e.id);
+      if (!disclosure && e.publicTick !== result.world.tick) continue;
+      const recipients = disclosure?.choice.communicate ?? ['public'];
+      const told = recipients.includes('public') ? 'the public' : recipients.map(id => result.world.agents[id]?.profile.name ?? 'a colleague').join(', ');
+      const evidence = result.world.eventState.evidence.filter(x => x.eventId === e.id && x.tick === result.world.tick && x.source === disclosure?.author && x.recipients.some(id => recipients.includes(id)));
+      const text = evidence.map(x => x.text).join(' ') || disclosure?.choice.acceptance;
+      if (text) events.push({ type: 'new_management', is_true: e.truth, text: `Shared with ${told}: ${text}`, business_id: e.id, custom: e.origin === 'injection' } as typeof events[number]);
+    }
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
 
     // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.
@@ -357,6 +371,7 @@ export class OfficeSimManager {
     }
 
     const frame: TickFrame = { price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state() };
+    frame.day_report = dayReport(this.world, [...this.frames, frame]);
     this.frames.push(frame);
     if (this.frames.length > MAX_HISTORY) this.frames.shift();
     this.emit({ type: 'tick', frame, ...this.response() });
@@ -394,6 +409,15 @@ export class OfficeSimManager {
     this.running = false;
     this.clearTimer();
     this.emitState();
+    return this.response();
+  }
+
+  acknowledge(body: unknown) {
+    const parsed = z.object({ tick: z.number().int().min(0), run_id: z.string().optional() }).strict().safeParse(body);
+    if (!parsed.success || parsed.data.tick > this.world.tick) throw new ApiFailure(400, 'invalid_presented', 'Expected an already computed hour.');
+    if (parsed.data.run_id && parsed.data.run_id !== this.runId) throw new ApiFailure(409, 'run_changed', 'This acknowledgement belongs to a previous run.');
+    this.presented = Math.max(this.presented, parsed.data.tick);
+    if (!this.inFlight) this.schedule(0);
     return this.response();
   }
 
@@ -600,6 +624,7 @@ app.post('/api/sim/new-seed', async (request) => {
   return sim.reseed(seed);
 });
 app.post('/api/sim/step', async () => sim.step());
+app.post('/api/sim/presented', async request => sim.acknowledge(request.body));
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
 app.post('/api/sim/inject-business', async request => sim.injectBusiness(request.body));
 app.get('/api/event-catalog', async () => CATALOG);

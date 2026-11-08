@@ -1,4 +1,5 @@
 import { BURNOUT_STRESS_THRESHOLD, BURNOUT_RECOVERY_THRESHOLD } from '../shared/stressThresholds';
+import { days } from '../shared/workday';
 import type { Action, EventType } from '../shared/types';
 
 export const simParams = {
@@ -236,6 +237,8 @@ export const ruleParams = {
     leak: { trust_mgmt: -8, leakerStress: 5 },
   },
   overtime: { stress: 2, burnout: 1 },
+  /** After 17:00 an agent stays for the next hour if they overwork or their workload is at least this. */
+  stayLate: { workloadMin: 65 },
   passive: {
     /**
      * Stress relaxes toward target = stressBase + stressPerExcessWorkload * max(0, workload - comfortable),
@@ -273,6 +276,16 @@ export const quitParams = {
   /** Each interview within interviewWindow ticks lowers the burnout threshold by this. */
   interviewThresholdDrop: 10,
   interviewWindow: 3,
+};
+
+/** How often things happen, in active workdays. */
+export const cadenceParams = {
+  /** One common business case every this many workdays, at a random office hour. */
+  commonEveryDays: 1,
+  /** One rare business case at a random office hour in each period of this many workdays. */
+  rareEveryDays: 10,
+  /** One billboard shock (merger, layoffs, scandal...) at a random office hour in each period of this many workdays. */
+  shockPeriodDays: 14,
 };
 
 /** Run-level setup. */
@@ -336,6 +349,7 @@ export interface HabitDef {
 export const voiceParams = {
   /** Master switch: off means no manners, briefs, checks or example calls (cards are still dealt). */
   enabled: true,
+  news: { windowTicks: days(1), mannerMultipliers: { change_subject: 0, deflect_joke: 0.5 } },
   card: {
     register: {
       base: { casual: 1, plain: 1.5, corporate: 0.5, clipped: 0.5 },
@@ -471,7 +485,8 @@ export const voiceParams = {
     openerWords: 3,
     /** Word-trigram Jaccard similarity above this is flagged. */
     trigramThreshold: 0.5,
-    /** An echo opener has an event key term within this many leading words. */
+    /** Restating a headline above this trigram similarity is an echo. */
+    echoSimilarity: 0.35,
     echoWords: 5,
     /** Flagged lines get one regeneration, within the tick's request budget. */
     regenerate: true,
@@ -490,6 +505,7 @@ export const voiceParams = {
   bannedSentences: ['Sure.'],
   /** Case-insensitive regexes for archetype labels used as names. */
   labelPatterns: [
+    '\\b[cte]\\d+\\b',
     '\\bclimbers?\\b', '\\bloyalists?\\b', '\\bgossip hubs?\\b', '\\bs[ck]eptics?\\b',
     '\\bbreadwinners?\\b', '\\bflight risks?\\b', '\\bops (?:would|will|knows?|says?|thinks?|said)\\b',
   ],
@@ -518,6 +534,8 @@ export const DEFAULT_PARAMS = {
   setup: setupParams,
   price: priceParams,
   voice: voiceParams,
+  cadence: cadenceParams,
+  playback: { quietDwellMs: 1200, ackRetryMs: 1000, tickIntervalMs: 800, dialogueCap: 5, charsPerSecond: 70, punctuationPauseMs: 100, autoBaseMs: 1500, autoPerWordMs: 250, stressJump: 10 },
 };
 
 export type Params = typeof DEFAULT_PARAMS;

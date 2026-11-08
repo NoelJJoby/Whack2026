@@ -3,10 +3,10 @@ import { performance } from 'node:perf_hooks';
 import { createWorld, runTick } from '../tick';
 import { fixtureCast } from './fixture';
 import type { World } from '../engine-types';
-import { interval } from '../events/lifecycle';
-import { workdayTime } from '../../shared/workday';
+import { arrival } from '../events/lifecycle';
+import { TICKS_PER_MONTH, workdayTime } from '../../shared/workday';
 const seeds = Array.from({ length: Number(process.env.EVENT_SEEDS ?? 100) },(_,i) => i+1);
-const ticks = 600;
+const ticks = TICKS_PER_MONTH * 12;
 function metrics(w: World) {
   const b = w.business; const roots = w.eventState.cases;
   const arrivals = w.eventState.scheduling.filter(s => s.reason === 'scheduled');
@@ -37,7 +37,8 @@ for (const seed of seeds) {
   results.push(metrics(w));
 }
 const nominal = Object.fromEntries((['common','rare'] as const).map(rarity => {
-  const samples = seeds.flatMap(seed => Array.from({length: 30},(_,i) => interval(seed,rarity,i)));
+  // Gaps between successive nominal arrivals, in ticks.
+  const samples = seeds.flatMap(seed => { let due = arrival(seed,rarity,0,0); return Array.from({length: 30},(_,i) => { const next = arrival(seed,rarity,i+1,due); const gap = next-due; due = next; return gap; }); });
   return [rarity,{ min: Math.min(...samples), max: Math.max(...samples), mean: samples.reduce((n,v) => n+v,0)/samples.length }];
 }));
 const roots = results.reduce((n,r) => n+r.roots,0); const positive = results.reduce((n,r) => n+r.positive,0);
