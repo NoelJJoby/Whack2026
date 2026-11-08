@@ -35,6 +35,9 @@ const BriefSchema = z.object({
   public_line: text,
   inner_monologue: text,
   beliefs: z.record(z.unknown()).optional(),
+  emotion: z.string().optional(),
+  cause: z.string().optional(),
+  reply_to: z.string().optional(),
 });
 
 /** shared/types LlmTurn: one action, no weights, no beliefs. */
@@ -80,6 +83,7 @@ export function toLlmOutput(raw: unknown): AdaptResult {
   let public_line: string;
   let inner_monologue: string;
   let beliefs: Record<string, number> = {};
+  let extras: Pick<LlmOutput, 'emotion' | 'cause' | 'reply_to'> = {};
 
   const brief = BriefSchema.safeParse(value);
   if (brief.success) {
@@ -87,6 +91,8 @@ export function toLlmOutput(raw: unknown): AdaptResult {
     public_line = brief.data.public_line;
     inner_monologue = brief.data.inner_monologue;
     beliefs = cleanBeliefs(brief.data.beliefs);
+    const { emotion, cause, reply_to } = brief.data;
+    extras = { ...(emotion ? { emotion } : {}), ...(cause ? { cause } : {}), ...(reply_to ? { reply_to } : {}) };
   } else {
     const turn = TurnSchema.safeParse(value);
     if (!turn.success) return fail('schema_mismatch');
@@ -125,5 +131,5 @@ export function toLlmOutput(raw: unknown): AdaptResult {
   if (proposals.length === 0) return fail('no_valid_actions', dropped);
   if (proposals.reduce((s, p) => s + p.weight, 0) <= 0) return fail('zero_weights', dropped);
 
-  return { output: { proposals, public_line, inner_monologue, beliefs }, reason: null, dropped };
+  return { output: { proposals, public_line, inner_monologue, beliefs, ...extras }, reason: null, dropped };
 }

@@ -6,7 +6,8 @@ import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type Group
 import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
-import { Agent3D, type Behaviour, type Crowd } from './Agent3D';
+import { Agent3D, type Behaviour, type Crowd, type Emote } from './Agent3D';
+import { EMOTES, FOCUS_PRIORITY } from '../emotes';
 import { DESK_OFFSET, FLOOR, SEAT_LIST, seatFor, type Seat } from './layout';
 import { accessNode, buildNav, seatNode, type Nav } from './nav';
 import { carBoxes, glass, glow, solid } from './world';
@@ -289,6 +290,20 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     cam.updateProjectionMatrix();
     c.update();
   };
+  // Part A focus system: full speech bubbles for at most two conversations from the latest hour
+  // (the dialogue bar's speaker counts as one); everyone else shows only their emote.
+  const latestTick = Math.max(0, ...Object.values(records).map(r => r.tick));
+  const talk = EMOTES ? people.map(p => records[p.id]).filter((r): r is TickRecord => Boolean(r && r.tick === latestTick && r.conversation && r.public_line?.trim())) : [];
+  const ranked = [...talk].sort((a, b) => Number(Boolean(b.quit)) - Number(Boolean(a.quit)) || FOCUS_PRIORITY[a.conversation!.kind] - FOCUS_PRIORITY[b.conversation!.kind]);
+  const focusConvs = [...new Set(ranked.map(r => r.conversation!.id))].slice(0, line?.kind === 'agent' ? 1 : 2);
+  const focusSpeakers = talk.filter(r => focusConvs.includes(r.conversation!.id));
+  // Partners face each other: the opener faces who they address, the addressee and the replier face the other.
+  const faceTowards = new Map<string, string>();
+  for (const r of talk) { faceTowards.set(r.agent, r.conversation!.with); if (!faceTowards.has(r.conversation!.with)) faceTowards.set(r.conversation!.with, r.agent); }
+  const emoteFor = (p: Person): Emote | undefined => {
+    const r = records[p.id];
+    return EMOTES && r?.emotion && r.tick === latestTick && !p.quit && p.present !== false ? { emotion: r.emotion, intensity: r.intensity ?? 1, key: `${r.tick}:${r.emotion}`, conversation: r.conversation } : undefined;
+  };
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
   return <div className="o3-scene">
     <Canvas fallback={fallback} orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
@@ -314,7 +329,10 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
             <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
-          <Agent3D key={`${p.id}:${p.present !== false || p.quit}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} onExit={() => boarded.add(p.id)} selected={selected === p.id} highlighted={highlight.includes(p.id)}
+          <Agent3D key={`${p.id}:${p.present !== false || p.quit}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} onExit={() => boarded.add(p.id)}
+            emote={emoteFor(p)} faceTowards={EMOTES ? faceTowards.get(p.id) ?? null : null}
+            convLine={focusSpeakers.find(r => r.agent === p.id)?.public_line ?? null}
+            convDelay={(() => { const mine = focusSpeakers.find(r => r.agent === p.id); return mine?.conversation?.role === 'reply' && focusSpeakers.some(r => r.agent !== p.id && r.conversation?.id === mine.conversation?.id) ? 1.5 : 0; })()} selected={selected === p.id} highlighted={highlight.includes(p.id)}
             line={line?.kind === 'agent' && line.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={id => { if (!p.quit && p.present !== false) setFollow(id); onSelect(id); }} />
         </group>;
       })}

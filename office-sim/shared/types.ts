@@ -97,7 +97,16 @@ export interface TickRecord {
   quit?: boolean;
   state?: AgentState;
   decision?: DecisionLog;
+  /** Validated emotion (server/emotion.ts) and how strongly it shows, 1-3. */
+  emotion?: Emotion;
+  intensity?: 1 | 2 | 3;
+  /** The trigger behind the emotion or action, in words. */
+  cause?: string | null;
+  /** This line opens or replies to a short conversation. */
+  conversation?: { id: string; kind: 'confrontation' | 'venting' | 'gossip' | 'task'; role: 'open' | 'reply'; with: string };
 }
+
+export type Emotion = 'neutral' | 'happy' | 'excited' | 'stressed' | 'anxious' | 'frustrated' | 'angry' | 'sad' | 'skeptical' | 'surprised';
 
 export interface LlmTurn {
   action: Action;

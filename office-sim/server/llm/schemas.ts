@@ -9,5 +9,5 @@ export const employeeProposalSchema = z.union([
   z.object({ action: z.literal('support_colleague'), weight: z.number().nonnegative(), ...task, target: z.string() }).strict(),
   z.object({ action: z.literal('report_issue'), weight: z.number().nonnegative(), evidence_id: z.string(), target: z.string() }).strict(), social,
 ]);
-export const employeeSchema = z.object({ proposals: z.array(employeeProposalSchema).min(1).max(3), public_line: z.string().max(400), inner_monologue: z.string().max(400), beliefs: z.record(z.number().min(0).max(100)) }).strict();
+export const employeeSchema = z.object({ proposals: z.array(employeeProposalSchema).min(1).max(3), public_line: z.string().max(400), inner_monologue: z.string().max(400), beliefs: z.record(z.number().min(0).max(100)), emotion: z.string().max(20).optional(), cause: z.string().max(80).optional(), reply_to: z.string().max(80).optional() }).strict();
 export const reportSchema = z.object({ schemaVersion: z.literal(1), kind: z.literal('report'), sections: z.array(z.object({ title: z.string().max(120), observations: z.array(z.object({ evidenceIds: z.array(z.string()).min(1).max(12), metricIds: z.array(z.string()).max(12), assessment: z.enum(['observed','recommendation']), text: z.string().min(1).max(600) }).strict()).min(1).max(12) }).strict()).min(1).max(8) }).strict();

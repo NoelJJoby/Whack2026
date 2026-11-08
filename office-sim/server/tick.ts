@@ -7,6 +7,9 @@ import { initialiseBusiness, openBusinessTick } from './business';
 import { initialEvents, openEvent, updateLifecycle } from './events/lifecycle';
 import { scheduleEvents } from './events/scheduler';
 import { managementPhase } from './management';
+import { computeTriggers, recordPeers, type Trigger } from './triggers';
+import { settleEmotion, type SettledEmotion } from './emotion';
+import { advanceConversations, incomingFor, type Incoming } from './conversations';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
@@ -325,6 +328,10 @@ export async function runTick(
   // After 17:00 only people who stayed late are in.
   const activeIds = w.ids.filter((id) => isPresent(w, id) && (!config.business || w.business.positions[id].role === 'employee'));
   const order = stream(w.seed, t, '*', 'order').shuffle(activeIds);
+  // Causes and conversations: what is bothering each agent, and who just said something to them.
+  const triggers: Record<string, Trigger[]> = {};
+  const incoming: Record<string, Incoming | null> = {};
+  for (const id of activeIds) { triggers[id] = computeTriggers(w, w.agents[id], events); incoming[id] = incomingFor(w, id); }
 
   const llm: Record<string, { output: LlmOutput | null; reason: string | null; providerLog?: ProviderLog }> = {};
   // Voice: manners are drawn in turn order before the calls (server/speech.ts).
@@ -338,6 +345,8 @@ export async function runTick(
     for (const id of activeIds) {
       contexts[id] = buildContext(w, w.agents[id], config, events, params);
       if (styles[id]) contexts[id].speech = speechContext(w, id, styles[id], params);
+      contexts[id].triggers = triggers[id];
+      if (incoming[id]) contexts[id].incoming = incoming[id]!;
     }
     const results = await Promise.all(
       activeIds.map((id) =>
@@ -386,6 +395,13 @@ export async function runTick(
       agent: id, public_line: decisions[id].public_line, inner_monologue: decisions[id].inner_monologue,
     })), params);
   }
+
+  // Emotions are validated against the triggers; replies and targeted actions advance conversations.
+  const emotions: Record<string, SettledEmotion> = {};
+  for (const id of order) emotions[id] = settleEmotion(w.agents[id], decisions[id].action, triggers[id] ?? [], llm[id]?.output?.emotion, llm[id]?.output?.cause);
+  const conversations = advanceConversations(w, order, decisions, emotions, incoming,
+    Object.fromEntries(order.map(id => [id, llm[id]?.output?.reply_to])), LLM_MODES.includes(config.mode) && Boolean(provider));
+  recordPeers(w, decisions);
 
   const seats = w.ids.map(id => ({ id, action: decisions[id]?.action ?? null, burnout: w.agents[id].state.burnout }));
 
@@ -463,6 +479,10 @@ export async function runTick(
     agent: id,
     target: decisions[id].target,
     summary: config.business ? `${w.agents[id].profile.name}: ${w.business.work.find(r => r.id === `work-${t}-${id}`)?.outcome ?? 'No assigned work'}.` : summarise(w, decisions[id], id, results[id], quits.includes(id)),
+    emotion: emotions[id].emotion,
+    intensity: emotions[id].intensity,
+    cause: emotions[id].cause?.text ?? null,
+    ...(conversations[id] ? { conversation: conversations[id] } : {}),
   }));
 
   const states: EngineTickLog['states'] = {};

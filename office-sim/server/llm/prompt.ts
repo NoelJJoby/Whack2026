@@ -101,7 +101,14 @@ export function buildTurnPrompt(
     public_line: '<what you say out loud>',
     inner_monologue: '<what you honestly think>',
     beliefs: Object.fromEntries(ctx.claims.map(claim => [keys.get(claim.id), 50])),
+    emotion: 'neutral',
   };
+  const triggers = ctx.triggers ?? [];
+  const inc = ctx.incoming;
+  const incomingGuide = inc?.kind === 'confrontation' ? 'They are blaming you. Answer for yourself: defend, apologise or push back, in character.'
+    : inc?.kind === 'venting' ? 'They are venting about something you share. A sympathetic reply fits better than a hostile one.'
+    : inc?.kind === 'task' ? 'They are talking about the work. Answer about the task.'
+    : 'They are passing something on. Say whether you buy it.';
   const limit = speech?.minimal ? `This time: one to ${v.words.minimalMax === 4 ? 'four' : v.words.minimalMax} words.` : '';
   const clock = workdayTime(ctx.tick);
 
@@ -123,6 +130,10 @@ export function buildTurnPrompt(
       ? `Just announced:\n${ctx.events.map(event => `- ${JSON.stringify(event.text)}`).join('\n')}`
       : 'Nothing new has been announced.',
     speech?.news?.length ? `News that affects you:\n${speech.news.map(text => `- ${JSON.stringify(text)}`).join('\n')}` : '',
+    triggers.length
+      ? `What is actually bothering you (cause keys):\n${triggers.map((t, i) => `- k${i + 1}: ${t.text}${t.severity >= 3 ? ' (this really gets to you)' : ''}`).join('\n')}`
+      : 'Nothing in particular is bothering you right now.',
+    inc ? `${inc.fromName} just said to you: ${JSON.stringify(inc.line)}${inc.cause ? ` (because ${inc.cause})` : ''}. ${incomingGuide} To answer them, set "reply_to": "r1" and reply in public_line.` : '',
     `Colleagues still here: ${ctx.colleagues.map(c => (c.group ? `${c.name} (${c.group})` : c.name)).join(', ') || 'None.'}`,
     `What you can do:\n${ctx.available.map(action => `- ${action}: ${actionMeanings[action]}`).join('\n')}\nComplain, gossip and verify need a colleague's name as "target". When proposing gossip, verify or leak, you may give a claim key from above (such as c1) as "claim".`,
     ...(ctx.work ? ['Work, overwork and review_work require a task key (such as t1) as task_id; include only action, weight and task_id for these actions. support_colleague also requires the named colleague as target. report_issue requires an evidence key (such as e1) as evidence_id and a management colleague name as target. Omit fields that do not apply to the action, including null fields. Use only the authorised combinations above; current assignment versions are filled in automatically.'] : []),
@@ -146,6 +157,14 @@ export function buildTurnPrompt(
       `- About ${v.words.publicMax} words at most.${limit ? ` ${limit}` : ''}`,
       `Your thoughts ("inner_monologue") are honest and direct, in the same voice, at most ${v.words.innerMax} words: what you really make of the news, whether you believe it, what it means for you, and what you'll do.`,
     ].join('\n'),
+    [
+      `How you come across ("emotion"): exactly one of neutral, happy, excited, stressed, anxious, frustrated, angry, sad, doubtful, surprised.`,
+      '- Base it on your personality, how you feel, the work in front of you and what is bothering you above. Your public line and thoughts must match it.',
+      '- "angry" or "frustrated" need a cause key from the list above in "cause"; otherwise they will be ignored.',
+      '- If you complain or pass on a rumour, set "cause" to the key (such as k1) that explains it, and aim it at the colleague involved or at someone affected by the same thing.',
+      triggers.length ? '' : '- With nothing bothering you, stay neutral to positive and focused on your work.',
+      ctx.events.length ? '- News reached you this hour: your emotion is your reaction to it.' : '',
+    ].filter(Boolean).join('\n'),
     speech?.nudge ? nudgeText(speech.nudge) : '',
     `Respond with JSON only, in this shape: ${JSON.stringify(example)}\nGive 1 to 3 proposals, one per ${ctx.work ? 'action and task' : 'action'}, using only the available actions above. Weights are relative, non-negative and need not sum to one. Target and claim are optional or null; use only names and keys shown above. Public and inner lines express mood, without claiming an action has already happened, because the engine may select a different action. Write complete sentences that fit the limits; never cut off mid-thought. For each claim you've heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.`,
   ].filter(Boolean).join('\n\n');
@@ -173,6 +192,10 @@ export function restoreIds(raw: unknown, ctx: TurnContext): unknown {
       }
       : p));
   }
+  // Cause keys (k1...) and the reply key (r1) map back to trigger and conversation ids.
+  const causes = new Map((ctx.triggers ?? []).map((t, i) => [`k${i + 1}`, t.id]));
+  if (typeof out.cause === 'string') out.cause = causes.get(out.cause.trim().toLowerCase()) ?? out.cause;
+  if (typeof out.reply_to === 'string' && out.reply_to.trim().toLowerCase() === 'r1' && ctx.incoming) out.reply_to = ctx.incoming.id;
   if ('target' in out) out.target = target(out.target);
   if ('claim_id' in out) out.claim_id = claim(out.claim_id);
   if (out.beliefs && typeof out.beliefs === 'object' && !Array.isArray(out.beliefs)) {

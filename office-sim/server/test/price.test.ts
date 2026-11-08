@@ -298,7 +298,9 @@ test('feedback off preserves the versioned legacy fixture over ten seeds and thi
     const logs = r.logs.map(({ price: _price, voices: _v, examples: _e, speech: _s, ...log }) => ({
       ...log, decisions: log.decisions.map(({ speech: _d, ...d }) => d),
     }));
-    results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs, records: r.records });
+    // Emotion and conversation fields are new record metadata, stripped the same way.
+    const records = r.records.map(({ emotion: _em, intensity: _in, cause: _ca, conversation: _cv, ...rec }) => rec);
+    results.push({ seed, agents: r.world.agents, claims: r.world.claims, logs, records });
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
   // v2: false announcements no longer apply factual shocks; added employee actions are explicitly masked.

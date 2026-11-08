@@ -19,6 +19,7 @@ import { usePresentation } from './usePresentation';
 import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
 import { DialogueBar, type Speaker } from './DialogueBar';
+import { EMOTES, FEED_EMOJI } from './emotes';
 import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company' | 'scorecard' | 'leaderboard';
@@ -93,7 +94,7 @@ export default function App() {
       says: record?.public_line ?? '', thinks: record?.inner_monologue ?? '', quit: s?.status === 'quit' || s?.status === 'laid_off',
     };
   }), [cast, latest, state, presentation.frame, presentation.previous, presenceFinished, hour]);
-  const entries = useMemo(() => feedEntries(history), [history]);
+  const entries = useMemo(() => feedEntries(history, EMOTES ? { names: Object.fromEntries(cast.map(c => [c.id, c.name])), emoji: FEED_EMOJI } : undefined), [history, cast]);
   const objective = sim.companyTasks.find(t => isActiveObjective(t.status));
   const objectiveWork = objective ? (state?.business?.tasks ?? []).filter(t => t.id.startsWith(objectiveWorkPrefix(objective.id))) : [];
   const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
@@ -157,7 +158,7 @@ export default function App() {
       <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
         {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
           const content = <><div className="feed-meta"><span className={entry.tone ?? (entry.label === 'Resignation' ? 'coral' : '')}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
-          return entry.ids.length ? <button className="feed-entry" key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
+          return entry.ids.length ? <button className={`feed-entry${entry.reply ? ' reply' : ''}`} key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
         })}
         {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
       </div>
