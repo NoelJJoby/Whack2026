@@ -71,26 +71,31 @@ describe('role calls through the actual Anthropic prompt, parser, schemas and en
   it('orders CEO → Ops → employees and books, earns and collects one client contract', async () => {
     const old = process.env.ANTHROPIC_API_KEY; process.env.ANTHROPIC_API_KEY = 'test-only';
     const calls: Array<{ kind: string; ctx: unknown }> = [];
-    const provider = createTurnProvider({ fetch: async (_url,init) => {
+    const employeeContexts: NonNullable<TurnContext['work']>[] = [];
+    const transport = createTurnProvider({ fetch: async (_url,init) => {
       const request = JSON.parse(String(init?.body)); const prompt = request.messages[0].content as string;
       const managementLine = prompt.split('\n').find(l => l.startsWith('{"schemaVersion":1,"kind":') && l.includes('"actor"'));
       let output: unknown;
       if (managementLine) {
         const ctx = JSON.parse(managementLine) as ManagementContext; calls.push({kind:ctx.kind,ctx});
         output = ctx.kind === 'ceo' ? fallbackCeo(ctx) : fallbackOps(ctx);
-      } else if (prompt.includes('Small talk only:')) {
+      } else if (prompt.includes('Ordinary remarks at work:')) {
         output = { lines: ['Rain again.', 'The bus was late.', 'I made soup.'] };
       } else {
-        const prefix = 'Your current role, supervisor, assignments, directive versions and known evidence: ';
+        const prefix = 'Respond with JSON only, in this shape: ';
         const line = prompt.split('\n').find(l => l.startsWith(prefix))!;
-        const ctx = JSON.parse(line.slice(prefix.length)) as NonNullable<TurnContext['work']>;
+        const example = JSON.parse(line.slice(prefix.length));
         const regenerating = prompt.includes('You were going to say:') || prompt.includes('Your thoughts were going to be:');
-        calls.push({kind:regenerating ? 'speech' : 'employee',ctx});
-        const task = ctx.reviewable[0] ?? ctx.assignments[0];
-        output = { proposals: [task ? { action: ctx.reviewable.length ? 'review_work' : 'work', weight: 1, task_id: task.id, assignment_version: task.version } : { action: 'slack_off', weight: 1 }], public_line:'I will follow the current plan.', inner_monologue:'I should check the acceptance criteria.', beliefs:{} };
+        calls.push({kind:regenerating ? 'speech' : 'employee',ctx:prompt});
+        output = { ...example, public_line:'I will follow the current plan.', inner_monologue:'I should check the acceptance criteria.' };
       }
       return new Response(JSON.stringify({ id:'test', type:'message', role:'assistant', model:'fixture', content:[{type:'text',text:JSON.stringify(output)}], stop_reason:'end_turn', usage:{input_tokens:100,output_tokens:100} }),{ status:200,headers:{'content-type':'application/json'} });
     } });
+    const provider: TurnProvider = async (agent, ctx) => {
+      if (ctx.work && !ctx.speech?.nudge) employeeContexts.push(structuredClone(ctx.work));
+      return transport(agent, ctx);
+    };
+    provider.styleExamples = transport.styleExamples;
     try {
       let w = queueEvent(world(),{type:'new_management',templateId:'client_win'});
       const before = structuredClone(w); w = await advance(w,1,provider);
@@ -100,7 +105,6 @@ describe('role calls through the actual Anthropic prompt, parser, schemas and en
       assert.deepEqual(before.business.contracts.length,3);
       assert.equal(w.business.contracts.length,4); assert.equal(w.business.bookings,10_000_000);
       const e = w.eventState.cases[0]; assert.equal(e.target,100_000_000); assert.equal(e.value/e.target,0.1);
-      const employeeContexts = calls.filter(c => c.kind === 'employee').map(c => c.ctx as NonNullable<TurnContext['work']>);
       assert.ok(employeeContexts.some(c => c.assignments.some(t => t.eventId === e.id && t.directiveId)));
       assert.ok(employeeContexts.some(c => c.directives.some(d => d.eventId === e.id && d.version === 1)));
       assert.equal(w.business.contracts.at(-1)!.recognised,0); assert.equal(w.business.contracts.at(-1)!.collected,0);

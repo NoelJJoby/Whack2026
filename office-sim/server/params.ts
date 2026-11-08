@@ -534,6 +534,7 @@ export const DEFAULT_PARAMS = {
   price: priceParams,
   voice: voiceParams,
   cadence: cadenceParams,
+  playback: { quietDwellMs: 1200, ackRetryMs: 1000, tickIntervalMs: 800, dialogueCap: 5, charsPerSecond: 70, punctuationPauseMs: 100, autoBaseMs: 1500, autoPerWordMs: 250, stressJump: 10 },
 };
 
 export type Params = typeof DEFAULT_PARAMS;
