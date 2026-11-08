@@ -4,12 +4,12 @@ import { Html } from '@react-three/drei';
 import { Color, type Group } from 'three';
 import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
-import { playerText } from '../hudModel';
+import { AgentActivity } from './AgentActivity';
 import { FLOOR } from './layout';
 import { PANIC_NODES, seatNode, type Nav } from './nav';
 import { mat, unitBox } from './voxel';
 import type { Emotion, TickRecord } from '../../shared/types';
-import { EMOTES, EMOTE_ICON } from '../emotes';
+import { EMOTES } from '../emotes';
 
 const PANTS = '#2c3040', SHOES = '#1c1d22', EYES = '#241c22', SWEAT = '#d6f1ff', BOX = '#c08a4e';
 const WALK = 2.6; // units per second at 1x
@@ -45,29 +45,9 @@ function Part({ p, s, c }: { p: [number, number, number]; s: [number, number, nu
   return <mesh geometry={unitBox} material={mat(c)} position={p} scale={s} castShadow />;
 }
 
-const clip = (text: string) => { const t = playerText(text); return t.length > 60 ? `${t.slice(0, 58).trimEnd()}…` : t; };
-
-/** The dialogue bar's current line, above its speaker: speech bubble, plus a thought cloud when thoughts are on. */
-function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine; showThoughts: boolean }) {
-  const thought = showThoughts && line.inner ? line.inner : '';
-  if (!line.publicLine && !thought) return null;
-  return <div className="o3-stack">
-    {thought && <div className="o3-bubble thought"><small>{name} thinks</small><span>{clip(thought)}</span></div>}
-    {line.publicLine && <div className="o3-bubble speech"><small>{name} says</small><span>{clip(line.publicLine)}</span></div>}
-  </div>;
-}
-
 /** This agent's emotion this hour, from their latest record (server-validated). */
 export interface Emote { emotion: Emotion; intensity: 1 | 2 | 3; key: string; conversation?: TickRecord['conversation'] }
 const EMOTE_SECONDS = 2.5;
-
-/** A conversation line in a speech bubble, optionally a beat after the other speaker. */
-function ConvBubble({ name, text, delay, pinned = false }: { name: string; text: string; delay: number; pinned?: boolean }) {
-  const [shown, setShown] = useState(delay <= 0);
-  useEffect(() => { if (delay <= 0) return; setShown(false); const id = setTimeout(() => setShown(true), delay * 1000); return () => clearTimeout(id); }, [text, delay]);
-  if (!shown) return null;
-  return <div className="o3-stack"><div className={`o3-bubble speech${pinned ? ' announce' : ''}`}><small>{name} {pinned ? 'announces' : 'says'}</small><span>{pinned ? playerText(text) : clip(text)}</span></div></div>;
-}
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
@@ -112,11 +92,12 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const offShift = person.present === false && !person.quit;
   const startsGone = person.quit || (offShift && !departing);
   const [gone, setGone] = useState(startsGone);
+  const [entered, setEntered] = useState(!arriving);
   const [leaveStage, setLeaveStage] = useState<'pack' | 'bye' | 'go'>('pack');
   const home = nav.pos.get(seatNode(person.id)) ?? [0, 0];
   const startNode = arriving ? 'exit' : seatNode(person.id);
   const start = nav.pos.get(startNode) ?? home;
-  const mv = useRef({ x: start[0], z: start[1], node: startNode, queue: [] as string[], heading: 0, t: phase, gone: startsGone, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null, leaveT: 0, byeT: 0, stage: 'pack', emoteT: 0, arrivalDelay: arriving ? phase * 0.35 : 0 });
+  const mv = useRef({ x: start[0], z: start[1], node: startNode, queue: [] as string[], heading: 0, t: phase, gone: startsGone, entered: !arriving, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null, leaveT: 0, byeT: 0, stage: 'pack', emoteT: 0, arrivalDelay: arriving ? phase * 0.35 : 0 });
   // Ticks can outpace walking: finish the current move, then switch. Quitting and panic interrupt at once.
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
@@ -187,6 +168,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       if (d <= step) { m.x = tx; m.z = tz; m.node = id; m.queue.shift(); }
       else { m.x += (dx / d) * step; m.z += (dz / d) * step; m.heading = Math.atan2(dx, dz); }
     }
+    // Entrance visibility follows the actual walk, including staggering, pauses and speed changes.
+    if (!m.entered && m.node === 'doorIn') { m.entered = true; setEntered(true); }
     let arrived = !m.queue.length;
     if (arrived && (k === 'quit' || (leaving && m.goal === behaviour.goal))) {
       m.gone = true; crowd.delete(person.id); setGone(true); if (leaving) onExit?.(); return;
@@ -303,13 +286,11 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   // The bubble or action tag rides in the label's own overlay, pinned just above the name in screen
   // space, so it never covers the name at any zoom or font size.
   const tag = k === 'leave' ? (leaveStage === 'bye' ? 'bye!' : leaveStage === 'pack' ? 'packing up' : behaviour.tag) : behaviour.tag;
-  const overhead = gone ? null : line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
-    : convLine ? <ConvBubble name={person.name} text={convLine} delay={convDelay} pinned={k === 'announce'} />
-    : tag ? <div className={`o3-tag ${k}`}>{tag}</div> : null;
   const label = <Html position={[0, gone ? 0.65 : 1.85, 0]} center zIndexRange={[4, 0]} className="o3-person-anchor">
     <div className="o3-overhead">
-      {overhead && <div className="o3-above">{overhead}</div>}
-      {!gone && emoteShown && emote && <div className={`o3-emote ${emote.emotion} i${emote.intensity}`} aria-label={emote.emotion}>{EMOTE_ICON[emote.emotion]}</div>}
+      <AgentActivity visible={entered && !gone} name={person.name} line={line} showThoughts={showThoughts}
+        convLine={convLine} convDelay={convDelay} pinned={k === 'announce'} tag={tag} kind={k}
+        emote={emoteShown ? emote : undefined} />
       <button className={`o3-person ${offShift || gone ? 'off-shift' : ''}`} data-employee={person.id}
         aria-label={`Inspect ${person.name}`} aria-haspopup="dialog" aria-expanded={selected} onClick={event => { event.stopPropagation(); inspect(); }}>
         {person.name}{(person.quit || (offShift && gone) || person.late) && <small className={!person.quit && offShift ? 'o3-presence' : undefined}>{person.quit ? person.action : offShift ? 'Left for the day' : 'Working late'}</small>}
