@@ -115,3 +115,20 @@ export function engineLabel(mode: string | null, reason: string | null): string 
   if (reason === 'llm_failed') return 'Rules mode · LLM unavailable';
   return 'Rules mode';
 }
+
+/** Mock CEO model choices. Selecting one only changes the label; the engine keeps running its current model. */
+export const CEO_MODEL_OPTIONS = [
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5' },
+  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5' },
+  { id: 'gpt-5', label: 'OpenAI GPT-5' },
+  { id: 'gpt-5-mini', label: 'OpenAI GPT-5 mini' },
+  { id: 'gemini-2.5-pro', label: 'Google Gemini 2.5 Pro' },
+  { id: 'gemini-2.5-flash', label: 'Google Gemini 2.5 Flash' },
+  { id: 'mistral-large', label: 'Mistral Large' },
+  { id: 'mistral-small', label: 'Mistral Small' },
+  { id: 'llama-3.3-70b', label: 'Meta Llama 3.3 70B' },
+  { id: 'deepseek-v3', label: 'DeepSeek V3' },
+  { id: 'qwen-2.5-72b', label: 'Alibaba Qwen 2.5 72B' },
+  { id: 'grok-4', label: 'xAI Grok 4' },
+] as const;
