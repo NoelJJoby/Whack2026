@@ -105,9 +105,8 @@ function hasTerm(t: string[], terms: readonly string[]): boolean {
  * Echo opener: a key term within the first `firstWords` words, or a first
  * sentence that is a question containing one ("Twenty-hour days? Sure.").
  */
-export function isEchoOpener(line: string, terms: readonly string[], firstWords: number): boolean {
+export function isEchoOpener(line: string, terms: readonly string[], _firstWords?: number): boolean {
   if (terms.length === 0) return false;
-  if (hasTerm(tokens(line).slice(0, firstWords), terms)) return true;
   const first = sentences(line)[0] ?? '';
   return first.endsWith('?') && hasTerm(tokens(first), terms);
 }

@@ -23,7 +23,7 @@ interface RunFile {
   usage?: { requests: number };
 }
 
-interface Line { tick: number; agent: string; said: string; thought: string; llm: boolean; manner: string | null }
+interface Line { tick: number; agent: string; said: string; thought: string; llm: boolean; manner: string | null; news: string[] }
 
 function load(path: string): RunFile {
   return JSON.parse(readFileSync(path, 'utf8')) as RunFile;
@@ -43,6 +43,7 @@ function linesOf(run: RunFile): Line[] {
     return {
       tick: l.tick, agent: x.agent, said: x.public_line ?? '', thought: x.inner_monologue ?? '',
       llm: Boolean(d && !d.fallback && d.effective_mode !== 'rules'), manner: d?.speech?.manner ?? null,
+      news: d?.speech?.news ?? [],
     };
   }));
 }
@@ -77,6 +78,7 @@ function pairs<T>(xs: T[]): Array<[T, T]> {
 interface Metrics {
   lines: number;
   echo: { hits: number; of: number };
+  onTopic: { hits: number; of: number };
   sameOpeners: number;
   meanTrigram: number;
   banned: number;
@@ -94,6 +96,11 @@ function measure(run: RunFile, scope: 'llm' | 'all'): Metrics {
   const lines = linesOf(run).filter((l) => l.said && (scope === 'all' || l.llm));
   const terms = termsByTick(run);
   const onEvent = lines.filter((l) => terms.has(l.tick));
+  const news = lines.filter(l => l.news.length);
+  const touches = (l: Line) => l.news.some(text => {
+    const words = tokens(l.said).join(' ');
+    return eventTerms({ type: null, text }, V.eventKeyTerms).some(term => words.includes(term));
+  });
   const rounds = byTick(lines);
   const sims = rounds.flatMap((r) => pairs(r).map(([a, b]) => trigramSimilarity(a.said, b.said)));
   const mannerRounds = byTick(linesOf(run).filter((l) => l.manner)).filter((r) => r.length >= 6);
@@ -104,7 +111,8 @@ function measure(run: RunFile, scope: 'llm' | 'all'): Metrics {
   const lead = (t: string) => tokens(t).slice(0, V.speech.thoughtEchoWords).join(' ');
   return {
     lines: lines.length,
-    echo: { hits: onEvent.filter((l) => terms.get(l.tick)!.some((t) => isEchoOpener(l.said, t, V.speech.echoWords))).length, of: onEvent.length },
+    onTopic: { hits: news.filter(touches).length, of: news.length },
+    echo: { hits: news.filter(l => l.news.some(text => isEchoOpener(l.said, eventTerms({ type: null, text }, V.eventKeyTerms)) || trigramSimilarity(l.said, text) > V.speech.echoSimilarity)).length, of: news.length },
     sameOpeners: rounds.reduce((n, r) => n + pairs(r).filter(([a, b]) => openerMatch(a.said, b.said, 3)).length, 0),
     meanTrigram: sims.length ? sims.reduce((a, b) => a + b, 0) / sims.length : 0,
     banned: lines.filter((l) => bannedHits(l.said, V).length > 0).length,
@@ -130,7 +138,8 @@ function table(base: RunFile | null, next: RunFile, scope: 'llm' | 'all'): strin
   const b = base ? measure(base, scope) : null;
   const n = measure(next, scope);
   const rows: Array<[string, string, string, string, boolean | null]> = [
-    ['Echo openers (event ticks)', '< 10%', b ? pct(b.echo.hits, b.echo.of) : '-', pct(n.echo.hits, n.echo.of), n.echo.of ? n.echo.hits / n.echo.of < 0.1 : null],
+    ['Public lines touching heard news', '>= 70%', b ? pct(b.onTopic.hits, b.onTopic.of) : '-', pct(n.onTopic.hits, n.onTopic.of), n.onTopic.of ? n.onTopic.hits / n.onTopic.of >= 0.7 : null],
+    ['Headline restatements (news hours)', '< 10%', b ? pct(b.echo.hits, b.echo.of) : '-', pct(n.echo.hits, n.echo.of), n.echo.of ? n.echo.hits / n.echo.of < 0.1 : null],
     ['Same first 3 words, same round (pairs)', '0', b ? String(b.sameOpeners) : '-', String(n.sameOpeners), n.sameOpeners === 0],
     ['Mean pairwise trigram similarity', '< baseline', b ? b.meanTrigram.toFixed(4) : '-', n.meanTrigram.toFixed(4), b ? n.meanTrigram < b.meanTrigram : null],
     ['Banned-phrase hits (lines)', '0', b ? String(b.banned) : '-', String(n.banned), n.banned === 0],

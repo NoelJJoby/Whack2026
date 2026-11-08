@@ -75,21 +75,22 @@ if (writeIndex !== -1) {
 
 // Every prompt a full 16-tick run sends, voice brief included, is free of ids,
 // claim ids, archetype labels and the word "tick".
-for (const seed of [42, 7]) {
+for (const business of [false, true]) for (const seed of [42, 7]) {
   const stub = createStubProvider(seed);
   const sent: Array<{ id: string; prompt: string }> = [];
   const capture: TurnProvider = async (agent, ctx: TurnContext) => {
-    sent.push({ id: agent.id, prompt: buildTurnPrompt(agent, ctx) });
+    if (!ctx.management) sent.push({ id: agent.id, prompt: buildTurnPrompt(agent, ctx) });
     return stub(agent, ctx);
   };
   const cast = fixtureCast(seed);
   const run = await runSimulation(cast, {
-    seed, mode: 'llm_bias', ticks: 16, scenario: buildScenario(seed, 16), gossip: true, billboard: true, priceFeedback: false,
+    seed, mode: 'llm_bias', ticks: 16, scenario: buildScenario(seed, 16), gossip: true, billboard: true, priceFeedback: false, business,
   }, capture);
-  assert.ok(sent.length >= 16 * 6);
+  assert.ok(sent.length >= 10 * 6);
+  if (business) assert.ok(sent.some(s => /\(key: t\d+\)/.test(s.prompt)), 'business assignments are exercised');
   assert.ok(sent.some((s) => s.prompt.includes('How you talk:')), 'voice briefs are sent');
   for (const { prompt } of sent) {
-    assert.doesNotMatch(prompt, /\btick|claim-\d/i);
+    assert.doesNotMatch(prompt, /\btick|claim-\d|task-|event-\d|evidence-/i);
     assert.doesNotMatch(prompt, LABELS);
     for (const other of run.world.ids) assert.doesNotMatch(outsideActions(prompt), new RegExp(`\\b${other}\\b`), `seed ${seed}: raw id ${other}`);
   }

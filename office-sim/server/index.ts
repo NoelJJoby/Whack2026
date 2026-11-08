@@ -335,7 +335,18 @@ export class OfficeSimManager {
       text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
       ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
     }));
-    events.push(...result.world.eventState.cases.filter(e => e.openedTick === result.world.tick).map(e => ({ type: 'new_management' as const, is_true: e.truth, text: e.headline, business_id: e.id, custom: e.origin === 'injection' })));
+    // The office banner follows disclosure, not the spectator's private case list.
+    const shared = result.world.eventState.decisions.filter(d => d.tick === result.world.tick)
+      .flatMap(d => d.choices.filter(c => c.communicate.length).map(c => ({ choice: c, author: d.author })));
+    for (const e of result.world.eventState.cases) {
+      const disclosure = shared.find(s => s.choice.eventId === e.id);
+      if (!disclosure && e.publicTick !== result.world.tick) continue;
+      const recipients = disclosure?.choice.communicate ?? ['public'];
+      const told = recipients.includes('public') ? 'the public' : recipients.map(id => result.world.agents[id]?.profile.name ?? 'a colleague').join(', ');
+      const evidence = result.world.eventState.evidence.filter(x => x.eventId === e.id && x.tick === result.world.tick && x.source === disclosure?.author && x.recipients.some(id => recipients.includes(id)));
+      const text = evidence.map(x => x.text).join(' ') || disclosure?.choice.acceptance;
+      if (text) events.push({ type: 'new_management', is_true: e.truth, text: `Shared with ${told}: ${text}`, business_id: e.id, custom: e.origin === 'injection' } as typeof events[number]);
+    }
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
 
     // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.

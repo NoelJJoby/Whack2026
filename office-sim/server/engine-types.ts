@@ -176,6 +176,7 @@ export interface World {
 export interface SpeechState {
   voices: Record<string, VoiceCard>;
   lastManner: Record<string, Manner>;
+  workSeen?: Record<string, { signature: string; tick: number }>;
   /** Public lines of the last few rounds, for the prompt and the repetition check. */
   recent: Array<{ tick: number; agent: string; line: string; thought?: string }>;
   /** Example small-talk lines per agent; [] once tried and failed. Acts as the run's cache. */
@@ -184,6 +185,7 @@ export interface SpeechState {
 
 /** The style brief the prompt builder renders. */
 export interface SpeechContext {
+  news?: string[];
   /** "How you talk" brief, without the label. */
   voice: string;
   /** "This time" instruction, without the label. */

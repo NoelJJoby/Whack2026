@@ -205,6 +205,8 @@ export function stanceFor(trustMgmt: number, p: VoiceParams): Stance {
 }
 
 export interface TurnStyle {
+  /** News this employee actually heard, retained in logs for relevance metrics. */
+  news?: string[];
   manner: Manner;
   stance: Stance;
   /** Colleague id for talk_to_colleague and comment_on_other. */
@@ -215,6 +217,7 @@ export interface TurnStyle {
 }
 
 export interface MannerOptions {
+  news?: boolean;
   hasColleagues: boolean;
   last: Manner | null;
   /** Manners already drawn this round, with counts. */
@@ -227,6 +230,7 @@ export function mannerWeights(card: VoiceCard, signals: Signals, stance: Stance,
   w[TELL_MANNER[card.tell]] *= m.tellBoost;
   if (card.humour === 'none') for (const [k, f] of Object.entries(m.noHumour)) w[k as Manner] *= f;
   for (const [k, f] of Object.entries(m.stance[stance] ?? {})) w[k as Manner] *= f;
+  if (o.news) for (const [key, factor] of Object.entries(p.news.mannerMultipliers)) w[key as Manner] *= factor;
   if (!o.hasColleagues) w.talk_to_colleague = w.comment_on_other = 0;
   for (const k of MANNERS) if ((o.round[k] ?? 0) >= m.roundCap) w[k] = 0;
   if (o.last) w[o.last] = 0;
@@ -304,7 +308,7 @@ function lengthText(card: VoiceCard, p: VoiceParams): string {
 }
 
 /** The "How you talk" brief (no stance line when stance is null). A believer's sarcasm reads as dry: cynicism needs fallen trust. */
-export function describeVoice(card: VoiceCard, stance: Stance | null, habitsShown: boolean, p: VoiceParams): string {
+export function describeVoice(card: VoiceCard, stance: Stance | null, habitsShown: boolean, p: VoiceParams, showTopics = false): string {
   const humour = stance === 'believer' && card.humour === 'sarcastic' ? 'dry' : card.humour;
   const habits = habitsShown
     ? card.habits.map((id) => p.card.habits.find((h) => h.id === id)?.text).filter(Boolean).join(' ')
@@ -314,7 +318,7 @@ export function describeVoice(card: VoiceCard, stance: Stance | null, habitsShow
     REGISTER_TEXT[card.register], lengthText(card, p), HUMOUR_TEXT[humour],
     `When you're unhappy you ${TELL_TEXT[card.tell]}.`,
     habits,
-    b ? `You like to talk about ${a}, and ${b}.` : a ? `You like to talk about ${a}.` : '',
+    showTopics ? (b ? `You like to talk about ${a}, and ${b}.` : a ? `You like to talk about ${a}.` : '') : '',
     stance ? STANCE_TEXT[stance] : '',
   ].filter(Boolean).join(' ');
 }
@@ -322,6 +326,21 @@ export function describeVoice(card: VoiceCard, stance: Stance | null, habitsShow
 /** The "This time" instruction. */
 export function describeManner(style: TurnStyle, nameOf: (id: string) => string, p: VoiceParams): string {
   const who = style.addressee ? nameOf(style.addressee) : 'a colleague';
+  if (style.news?.length) {
+    const news: Record<Manner, string> = {
+      deflect_joke: 'make a joke about what the news means for your work.',
+      practical_question: 'ask one concrete question about what the news means for your work.',
+      change_subject: 'react to the news in your own words.',
+      personal_aside: 'say what the news means for you personally.',
+      overly_positive: 'put an overly bright spin on the news.',
+      minimal: `give a one-to-${num(p.words.minimalMax)}-word reaction to the news.`,
+      talk_to_colleague: `say what you make of the news directly to ${who}, using their name.`,
+      comment_on_other: `remark on how ${who} is taking the news.`,
+      set_boundary: "say what you will or won't do in response to the news.",
+      gallows: 'make a dark joke about the consequences of the news.',
+    };
+    return news[style.manner];
+  }
   switch (style.manner) {
     case 'deflect_joke': return 'make a joke in your own style about something nearby, not the news itself.';
     case 'practical_question': return 'ask one concrete question about your own work or your day.';
@@ -341,9 +360,9 @@ export function describeManner(style: TurnStyle, nameOf: (id: string) => string,
 export function examplesPrompt(name: string, voice: string, p: VoiceParams): string {
   const n = num(p.examples.count);
   return [
-    `Write ${n} short things ${name} might say at the coffee machine, to show how they talk.`,
+    `Write ${n} short things ${name} might say at work, to show how they talk.`,
     `How ${name} talks (written to them): ${voice}`,
-    'Small talk only: the weekend, hobbies, home, food, the weather, the commute. Nothing about work news, announcements, the company, leadership or colleagues.',
+    'Ordinary remarks at work: tasks, deadlines, colleagues and everyday concerns. Do not invent news or outcomes.',
     `Each line at most ${p.words.examplesMax} words. Make the ${n} lines different from each other.`,
     `Respond with JSON only, in this shape: {"lines": [${Array(p.examples.count).fill('"..."').join(', ')}]}`,
   ].join('\n\n');

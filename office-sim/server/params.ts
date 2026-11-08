@@ -1,4 +1,5 @@
 import { BURNOUT_STRESS_THRESHOLD, BURNOUT_RECOVERY_THRESHOLD } from '../shared/stressThresholds';
+import { days } from '../shared/workday';
 import type { Action, EventType } from '../shared/types';
 
 export const simParams = {
@@ -348,6 +349,7 @@ export interface HabitDef {
 export const voiceParams = {
   /** Master switch: off means no manners, briefs, checks or example calls (cards are still dealt). */
   enabled: true,
+  news: { windowTicks: days(1), mannerMultipliers: { change_subject: 0, deflect_joke: 0.5 } },
   card: {
     register: {
       base: { casual: 1, plain: 1.5, corporate: 0.5, clipped: 0.5 },
@@ -483,7 +485,8 @@ export const voiceParams = {
     openerWords: 3,
     /** Word-trigram Jaccard similarity above this is flagged. */
     trigramThreshold: 0.5,
-    /** An echo opener has an event key term within this many leading words. */
+    /** Restating a headline above this trigram similarity is an echo. */
+    echoSimilarity: 0.35,
     echoWords: 5,
     /** Flagged lines get one regeneration, within the tick's request budget. */
     regenerate: true,

@@ -3,11 +3,17 @@ import { describe, it } from 'node:test';
 
 import { voiceParams } from '../../params';
 import { workdayTime } from '../../../shared/workday';
-import { clockAt, heardWhen } from '../clock';
+import { clockAt, dueWhen, heardWhen } from '../clock';
 
 const c = voiceParams.clock;
 
 describe('clock', () => {
+  it('renders deadlines without internal counters', () => {
+    assert.equal(dueWhen(1, 4), 'by 15:00 today');
+    assert.equal(dueWhen(1, 11), 'by tomorrow 13:00');
+    assert.equal(dueWhen(1, 25), 'in three days, by 09:00');
+    assert.equal(dueWhen(9, 5), 'overdue since day 1, 17:00');
+  });
   it('reads the shared workday: eight ticks a day, 09:00 to 23:00', () => {
     for (const [tick, day, hour] of [[0, 1, 8], [1, 1, 9], [3, 1, 13], [5, 1, 17], [6, 1, 19], [8, 1, 23], [9, 2, 9], [16, 2, 23]]) {
       assert.deepEqual(clockAt(tick), { day, hour }, `tick ${tick}`);

@@ -48,9 +48,9 @@ assert.ok(prompt.includes("(key: c3), from the grapevine, a couple of hours ago.
 assert.ok(prompt.includes('A new manager arrives.'));
 assert.ok(prompt.includes('Colleagues still here: Rae'));
 assert.ok(prompt.includes('Public and inner lines express mood, without claiming an action has already happened'));
-assert.ok(prompt.includes("- Don't repeat, quote or name the announcement. Don't open with a question about it."));
+assert.ok(prompt.includes("React to the news in your own words"));
 assert.ok(prompt.includes('- About 15 words at most.'));
-assert.ok(prompt.includes("at most 30 words. Start them from what's on your mind, not with the announcement, and don't copy the facts above."));
+assert.ok(prompt.includes('at most 30 words: what you really make of the news'));
 assert.ok(prompt.includes('"running on fumes"') && prompt.includes('"Sure."'), 'banned phrases are listed');
 assert.ok(prompt.includes('For each claim you\'ve heard, say how likely you think it is to be true, from 0 to 100, in "beliefs", keyed by claim key. Give one integer for every claim key.'));
 assert.doesNotMatch(prompt, /\btick|claim-[abc]|\ba2\b|grapevine,? heard/i);

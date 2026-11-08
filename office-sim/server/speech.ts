@@ -18,6 +18,7 @@ import {
 } from './llm/voice';
 import type { Params, VoiceParams } from './params';
 import { stream } from './rng';
+import { workContext } from './tasks';
 
 const subject = (world: World, id: string) => ({
   id, traits: world.agents[id].profile.traits, state: world.agents[id].state,
@@ -50,15 +51,25 @@ export function planRound(world: World, order: readonly string[], p: Params): Re
     const agent = world.agents[id];
     const card = speech.voices[id];
     if (!card) continue;
+    const recent = (tick: number) => tick <= world.tick && world.tick - tick < p.voice.news.windowTicks;
+    const work = (world as World & { businessEnabled?: boolean }).businessEnabled ? workContext(world, agent) : undefined;
+    const news = agent.claims.filter(c => recent(c.tickHeard)).map(c => world.claims[c.claimId].text);
+    news.push(...(work?.evidence ?? []).filter(e => recent(e.deliveryTick)).map(e => e.text));
+    news.push(...(work?.directives ?? []).filter(d => recent(d.effectiveTick)).map(d => d.acceptance));
+    const assignments = [...work?.assignments ?? [], ...work?.reviewable ?? []];
+    const signature = assignments.map(t => `${t.id}:${t.version}`).join('|');
+    speech.workSeen ??= {};
+    if (speech.workSeen[id]?.signature !== signature) speech.workSeen[id] = { signature, tick: world.tick };
+    if (signature && recent(speech.workSeen[id].tick)) news.push(...assignments.map(t => t.title));
     const colleagues = world.ids
-      .filter((o) => o !== id && world.agents[o].status === 'active')
+      .filter((o) => o !== id && world.agents[o].status === 'active' && world.agents[o].present !== false)
       .map((o) => ({ id: o, affinity: agent.state.affinity[o] ?? p.rules.defaultAffinity }));
     const style = sampleStyle(
       stream(world.seed, world.tick, id, 'manner'), card, signalsOf(agent.profile.traits, agent.state),
-      agent.state.trust_mgmt, colleagues, { last: speech.lastManner[id] ?? null, round }, p.voice,
+      agent.state.trust_mgmt, colleagues, { last: speech.lastManner[id] ?? null, round, news: news.length > 0 }, p.voice,
     );
     round[style.manner] = (round[style.manner] ?? 0) + 1;
-    out[id] = style;
+    out[id] = { ...style, news: [...new Set(news)] };
   }
   return out;
 }
@@ -76,7 +87,8 @@ export function speechContext(world: World, id: string, style: TurnStyle, p: Par
   const card = speech.voices[id];
   const name = nameOf(world);
   return {
-    voice: describeVoice(card, style.stance, style.habits_shown, p.voice),
+    news: style.news,
+    voice: describeVoice(card, style.stance, style.habits_shown, p.voice, style.manner === 'change_subject'),
     manner: describeManner(style, name, p.voice),
     minimal: style.manner === 'minimal',
     feelings: card.feelings,
@@ -128,7 +140,7 @@ type Said = { agent: string; line: string };
  */
 export function checkLine(
   agent: string, line: string, earlier: readonly Said[], recent: readonly Said[],
-  terms: readonly string[][], p: VoiceParams,
+  terms: readonly string[][], p: VoiceParams, headlines: readonly string[] = [],
 ): LineCheck {
   const flags: string[] = [];
   let against: string | null = null;
@@ -146,7 +158,7 @@ export function checkLine(
   for (const b of bannedHits(line, p)) flags.push(`banned:${b}`);
   if (patternHits(line, p.labelPatterns).length) flags.push('label');
   if (patternHits(line, p.tickPatterns).length) flags.push('tick');
-  if (terms.some((t) => isEchoOpener(line, t, p.speech.echoWords))) flags.push('echo');
+  if (terms.some((t) => isEchoOpener(line, t, p.speech.echoWords)) || headlines.some(h => trigramSimilarity(line, h) > p.speech.echoSimilarity)) flags.push('echo');
   return { flags, against };
 }
 
@@ -165,8 +177,6 @@ export function checkThought(
   if (others([...earlier, ...recent]).some((o) => trigramSimilarity(thought, o.line) > p.speech.trigramThreshold)) flags.push('thought:similar');
   if (patternHits(thought, p.labelPatterns).length) flags.push('thought:label');
   if (patternHits(thought, p.tickPatterns).length) flags.push('thought:tick');
-  const lead = tokens(thought).slice(0, p.speech.thoughtEchoWords).join(' ');
-  if (terms.some((t) => isEchoOpener(lead, t, p.speech.thoughtEchoWords))) flags.push('thought:echo');
   return flags;
 }
 
@@ -202,7 +212,9 @@ export async function reviewRound(input: ReviewInput): Promise<{ logs: Record<st
   const speakers = order.filter((id) => lineOf(id));
   const before = (id: string) => speakers.slice(0, speakers.indexOf(id));
   const flagsFor = (id: string): LineCheck => {
-    const line = checkLine(id, lineOf(id), before(id).map((a) => ({ agent: a, line: lineOf(a) })), recent, terms, v);
+    const headlines = styles[id]?.news ?? [];
+    const knownTerms = headlines.map(text => eventTerms({ type: null, text }, v.eventKeyTerms));
+    const line = checkLine(id, lineOf(id), before(id).map((a) => ({ agent: a, line: lineOf(a) })), recent, knownTerms, v, headlines);
     const thought = v.speech.checkThoughts && thoughtOf(id)
       ? checkThought(id, thoughtOf(id), before(id).filter(thoughtOf).map((a) => ({ agent: a, line: thoughtOf(a) })), recentThoughts, terms, v)
       : [];
