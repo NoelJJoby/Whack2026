@@ -192,7 +192,7 @@ function Cars({ cars, boarded, speed, paused }: { cars: CarState[]; boarded: Set
   </group>)}</>;
 }
 
-export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, panic = false, paused = false, fallback }: {
+export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, panic = false, paused = false, showDebug = false, fallback }: {
   people: Person[];
   selected: string | null;
   onSelect: (id: string) => void;
@@ -205,12 +205,19 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
   /** Playback speed: scales walking and animation only. */
   speed?: number;
   paused?: boolean;
+  /** The HUD's existing debug key controls development diagnostics, including FPS. */
+  showDebug?: boolean;
   fallback?: ReactNode;
   /** Placeholder reaction to a catastrophic event: everyone still employed runs about flailing. */
   panic?: boolean;
 }) {
   const [previewing, setPreviewing] = useState(false);
+  const [showHint, setShowHint] = useState(true);
   useEffect(() => { if (PREVIEW) { const id = setTimeout(() => setPreviewing(true), 3000); return () => clearTimeout(id); } }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 6000);
+    return () => clearTimeout(timer);
+  }, []);
   // The CEO preview seats the CEO first (even if they already quit this run), then makes them resign.
   // Home-time preview: everyone in, then all but two (who stay late) go home.
   const people = useMemo(() => PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: previewing, present: true, action: previewing ? 'Resigned' : p.action } : p)
@@ -291,7 +298,8 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
   };
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
   return <div className="o3-scene">
-    <Canvas fallback={fallback} orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
+    <Canvas fallback={fallback} orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}
+      onPointerMove={event => { if (event.buttons) setShowHint(false); }} onWheel={() => setShowHint(false)}>
       <color attach="background" args={['#14203a']} />
       <PerformanceMonitor onDecline={() => setMaxDpr(1)} />
       <hemisphereLight args={['#c9d6ff', '#6b4a2a', 1.4]} />
@@ -322,7 +330,7 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
       <Director focus={focus} crowd={crowd} controls={controls} onLost={cutscene ? endCutscene : () => setFollow(null)} />
-      {import.meta.env.DEV && <Stats className="o3-stats" />}
+      {import.meta.env.DEV && showDebug && <Stats className="o3-stats" />}
     </Canvas>
     {cutscene && <div className={`o3-cutscene ${cutscene.ending ? 'out' : ''}`} role="status">
       <i className="bar top" /><i className="bar bottom" />
@@ -336,6 +344,6 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
       <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>
       <button onClick={() => zoom(0.8)} aria-label="Zoom out">−</button>
     </div>
-    <p className="o3-hint">Drag to orbit · Scroll to zoom</p>
+    <p className={`o3-hint ${showHint ? '' : 'dismissed'}`}>Drag to orbit · Scroll to zoom</p>
   </div>;
 }

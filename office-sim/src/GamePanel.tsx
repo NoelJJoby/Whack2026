@@ -29,6 +29,23 @@ export function MenuPanel({ title, onClose, children }: { title: string; onClose
   }}><div className="tool-heading"><h2 id="tool-title">{title}</h2><button className="close" autoFocus onClick={onClose} aria-label={`Close ${title}`}>×</button></div><div className="tool-content">{children}</div></dialog>;
 }
 
+/** A non-modal panel keeps the rail available, so players can switch tools directly. */
+export function RailPanel({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panel.current?.querySelector<HTMLButtonElement>('.close')?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+    };
+    document.addEventListener('keydown', escape);
+    return () => document.removeEventListener('keydown', escape);
+  }, [onClose]);
+  return <aside ref={panel} id={id} className="rail-panel" role="dialog" aria-labelledby={`${id}-title`}>
+    <div className="rail-panel-heading"><h2 id={`${id}-title`}>{title}</h2><button className="close" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>
+    <div className="rail-panel-content">{children}</div>
+  </aside>;
+}
+
 export function MetricBar({ label, value, threshold }: { label: Metric; value: number; threshold: number }) {
   const status = metricState(label, value, threshold);
   const displayValue = Number(value.toFixed(1));

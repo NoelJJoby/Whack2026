@@ -21,7 +21,7 @@
 .o3-bubble.thought::before, .o3-bubble.thought::after { content: ''; position: absolute; left: 50%; border-radius: 50%; background: #2a3550e6; border: 1px dashed #8e9bb8; }
 .o3-bubble.thought::before { width: 8px; height: 8px; bottom: -11px; margin-left: -6px; }
 .o3-bubble.thought::after { width: 4px; height: 4px; bottom: -17px; margin-left: -1px; }
-.o3-stats { top: auto !important; bottom: 8px; left: auto !important; right: 8px; }
+.o3-stats { top: auto !important; bottom: calc(var(--hud-gap, 16px) + 160px); left: auto !important; right: var(--hud-gap, 16px); }
 /* Action tags over heads (hidden while that agent is speaking). */
 .o3-tag { width: max-content; padding: 2px 6px; font: 13px/1.3 "VT323", monospace; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
 .o3-tag.complain { background: #e8947f; }
@@ -33,12 +33,12 @@
 .o3-tag.overwork { background: #e05b3b; color: #fff; }
 @keyframes o3-blink { 50% { opacity: .25; } }
 
-/* Zoom buttons and hint, bottom-right (above the dev fps meter). */
-.o3-zoom { position: absolute; right: 16px; bottom: 76px; display: flex; flex-direction: column; gap: 8px; }
+/* Zoom buttons and temporary orbit hint share the bottom-right HUD region. */
+.o3-zoom { position: absolute; right: var(--hud-gap, 16px); bottom: calc(var(--hud-gap, 16px) + 60px); display: flex; flex-direction: column; gap: 8px; }
 .o3-zoom button { width: 40px; height: 40px; font-size: 24px; line-height: 1; color: #d7b66c; background: #13203aeb; border: 1px solid #d7b66c; border-radius: 6px; }
 .o3-zoom button:hover { background: #1d2d4f; }
-.o3-hint { position: absolute; right: 16px; bottom: 56px; margin: 0; font-size: 13px; color: #b5bfb0; pointer-events: none; }
-@media (max-width: 1300px) { .o3-hint { display: none; } }
+.o3-hint { position: absolute; right: var(--hud-gap, 16px); bottom: var(--hud-gap, 16px); margin: 0; font-size: 13px; color: #b5bfb0; pointer-events: none; opacity: 1; transition: opacity .35s ease; }
+.o3-hint.dismissed { opacity: 0; }
 
 .o3-tag.panic { background: #f04a3a; color: #fff; font-weight: 700; animation: o3-blink .3s steps(2) infinite; }
 

@@ -86,7 +86,7 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
 
   // Space pause/play, Enter or N next, S skip round, A auto, M voices. Ignored while typing, with modifiers, or under a menu.
   useEffect(() => {
-    const ignored = (e: KeyboardEvent) => e.metaKey || e.ctrlKey || e.altKey || typing(e.target) || latest.current.blocked;
+    const ignored = (e: KeyboardEvent) => e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || typing(e.target) || latest.current.blocked;
     const down = (e: KeyboardEvent) => {
       if (ignored(e) || latest.current.paused && e.code !== 'Space') return;
       if (e.code === 'Space') {
