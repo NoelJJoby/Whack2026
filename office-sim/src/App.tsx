@@ -148,7 +148,7 @@ export default function App() {
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = engineLabel(sim.mode, sim.modeReason);
   return <main className="game-window" aria-label="The Daily Grind">
-    <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
+    <OfficeView key={sim.historyEpoch} people={people} tick={hour} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}

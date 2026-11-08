@@ -6,9 +6,9 @@ Implementation notes:
 
 - Quarter facts come from committed journal snapshots, using the shared 240-tick calendar. Legacy archives without tick snapshots keep their existing detailed reports rather than inventing peak prices.
 - Completion saves the factual report immediately, then runs a separately bounded AI recap when configured. Pending, successful, unavailable and manually retried versions are retained. Interrupted pending jobs recover once.
-- The end screen opens after presentation finishes, defers while another panel is open, and does not reopen after dismissal. It includes evidence, quarter price charts, exports, full-report navigation and new-run controls.
+- The end screen opens after presentation finishes, defers while another panel is open, and does not reopen after dismissal. It includes quarter price charts, exports, full-report navigation and new-run controls. Evidence links and source sections were removed from the report UI at the user's request; saved facts still support recap validation.
 - Editorial titles, the verdict and lessons are AI-generated. Highlight explanations must copy the supplied factual outcome excerpt exactly; this deliberately limits unsupported narrative claims. Autonomous CEO/Ops actions retain their actual actor.
-- Verified: full automated suite (318 tests), production build, a 240-tick paced benchmark (96.81 seconds, zero AI calls), and desktop/narrow-screen browser checks for unavailable and ready states, evidence, dismissal, reload and Report-tab navigation. One approved real-provider smoke test returned a validated recap in 2.5 seconds with one request.
+- Verified: full automated suite (319 tests), production build, a 240-tick paced benchmark (96.81 seconds, zero AI calls), and desktop/narrow-screen browser checks for unavailable and ready states, evidence, dismissal, reload and Report-tab navigation. One approved real-provider smoke test returned a validated recap in 2.5 seconds with one request.
 
 The sections below retain the implementation requirements and verification scenarios.
 
