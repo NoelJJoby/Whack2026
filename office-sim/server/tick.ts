@@ -29,6 +29,7 @@ import { toLlmOutput } from './llm-adapter';
 import type { CallMetrics } from './llm/client';
 import { withRequestMetrics } from './llm/telemetry';
 import { crackOrderFromEvents, firstQuitTime } from './metrics';
+import { advanceLiveScorecard, createLiveScorecard, type LiveScorecard, type ScoreAgent } from '../shared/scorecard';
 import { DEFAULT_PARAMS, type Params } from './params';
 import { applyPriceFeedback, createPriceState, updatePrice, workforceReport } from './price';
 import { rngFactory, stream } from './rng';
@@ -102,6 +103,7 @@ export function createWorld(cast: CastMember[], seed: number, params: Params = D
   }
   const world: World = { business: initialiseBusiness(agents), eventState: initialEvents(seed), seed, tick: 0, ids, agents, claims: {}, queue: [], quits: [], leaks: [], price, priceRecord: null };
   if (params.voice) world.speech = initSpeech(world, params);
+  world.scorecard = startScorecard(world);
   return world;
 }
 
@@ -430,6 +432,9 @@ export async function runTick(
   }, params.price, stream(w.seed, t, '*', 'price'));
   w.price = valuation.state;
   w.priceRecord = valuation.record;
+  w.scorecard = advanceLiveScorecard(w.scorecard ?? startScorecard(world), {
+    tick: t, price: w.price.price, agents: scoreAgents(w), falseReach: claimReach(w).false_holders, leaks: leaks.length,
+  });
 
   // 7. Record.
   const firstEvent = events[0]?.type ?? null;
@@ -489,6 +494,7 @@ export interface RunSummary {
   priceFeedback: boolean;
   headcount: number;
   morale: number | null;
+  scorecard?: LiveScorecard;
 }
 
 export interface RunResult {
@@ -498,6 +504,14 @@ export interface RunResult {
   records: TickRecord[];
   logs: EngineTickLog[];
   summary: RunSummary;
+}
+
+function scoreAgents(w: World): ScoreAgent[] {
+  return w.ids.map(id => { const a = w.agents[id]; return { status: a.status, stress: a.state.stress, burnout: a.state.burnout, trust_mgmt: a.state.trust_mgmt }; });
+}
+/** Scorecard baseline from a world before any tick of the run is scored. */
+function startScorecard(w: World): LiveScorecard {
+  return createLiveScorecard({ price: w.price.price, agents: scoreAgents(w) });
 }
 
 export function summariseRun(world: World, config: RunConfig, logs: EngineTickLog[]): RunSummary {
@@ -519,6 +533,7 @@ export function summariseRun(world: World, config: RunConfig, logs: EngineTickLo
     priceFeedback: config.priceFeedback,
     ...workforceReport(world.ids.map(id => ({ id, active: world.agents[id].status === 'active', state: world.agents[id].state }))),
     fallbacks: logs.reduce((n, l) => n + l.decisions.filter((d) => d.fallback).length, 0),
+    ...(world.scorecard ? { scorecard: world.scorecard } : {}),
   };
 }
 
@@ -580,6 +595,7 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
       first_quit_tick: firstQuitTime(world.quits),
       true_reach: reach.true_holders,
       false_reach: reach.false_holders,
+      ...(world.scorecard ? { scorecard: structuredClone(world.scorecard) } : {}),
     },
   };
 }

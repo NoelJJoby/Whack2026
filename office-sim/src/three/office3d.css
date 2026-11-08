@@ -1,14 +1,19 @@
-/* 3D view only. Bubbles live inside .office-scene (isolated), so the HUD always paints over them. */
-.o3-scene { background: #14203a; inset: 0; }
+/* 3D view. Bubbles live inside .o3-scene (isolated), so the HUD always paints over them. */
+.o3-scene { position: absolute; inset: 0; isolation: isolate; background: #14203a; }
+.o3-unavailable { display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-size: 16px; }
 .o3-scene canvas { touch-action: none; }
-.o3-anchor { pointer-events: none; }
 .o3-person-anchor { pointer-events: none; }
+/* Only the name button is in flow, so the label stays centred on its anchor; the bubble or tag sits above it. */
+.o3-overhead { position: relative; }
+.o3-above { position: absolute; left: 50%; bottom: calc(100% + 12px); transform: translateX(-50%); display: flex; justify-content: center; pointer-events: none; }
 .o3-person { pointer-events: auto; display: block; min-width: 48px; padding: 3px 6px; white-space: nowrap; font-size: 14px; color: #f2e6bf; background: #1d2928e8; border: 1px solid #536457; }
 .o3-person small { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
 .o3-person.off-shift { color: #a1aaa4; }
+/* "Left for the day" wears the yellow action-tag look, since it replaces that tag. */
+.o3-person small.o3-presence { padding: 1px 4px; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
 .o3-bubble { position: relative; width: max-content; max-width: 150px; padding: 4px 7px 5px; font: 13px/1.3 "VT323", monospace; }
-/* Stack sits bottom-centre on the head anchor. */
-.o3-stack { display: flex; flex-direction: column; align-items: center; gap: 14px; transform: translate(-50%, -100%); }
+/* Thought cloud above the speech bubble, both above the name label. */
+.o3-stack { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .o3-bubble small { display: block; font-size: 11px; letter-spacing: .04em; margin-bottom: 2px; opacity: .7; }
 .o3-bubble.speech { background: #fbf7ec; color: #1d2928; border: 2px solid #1d2928; box-shadow: 3px 3px 0 #10192b88; }
 .o3-bubble.speech::after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -5px; border: 5px solid transparent; border-top: 5px solid #1d2928; border-bottom: 0; }
@@ -18,7 +23,7 @@
 .o3-bubble.thought::after { width: 4px; height: 4px; bottom: -17px; margin-left: -1px; }
 .o3-stats { top: auto !important; bottom: 8px; left: auto !important; right: 8px; }
 /* Action tags over heads (hidden while that agent is speaking). */
-.o3-tag { transform: translate(-50%, -100%); width: max-content; padding: 2px 6px; font: 13px/1.3 "VT323", monospace; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
+.o3-tag { width: max-content; padding: 2px 6px; font: 13px/1.3 "VT323", monospace; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
 .o3-tag.complain { background: #e8947f; }
 .o3-tag.gossip { background: #c9a6e0; }
 .o3-tag.verify { background: #8fd3f5; font-weight: 700; }

@@ -134,14 +134,14 @@ await replace([afternoon]);
 const close = fixture(5, 'Finishing the regular shift.');
 close.state.agents.marcus.present = false;
 await send(close); await page.locator('.dialogue-bar.open').waitFor();
-assert.equal(await page.locator('.station.off-shift [data-employee="marcus"]').count(), 0);
+assert.equal(await page.locator('.o3-person.off-shift[data-employee="marcus"]').count(), 0);
 await skip();
-await page.locator('.station.off-shift [data-employee="marcus"]').waitFor();
-assert.ok((await page.locator('.presence-label').allTextContents()).includes('Left for the day'));
+await page.locator('.o3-person.off-shift[data-employee="marcus"]').waitFor();
+assert.ok((await page.locator('.o3-person small').allTextContents()).includes('Left for the day'));
 const late = fixture(6, 'Still working on the client review.');
 late.state.agents.marcus.present = false;
 await send(late); await page.locator('.dialogue-bar.open').waitFor();
-assert.ok((await page.locator('.presence-label').allTextContents()).includes('Working late'));
+assert.ok((await page.locator('.o3-person small').allTextContents()).includes('Working late'));
 await skip();
 
 // Shared announcements are narrated first; the banner follows the presented frame.
@@ -150,7 +150,7 @@ seven.events = [{ type: 'pr_scandal', text: 'A customer data breach was disclose
 await send(seven);
 await page.locator('.dialogue-bar.open.narrator').waitFor();
 assert.equal(await page.locator('.dialogue-portrait').count(), 0, 'narrator has no portrait');
-assert.equal(await page.locator('.station.speaking').count(), 0, 'narrator has no employee voice');
+assert.equal(await page.locator('.o3-bubble.speech').count(), 0, 'narrator has no employee speech bubble');
 assert.ok((await page.locator('.announcement').innerText()).includes('customer data breach'));
 const end = fixture(8, 'The last review is finished.');
 for (const agent of Object.values(end.state.agents)) agent.present = false;
@@ -162,7 +162,7 @@ await page.locator('.dialogue-bar.open:not(.narrator)').waitFor();
 assert.equal(await clock(), '23:00');
 await next(); await next();
 await page.locator('.dialogue-bar.open.narrator').waitFor();
-assert.equal(await page.locator('.station.off-shift').count(), 8, 'everyone leaves before the report');
+assert.equal(await page.locator('.o3-person.off-shift').count(), 8, 'everyone leaves before the report');
 await page.screenshot({ path: join(artifacts, 'reactive-day-report.png') });
 assert.ok((await page.locator('.dialogue-public').textContent() ?? '').includes('Day 1 report'));
 await next(); await next(); // second report line
@@ -176,7 +176,7 @@ assert.ok((await page.locator('.clock-readout').innerText()).includes('Day 3'), 
 await send(fixture(9, 'Back in the office.'));
 await page.locator('.dialogue-bar.open').waitFor();
 assert.equal(await clock(), '09:00');
-assert.equal(await page.locator('.station.off-shift').count(), 0, 'everyone returns the next morning');
+assert.equal(await page.locator('.o3-person.off-shift').count(), 0, 'everyone returns the next morning');
 
 // Reconnect/reset jumps to the latest snapshot without replaying narration.
 await replace([first, second, seven, end]);

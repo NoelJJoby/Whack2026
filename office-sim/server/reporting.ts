@@ -6,7 +6,38 @@ import { parseReply } from './llm/parse';
 import { reportSchema } from './llm/schemas';
 import { buildReportPrompt, RECOMMENDATIONS, REPORT_TITLES } from './llm/report-prompt';
 import { llmConfig } from './llm/config';
-import type { World } from './engine-types';
+import type { EngineTickLog, World } from './engine-types';
+import { productivity } from '../shared/scorecard';
+import { DEFAULT_PARAMS } from './params';
+
+/** Report-card metric ids, in display order; shared with the client's report card. */
+export function scorecardMetrics(txs: Array<{ kind: string; tick: number; world: World; audit: unknown }>): Record<string, number> {
+  const hours = txs.flatMap(tx => {
+    const log = tx.kind === 'tick' ? (tx.audit as { log?: EngineTickLog } | null)?.log : undefined;
+    return log ? [log.decisions.map(d => d.chosen.action)] : [];
+  });
+  const live = txs.at(-1)?.world.scorecard;
+  const out: Record<string, number> = {};
+  if (live) Object.assign(out, {
+    scorePrice: live.price, scoreStartPrice: live.startPrice,
+    scoreRetention: live.retention * 100, scoreQuits: live.quits, scoreLayoffs: live.layoffs,
+    scoreMorale: live.morale, scoreStartMorale: live.startMorale, scoreTrust: live.trust, scoreStartTrust: live.startTrust,
+    scorePeakFalseReach: live.peakFalseReach, scoreFalseReach: live.falseReach, scoreLeaks: live.leaks,
+    ...(live.firstQuitTick !== null ? { scoreFirstQuitTick: live.firstQuitTick } : {}),
+  });
+  out.scoreProductivity = productivity(hours, DEFAULT_PARAMS.scorecard, DEFAULT_PARAMS.rules.actions.overwork.burnout) * 100;
+  return out;
+}
+function scorecardText(m: Record<string, number>): string {
+  const n = (v: number | undefined, d = 1) => v === undefined ? 'n/a' : v.toFixed(d);
+  return [
+    m.scorePrice !== undefined ? `Stock price ${n(m.scorePrice, 2)} (start ${n(m.scoreStartPrice, 2)}).` : '',
+    m.scoreRetention !== undefined ? `Retention ${n(m.scoreRetention, 0)}% with ${m.scoreQuits} resignations and ${m.scoreLayoffs} layoffs.` : '',
+    m.scoreMorale !== undefined ? `Morale ${n(m.scoreMorale)} (start ${n(m.scoreStartMorale)}); trust in management ${n(m.scoreTrust)} (start ${n(m.scoreStartTrust)}).` : '',
+    m.scoreLeaks !== undefined ? `False-claim reach peaked at ${m.scorePeakFalseReach}; ${m.scoreLeaks} press leaks.` : '',
+    `Productivity ${n(m.scoreProductivity, 0)}% of staff-hours spent on sustainable work.`,
+  ].filter(Boolean).join(' ');
+}
 export function factsFor(store: RunStore, runId: string): ReportFacts {
   const txs = store.read(runId); const last = txs.at(-1); if (!last) throw new Error('Missing run evidence');
   const w = last.world; const b = w.business; const first = txs[0].world;
@@ -31,7 +62,9 @@ export function factsFor(store: RunStore, runId: string): ReportFacts {
     avoidedLayoffs: roots.filter(e => e.templateId === 'cost_review' && e.outcome?.includes('avoided')).length,
     headcount: w.ids.filter(id => w.agents[id].status === 'active').length, openCases: roots.filter(e => !['resolved','failed','cancelled','superseded'].includes(e.status)).length,
     completedTasks: b.tasks.filter(t => t.status === 'done').length, remainingTasks: b.tasks.filter(t => !['done','cancelled'].includes(t.status)).length,
-    trust: average(w,'trust_mgmt'), burnout: average(w,'burnout'), startingTrust: average(first,'trust_mgmt'), startingBurnout: average(first,'burnout') };
+    trust: average(w,'trust_mgmt'), burnout: average(w,'burnout'), startingTrust: average(first,'trust_mgmt'), startingBurnout: average(first,'burnout'),
+    ...scorecardMetrics(txs) };
+  evidence.unshift({ id: 'run-scorecard', tick: w.tick, text: scorecardText(metrics) });
   evidence.unshift({ id: 'run-metrics', tick: w.tick, text: 'Bookings record signed commitments. Revenue is earned by accepted delivery; collections change cash. Outstanding work and receivables remain obligations at this cutoff.' });
   const base = { runId, cutoff: last.sequence, tick: w.tick, currency: b.currency, metrics, evidence, unresolved: roots.filter(e => !['resolved','cancelled','superseded'].includes(e.status)).map(e => e.id) };
   return { ...base, hash: digest(base) };
@@ -52,7 +85,8 @@ export function validateReport(raw: unknown, facts: ReportFacts): ReportSection[
 export function factualSections(f: ReportFacts): ReportSection[] {
   const observations = (items: typeof f.evidence) => items.map(e => ({ text: e.text, evidenceIds: [e.id], metricIds: [] as string[], assessment: 'observed' as const }));
   return [
-    { title: 'Business performance', observations: [{ text: f.evidence[0].text, evidenceIds: ['run-metrics'], metricIds: ['cash','bookings','revenue','receivables','costs','targetAttainment'], assessment: 'observed' }] },
+    { title: 'Business performance', observations: [{ text: f.evidence[0].text, evidenceIds: ['run-metrics'], metricIds: ['cash','bookings','revenue','receivables','costs','targetAttainment'], assessment: 'observed' },
+      ...f.evidence.filter(e => e.id === 'run-scorecard').map(e => ({ text: e.text, evidenceIds: [e.id], metricIds: Object.keys(f.metrics).filter(k => k.startsWith('score')), assessment: 'observed' as const }))] },
     { title: 'Event outcomes', observations: observations(f.evidence.filter(e => /^event-\d+-\d+$/.test(e.id))) },
     { title: 'Leadership decisions', observations: observations(f.evidence.filter(e => e.id.startsWith('decision-'))) },
     { title: 'Outstanding work', observations: observations(f.evidence.filter(e => f.unresolved.includes(e.id))) },

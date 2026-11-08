@@ -30,11 +30,40 @@ export function metricState(label: Metric, value: number, burnoutThreshold: numb
     ? { text: 'Above comfortable load', tone: 'coral' } : { text: 'Comfortable load', tone: 'mint' };
 }
 export interface FeedEntry {
-  key: string; time: string; label: string; text: string; ids: string[]; truth?: boolean;
+  key: string; time: string; label: string; text: string; ids: string[]; truth?: boolean; tone?: BusinessNotice['tone'];
+}
+/** A business case changing in a way the spectator should see without opening the Business events panel. */
+export interface BusinessNotice {
+  key: string; caseId: string; stage: 'new' | 'uncovered' | 'escalated' | 'resolved' | 'failed';
+  label: string; text: string; tone: 'mint' | 'coral' | 'gold';
+}
+/** Compares a frame's business cases with the previous hour's. Spectator-only: what employees know is unchanged. */
+export function businessNotices(frame: TickFrame, prev?: TickFrame): BusinessNotice[] {
+  const before = new Map((prev?.state.eventState?.cases ?? []).map(c => [c.id, c]));
+  return (frame.state.eventState?.cases ?? []).flatMap((c): BusinessNotice[] => {
+    const was = before.get(c.id);
+    const notice = (stage: BusinessNotice['stage'], label: string, text: string, tone: BusinessNotice['tone']): BusinessNotice =>
+      ({ key: `${frame.tick}-business-${c.id}-${stage}`, caseId: c.id, stage, label, text: playerText(text), tone });
+    const valenceTone = c.valence === 'positive' ? 'mint' : 'coral';
+    const yours = c.origin === 'injection' ? 'Your business event' : null;
+    // With no previous frame, only cases opened this hour count as new (not everything in a reconnected history).
+    const opened = !was && (prev ? true : c.openedTick === frame.tick);
+    if (opened) return c.detected ? [notice('new', yours ?? (c.rarity === 'rare' ? 'Major business event' : 'New business event'), c.headline, valenceTone)] : [];
+    if (!was) return [];
+    const out: BusinessNotice[] = [];
+    if (!was.detected && c.detected) out.push(notice('uncovered', 'Business event uncovered', c.headline, valenceTone));
+    if (was.rarity !== 'rare' && c.rarity === 'rare') out.push(notice('escalated', 'Business event escalated', `${c.headline}. Now high severity.`, 'coral'));
+    if (was.status !== c.status && (c.status === 'resolved' || c.status === 'failed')) {
+      const unconfirmed = !c.truth;
+      out.push(notice(c.status, c.status === 'failed' ? 'Business event failed' : unconfirmed ? 'Business event archived' : 'Business event resolved',
+        `${c.headline}. ${c.outcome ?? ''}`.trim(), c.status === 'failed' ? 'coral' : unconfirmed ? 'gold' : 'mint'));
+    }
+    return out;
+  });
 }
 /** Each record occurs once: a resignation replaces its action entry. */
 export function feedEntries(history: TickFrame[]): FeedEntry[] {
-  return [...history].reverse().flatMap(frame => [
+  return history.map((frame, i) => ({ frame, prev: history[i - 1]?.tick === frame.tick - 1 ? history[i - 1] : undefined })).reverse().flatMap(({ frame, prev }) => [
     ...[...frame.records].reverse().sort((a, b) => Number(Boolean(b.quit)) - Number(Boolean(a.quit))).map((record) => ({
       key: `${frame.tick}-${record.agent}`, time: timeLabel(frame.tick),
       label: record.quit ? 'Resignation' : ACTION_LABEL[record.action], text: playerText(record.summary),
@@ -44,5 +73,6 @@ export function feedEntries(history: TickFrame[]): FeedEntry[] {
       key: `${frame.tick}-event-${i}`, time: timeLabel(frame.tick),
       label: event.custom ? 'Your announcement' : event.type === 'layoffs_rumour' ? 'Rumour' : 'Announcement', text: playerText(event.text), ids: [], truth: event.is_true,
     })),
+    ...businessNotices(frame, prev).reverse().map(n => ({ key: n.key, time: timeLabel(frame.tick), label: n.label, text: n.text, ids: [], tone: n.tone })),
   ]);
 }

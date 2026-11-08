@@ -1,5 +1,5 @@
 // Every voice tunable in one place. Values are starting points: tune by ear.
-import { looks } from '../design/Office';
+import { looks } from '../people';
 import type { Emotion } from './emotion';
 
 export interface Voice {

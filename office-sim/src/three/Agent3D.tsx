@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { Color, type Group } from 'three';
-import type { Person } from '../design/Office';
+import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
 import { playerText } from '../hudModel';
 import { FLOOR } from './layout';
@@ -44,12 +44,10 @@ const clip = (text: string) => { const t = playerText(text); return t.length > 6
 function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine; showThoughts: boolean }) {
   const thought = showThoughts && line.inner ? line.inner : '';
   if (!line.publicLine && !thought) return null;
-  return <Html position={[0, 2.15, 0]} zIndexRange={[4, 0]} className="o3-anchor">
-    <div className="o3-stack">
-      {thought && <div className="o3-bubble thought"><small>{name} thinks</small><span>{clip(thought)}</span></div>}
-      {line.publicLine && <div className="o3-bubble speech"><small>{name} says</small><span>{clip(line.publicLine)}</span></div>}
-    </div>
-  </Html>;
+  return <div className="o3-stack">
+    {thought && <div className="o3-bubble thought"><small>{name} thinks</small><span>{clip(thought)}</span></div>}
+    {line.publicLine && <div className="o3-bubble speech"><small>{name} says</small><span>{clip(line.publicLine)}</span></div>}
+  </div>;
 }
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
@@ -179,11 +177,18 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     }
   });
 
-  const label = <Html position={[0, gone ? 0.65 : 1.85, 0]} center zIndexRange={[3, 0]} className="o3-person-anchor">
-    <button className={`o3-person ${offShift || gone ? 'off-shift' : ''}`} data-employee={person.id}
-      aria-label={`Inspect ${person.name}`} aria-haspopup="dialog" aria-expanded={selected} onClick={event => { event.stopPropagation(); inspect(); }}>
-      {person.name}{(person.quit || offShift || person.late) && <small>{person.quit ? person.action : offShift ? 'Left for the day' : 'Working late'}</small>}
-    </button>
+  // The bubble or action tag rides in the label's own overlay, pinned just above the name in screen
+  // space, so it never covers the name at any zoom or font size.
+  const overhead = gone ? null : line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
+    : behaviour.tag ? <div className={`o3-tag ${k}`}>{behaviour.tag}</div> : null;
+  const label = <Html position={[0, gone ? 0.65 : 1.85, 0]} center zIndexRange={[4, 0]} className="o3-person-anchor">
+    <div className="o3-overhead">
+      {overhead && <div className="o3-above">{overhead}</div>}
+      <button className={`o3-person ${offShift || gone ? 'off-shift' : ''}`} data-employee={person.id}
+        aria-label={`Inspect ${person.name}`} aria-haspopup="dialog" aria-expanded={selected} onClick={event => { event.stopPropagation(); inspect(); }}>
+        {person.name}{(person.quit || offShift || person.late) && <small className={!person.quit && offShift ? 'o3-presence' : undefined}>{person.quit ? person.action : offShift ? 'Left for the day' : 'Working late'}</small>}
+      </button>
+    </div>
   </Html>;
   if (gone) return <group position={[home[0], FLOOR, home[1]]}>{label}</group>;
   const ring = selected ? '#d7b66c' : highlighted ? '#fff2cf' : line ? '#8abca2' : null;
@@ -224,9 +229,5 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       <Part p={[-0.34, 1.7, 0.15]} s={[0.09, 0.14, 0.09]} c={SWEAT} />
       <Part p={[0.36, 1.7, 0.1]} s={[0.09, 0.14, 0.09]} c={SWEAT} />
     </group>
-    {line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
-      : behaviour.tag && <Html position={[0, 2.05, 0]} zIndexRange={[4, 0]} className="o3-anchor">
-        <div className={`o3-tag ${k}`}>{behaviour.tag}</div>
-      </Html>}
   </group>;
 }

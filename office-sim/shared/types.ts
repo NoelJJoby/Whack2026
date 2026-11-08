@@ -134,5 +134,7 @@ export interface SimulationState {
     first_quit_tick: number | null;
     true_reach: number;
     false_reach: number;
+    /** Live run scorecard; absent from older servers and stored runs. */
+    scorecard?: import('./scorecard').LiveScorecard;
   };
 }

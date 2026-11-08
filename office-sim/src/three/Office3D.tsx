@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject, 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
 import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type OrthographicCamera } from 'three';
-import type { Person } from '../design/Office';
+import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
 import { Agent3D, type Behaviour, type Crowd } from './Agent3D';
@@ -36,7 +36,7 @@ const PREVIEW = import.meta.env.DEV ? new URLSearchParams(location.search).get('
 function behaviourFor(p: Person, rec: TickRecord | undefined, i: number, people: Person[], nav: Nav, seats: Map<string, Seat>, panic: boolean): Behaviour {
   const desk: Behaviour = { goal: seatNode(p.id), face: 0, kind: 'desk', tag: null, spread: null };
   if (p.quit) return { goal: 'exit', face: null, kind: 'quit', tag: p.action === 'Laid off' ? 'laid off' : p.role === 'CEO' ? 'CEO resigns' : 'resigned', spread: null };
-  if (p.present === false) return { ...desk, kind: 'off-shift', tag: 'Left for the day' };
+  if (p.present === false) return { ...desk, kind: 'off-shift', tag: null };
   if (panic) return { goal: 'mC', face: null, kind: 'panic', tag: '!!', spread: null };
   if (!rec) return desk;
   const target = rec.target && rec.target !== p.id && seats.has(rec.target)
@@ -207,7 +207,7 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     c.update();
   };
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
-  return <div className="office-scene o3-scene">
+  return <div className="o3-scene">
     <Canvas fallback={fallback} orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
       <color attach="background" args={['#14203a']} />
       <PerformanceMonitor onDecline={() => setMaxDpr(1)} />

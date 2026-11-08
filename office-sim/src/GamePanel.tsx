@@ -2,7 +2,7 @@ import type { Business } from '../shared/business';
 import type { AgentProfile } from '../shared/types';
 import { timeLabel } from './hudModel';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Sprite, type Person } from './design/Office';
+import { Sprite, type Person } from './people';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { metricState, playerText, type Metric } from './hudModel';
 

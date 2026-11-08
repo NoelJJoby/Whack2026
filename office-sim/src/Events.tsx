@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { SimulationState, AgentProfile } from '../shared/types';
 import { EventDetail, money } from './EventDetail';
 import { timeLabel } from './hudModel';
-export function Events({ state, cast, onPerson, selectedId }: { state: SimulationState | null; cast: AgentProfile[]; onPerson?: (id: string) => void; selectedId?: string | null }) {
-  const [selected,setSelected] = useState<string | null>(null);
+export function Events({ state, cast, onPerson, selectedId, initialId = null }: { state: SimulationState | null; cast: AgentProfile[]; onPerson?: (id: string) => void; selectedId?: string | null; initialId?: string | null }) {
+  const [selected,setSelected] = useState<string | null>(initialId);
   const [showCompleted,setShowCompleted] = useState(false);
   if (!state?.business || !state.eventState) return <p>Business history will appear when the simulation connects.</p>;
   const b = state.business; const events = state.eventState;

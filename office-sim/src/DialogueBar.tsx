@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Sprite, moodFor, type Look, type Mood } from './design/Office';
+import { Sprite, moodFor, type Look, type Mood } from './people';
 import type { DialogueLine, PlayerState } from './dialogueQueue';
 
 export function Portrait({ look, mood }: { look: Pick<Look, 'color' | 'hair' | 'skin'>; mood?: Mood }) {

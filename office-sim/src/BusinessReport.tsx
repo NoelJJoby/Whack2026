@@ -5,6 +5,22 @@ import type { AgentProfile } from '../shared/types';
 import { api } from './useSimulation';
 import { EventDetail, money } from './EventDetail';
 interface Archive { metadata: RunMetadata; world: World; reports: Report[]; pending: boolean; }
+/** The scorecard figures from the report's facts; reports made before the scorecard have none. */
+function ReportCard({ m }: { m: Record<string, number> }) {
+  if (m.scoreProductivity === undefined) return null;
+  const f = (v: number | undefined, d = 0) => v === undefined ? '—' : v.toFixed(d);
+  const rows: Array<[string, string, string]> = [
+    ['Stock price', f(m.scorePrice, 2), `Started at ${f(m.scoreStartPrice, 2)}`],
+    ['Retention', m.scoreRetention === undefined ? '—' : `${f(m.scoreRetention)}%`, `${f(m.scoreQuits)} resigned · ${f(m.scoreLayoffs)} laid off`],
+    ['Morale', f(m.scoreMorale), `Started at ${f(m.scoreStartMorale)}`],
+    ['Trust', f(m.scoreTrust), `Started at ${f(m.scoreStartTrust)}`],
+    ['Rumour control', f(m.scorePeakFalseReach), `Peak false-claim reach · ${f(m.scoreLeaks)} press leaks`],
+    ['Productivity', `${f(m.scoreProductivity)}%`, 'Staff-hours on sustainable work; overwork counts half'],
+  ];
+  return <section className="report-card" aria-label="Report card"><h4>Report card</h4>
+    <dl className="score-tiles">{rows.map(([label, value, detail]) => <div className="score-tile" key={label}><dt>{label}</dt><dd><strong>{value}</strong><small>{detail}</small></dd></div>)}</dl>
+  </section>;
+}
 export function BusinessReport({ runId, tick, status, cast }: { runId?: string; tick: number; status?: string; cast: AgentProfile[] }) {
   const [runs,setRuns] = useState<RunMetadata[]>([]);
   const [chosen,setChosen] = useState(runId ?? '');
@@ -36,7 +52,8 @@ export function BusinessReport({ runId, tick, status, cast }: { runId?: string; 
       <p>Report covers tick {report.tick}. {archive && archive.world.tick > report.tick && 'This report is from an earlier cutoff; the run has continued.'}</p>
       {report.limitation && <p role="status" className="gold">{report.limitation}</p>}
       <div className="report-downloads"><a href={`/api/runs/${report.runId}/reports/${report.id}?format=markdown`} download>Download Markdown</a><a href={`/api/runs/${report.runId}/reports/${report.id}`} download="business-report.json">Download JSON evidence</a></div>
-      {report.sections.map((s,i) => <section key={i}><h4>{s.title}</h4>{s.observations.map((o,j) => <div className="report-observation" key={j}><p>{o.assessment === 'recommendation' && <strong>Recommendation: </strong>}{o.text}</p>{o.metricIds.map(id => <p key={id}>{id}: {['cash','bookings','revenue','receivables','costs','target','quarterRevenue','startingCash'].includes(id) ? money(report.facts.metrics[id],report.facts.currency) : report.facts.metrics[id].toFixed(1)}</p>)}<div className="evidence-links">{o.evidenceIds.map(id => <button key={id} onClick={() => setSource(id)}>Source: {id}</button>)}</div></div>)}</section>)}
+      <ReportCard m={report.facts.metrics}/>
+      {report.sections.map((s,i) => <section key={i}><h4>{s.title}</h4>{s.observations.map((o,j) => <div className="report-observation" key={j}><p>{o.assessment === 'recommendation' && <strong>Recommendation: </strong>}{o.text}</p>{o.metricIds.filter(id => !id.startsWith('score') && id in report.facts.metrics).map(id => <p key={id}>{id}: {['cash','bookings','revenue','receivables','costs','target','quarterRevenue','startingCash'].includes(id) ? money(report.facts.metrics[id],report.facts.currency) : report.facts.metrics[id].toFixed(1)}</p>)}<div className="evidence-links">{o.evidenceIds.map(id => <button key={id} onClick={() => setSource(id)}>Source: {id}</button>)}</div></div>)}</section>)}
       {source && <section className="report-source" tabIndex={0}><h4>Source evidence</h4><p>{report.facts.evidence.find(e => e.id === source)?.text}</p>{event && sourceWorld && <EventDetail event={event} events={sourceWorld.eventState} business={sourceWorld.business} cast={Object.values(sourceWorld.agents).map(a => a.profile)}/>}</section>}
     </>}
   </section>;

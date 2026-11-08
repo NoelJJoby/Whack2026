@@ -180,6 +180,8 @@ export interface World {
   leaks: Array<{ agent: string; claim: string; tick: number }>;
   /** Voice cards and speech history (server/speech.ts). Absent on worlds built before the voice system. */
   speech?: SpeechState;
+  /** Live run scorecard (shared/scorecard.ts). Absent on worlds built before it; runTick starts one. */
+  scorecard?: import('../shared/scorecard').LiveScorecard;
 }
 
 // --- Voice and speech (server/llm/voice.ts, server/speech.ts) ---------------

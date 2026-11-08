@@ -1,7 +1,7 @@
 // The dialogue bar's round queue and playback state. Pure: no React, no timers.
 import { DEFAULT_PARAMS } from '../server/params';
 import type { TickEvent, TickFrame } from '../shared/api';
-import { playerText } from './hudModel';
+import { businessNotices, playerText, type BusinessNotice } from './hudModel';
 import type { Action } from '../shared/types';
 import { emotionFor, type Emotion } from './voice/emotion';
 
@@ -20,6 +20,7 @@ export const STRESS_JUMP = DEFAULT_PARAMS.playback.stressJump;
 export interface DialogueLine {
   kind: 'agent' | 'narrator';
   announcement?: TickEvent;
+  business?: BusinessNotice;
   report?: boolean;
   calendarDay?: number;
   key: string;
@@ -66,6 +67,7 @@ export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
   });
   return [
     ...frame.events.map((event, i) => narrator(event.text, `announcement-${i}`, { announcement: event })),
+    ...businessNotices(frame, prev).map(n => narrator(`${n.label}: ${n.text}`, n.key.slice(`${frame.tick}-`.length), { business: n })),
     ...agents,
     ...(frame.day_report ? [
       ...frame.day_report.lines.map((text, i) => narrator(i === 0 ? `Day ${frame.day_report!.day} report. ${text}` : text, `report-${i}`, { report: true })),

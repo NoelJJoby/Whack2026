@@ -3,7 +3,7 @@ export const FLOOR = 0.2;
 
 export interface Seat { x: number; z: number }
 
-/** Desk seats joined to the cast on archetype (same key the 2D view uses). */
+/** Desk seats joined to the cast on archetype (the same key as the looks in src/people.tsx). */
 export const SEATS: Record<string, Seat> = {
   'CEO': { x: 8, z: -4.4 },
   'Ops manager': { x: -3.6, z: -4.6 },
