@@ -41,16 +41,15 @@ export function DialogueBar({ state, line, speaker, auto, voices, showThoughts, 
   const thoughts = showThoughts && Boolean(shown.line.inner);
   const innerStarted = !active || phase === 'inner' || phase === 'reading';
   const announcement = `${shown.speaker.name}: “${shown.line.publicLine}”${thoughts ? ` Thinks: ${shown.line.inner}` : ''}`;
-  return <section className={`dialogue-bar ${open ? 'open' : ''}`} aria-label="Dialogue" data-emotion={shown.line.emotion}>
+  return <section className={`dialogue-bar ${shown.line.kind === 'narrator' ? 'narrator' : ''} ${open ? 'open' : ''}`} aria-label="Dialogue" data-emotion={shown.line.emotion}>
     <div className="dialogue-plate"><strong>{shown.speaker.name}</strong>{shown.speaker.team && <small>· {shown.speaker.team}</small>}{shown.line.quit && <span className="dialogue-tag">Left the company</span>}</div>
     <div className="dialogue-box">
-      <Portrait look={shown.speaker.look} mood={moodFor(shown.line.stress)}/>
+      {shown.line.kind === 'agent' && <Portrait look={shown.speaker.look} mood={moodFor(shown.line.stress)}/>}
       <div className="dialogue-text" onClick={onNext} aria-hidden="true">
         <p className="dialogue-public">“<Typed text={shown.line.publicLine} shown={publicShown} typing={active && phase === 'public'}/>”</p>
         {thoughts && <p className={`dialogue-inner ${innerStarted ? '' : 'waiting'}`}><span>thinks:</span> <Typed text={shown.line.inner} shown={innerShown} typing={active && phase === 'inner'}/></p>}
       </div>
       <div className="dialogue-controls">
-        {state.pending && <span className="dialogue-new">New round ▸</span>}
         {active && <span className="dialogue-progress" aria-label={`Line ${state.index + 1} of ${state.round.length}`}>{state.index + 1}/{state.round.length}</span>}
         <button onClick={onNext} aria-label="Next line" title="Next line (Enter or N)">▶</button>
         <button onClick={onSkip} aria-label="Skip round" title="Skip round (S)">⏭</button>

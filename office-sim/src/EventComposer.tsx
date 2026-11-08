@@ -71,7 +71,7 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
       <h3 id="event-composer-title">Announcement board</h3>
       <span className="event-preview-label">{label}</span>
     </div>
-    {onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || businessSending} onClick={async () => { setBusinessSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setBusinessFailed(!ok); setBusinessMessage(ok ? 'Business situation queued for the next tick.' : ''); } finally { setBusinessSending(false); } }}>Queue business situation</button><p role="status">{businessFailed ? error : businessMessage}</p></section>}
+    {onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || businessSending} onClick={async () => { setBusinessSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setBusinessFailed(!ok); setBusinessMessage(ok ? `Business situation queued for ${timeLabel(nextTick)}.` : ''); } finally { setBusinessSending(false); } }}>Queue business situation</button><p role="status">{businessFailed ? error : businessMessage}</p></section>}
 
     <div className="event-panel-tabs" role="tablist" aria-label="Event type selector">
       <button type="button" role="tab" aria-selected={activePanel === 'preset'} className={activePanel === 'preset' ? 'event-panel-tab active' : 'event-panel-tab'} onClick={() => setActivePanel('preset')}>Preset events</button>
@@ -95,7 +95,7 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
             <fieldset className="event-truth-options"><legend>Behind the headline</legend><label className={presetTruth ? 'selected' : ''}><input type="radio" name="preset-event-truth" checked={presetTruth} onChange={() => setPresetTruth(true)} /> True event</label><label className={!presetTruth ? 'selected' : ''}><input type="radio" name="preset-event-truth" checked={!presetTruth} onChange={() => setPresetTruth(false)} /> False rumour</label></fieldset>
             <button className="post-event" type="submit" disabled={disabled || presetSending}>{presetSending ? 'Posting…' : 'Post preset'} <span aria-hidden="true">↗</span></button>
           </div>
-          <div className="event-form-note"><span>Quick board pushes for common office shocks.</span><p className="event-feedback" role="status">{presetFailed && error ? <span className="coral">{error}</span> : presetMessage || 'Queued announcements arrive at the start of the next hour.'}</p></div>
+          <div className="event-form-note"><span>Quick board pushes for common office shocks.</span><p className="event-feedback" role="status">{presetFailed && error ? <span className="coral">{error}</span> : presetMessage || `Next announcement: ${timeLabel(nextTick)}.`}</p></div>
         </form>
       </div>}
 
@@ -117,7 +117,7 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
             <fieldset className="event-truth-options"><legend>Behind the headline</legend><label className={customTruth ? 'selected' : ''}><input type="radio" name="custom-event-truth" checked={customTruth} onChange={() => setCustomTruth(true)} /> True event</label><label className={!customTruth ? 'selected' : ''}><input type="radio" name="custom-event-truth" checked={!customTruth} onChange={() => setCustomTruth(false)} /> False rumour</label></fieldset>
             <button className="post-event" type="submit" disabled={disabled || customSending || !check.ok}>{customSending ? 'Checking…' : 'Post custom'} <span aria-hidden="true">↗</span></button>
           </div>
-          <div className="event-form-note"><span>Truth stays hidden from employees. The sim infers the event family and impact automatically.</span><p className="event-feedback" role="status">{customFailed && error ? <span className="coral">{error}</span> : customMessage || 'Queued announcements arrive at the start of the next hour.'}</p></div>
+          <div className="event-form-note"><span>Truth stays hidden from employees. The sim infers the event family and impact automatically.</span><p className="event-feedback" role="status">{customFailed && error ? <span className="coral">{error}</span> : customMessage || `Next announcement: ${timeLabel(nextTick)}.`}</p></div>
         </form>
       </div>}
     </div>
