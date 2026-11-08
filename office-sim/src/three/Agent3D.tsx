@@ -175,7 +175,9 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       else { m.x += (dx / d) * step; m.z += (dz / d) * step; m.heading = Math.atan2(dx, dz); }
     }
     // Entrance visibility follows the actual walk, including staggering, pauses and speed changes.
-    if (!m.entered && m.node === 'doorIn') { m.entered = true; setEntered(true); onEnter?.(); }
+    // Someone whose first stop is outside (the interview spot on the front path) never crosses the
+    // doorway, so reaching their destination also counts; otherwise dialogue would wait for ever.
+    if (!m.entered && m.goal && (m.node === 'doorIn' || !m.queue.length)) { m.entered = true; setEntered(true); onEnter?.(); }
     let arrived = !m.queue.length;
     if (arrived && (k === 'quit' || (leaving && m.goal === behaviour.goal))) {
       m.gone = true; crowd.delete(person.id); setGone(true); if (leaving) onExit?.(); return;

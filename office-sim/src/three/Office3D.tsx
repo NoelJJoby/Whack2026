@@ -34,6 +34,9 @@ const lampPool = new MeshBasicMaterial({ color: '#ffd36b', transparent: true, op
 
 const name = (people: Person[], id: string) => people.find(p => p.id === id)?.name ?? id;
 
+/** Longest wait (at 1x) for morning arrivals to cross the doorway before dialogue goes on without them. */
+const ARRIVAL_TIMEOUT_MS = 20_000;
+
 /** Dev only: `?preview=panic`, `?preview=ceo-quit` or `?preview=home-time` plays that animation 3 s after load, without engine data. */
 const PREVIEW = import.meta.env.DEV ? new URLSearchParams(location.search).get('preview') : null;
 
@@ -273,6 +276,13 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   }
   for (const id of pendingArrivals.current) if (!people.some(p => p.id === id)) pendingArrivals.current.delete(id);
   const waitingForEntry = pendingArrivals.current.size > 0;
+  // Safety net: an animation must never stall the game. If an arrival hasn't registered well after the
+  // walk in should have taken (it is ~9 s at 1x), stop waiting for it. The timer restarts while paused.
+  useEffect(() => {
+    if (!waitingForEntry || paused) return;
+    const id = setTimeout(() => { pendingArrivals.current.clear(); refreshArrivals(value => value + 1); }, ARRIVAL_TIMEOUT_MS / Math.max(speed, 0.5));
+    return () => clearTimeout(id);
+  }, [waitingForEntry, paused, speed]);
   // Notify before paint, so the first arrival frame cannot show or start dialogue.
   useLayoutEffect(() => { onArrivalChange?.(waitingForEntry); }, [onArrivalChange, waitingForEntry]);
   for (const c of cars.current) {
