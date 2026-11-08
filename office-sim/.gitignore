@@ -3,5 +3,5 @@ dist
 .vite
 .env
 npm-debug.log*
-
+*.tsbuildinfo
 .runtime/
