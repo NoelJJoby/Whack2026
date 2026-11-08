@@ -310,7 +310,9 @@ export const priceParams = {
   impacts: {
     contract: 0.015, security: -0.035, operating_review: -0.01, delivery: 0.01,
     merger: -0.02, new_management: -0.01, long_hours_policy: 0.02,
-    pr_scandal: -0.08, layoffs_rumour: -0.03, surprise_bonus: -0.01,
+    pr_scandal: -0.08, layoffs_rumour: -0.03,
+    // Announced as profit-sharing after a record quarter: a signal of strength, so positive (was -0.01).
+    surprise_bonus: 0.01,
     competitor_poaching: -0.04, leak: -0.03,
   } as Record<EventType | 'leak' | import('../shared/events').BusinessNewsKind, number>,
 };

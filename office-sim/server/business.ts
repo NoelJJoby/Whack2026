@@ -1,6 +1,6 @@
 import type { Business, LedgerEntry, Task } from '../shared/business';
 import type { World, EngineAgent } from './engine-types';
-import { calendarSpan, dayIndexOf, days, isDayStart, workdayTime } from '../shared/workday';
+import { calendarSpan, dayIndexOf, days, isDayStart, isOfficeHour, workdayTime } from '../shared/workday';
 
 export const BUSINESS_PARAMS = {
   currency: 'GBP', salesTarget: 100_000_000, startingCash: 50_000_000,
@@ -8,6 +8,9 @@ export const BUSINESS_PARAMS = {
   errorBase: 0.025, errorMax: 0.24, fatigueError: 0.08, overloadError: 0.08,
   reviewReduction: 0.75, detectionDelay: 1, materialDelay: 5,
 };
+const ROUTINE_WORK = [['sales', 'Sales', 'Develop qualified pipeline'], ['release', 'Engineering', 'Maintain product release'], ['process', 'Operations', 'Improve service process']] as const;
+/** Work an employee could still be assigned (review is a reviewer's turn, not an owner's). */
+const OPEN_STATUSES: Task['status'][] = ['pending', 'active', 'paused', 'blocked'];
 export function initialiseBusiness(agents: Record<string, EngineAgent>): Business {
   const entries = Object.values(agents);
   const ceo = entries.find(a => a.id === 'ceo' || a.profile.functionGroup === 'Exec')?.id;
@@ -80,11 +83,16 @@ export function openBusinessTick(w: World) {
     }
   }
   // Established clients generate recurring service obligations, with real capacity costs.
-  // Every second workday, at 09:00.
+  // Each office hour every department keeps at least one open item per active employee, so an
+  // employee who finishes an assignment picks up routine backlog rather than idling like a vacant
+  // seat. Supply follows active headcount: quits and layoffs shrink it.
+  if (isOfficeHour(w.tick)) for (const [kind, dept, title] of ROUTINE_WORK) {
+    const staff = Object.values(b.positions).filter(p => p.role === 'employee' && p.department === dept && w.agents[p.id].status === 'active').length;
+    const open = b.tasks.filter(t => t.department === dept && OPEN_STATUSES.includes(t.status)).length;
+    for (let i = open; i < staff; i++) b.tasks.push(makeTask(`routine-${w.tick}-${kind}-${i}`, kind, dept, title, 3, w.tick + days(3)));
+  }
+  // New pipeline every second workday, at 09:00.
   if (isDayStart(w.tick) && dayIndexOf(w.tick) % 2 === 0) {
-    const id = `routine-${w.tick}`;
-    for (const [kind, dept, title] of [['sales', 'Sales', 'Develop qualified pipeline'], ['release', 'Engineering', 'Maintain product release'], ['process', 'Operations', 'Improve service process']] as const)
-      b.tasks.push(makeTask(`${id}-${kind}`, kind, dept, title, 3, w.tick + days(3)));
     if (b.opportunities.filter(o => o.stage === 'qualified').length < 4) b.opportunities.push({ id: `op-${w.tick}`, client: `Client ${w.tick}`, value: 4_000_000, stage: 'qualified', owner: null });
   }
   for (const t of b.tasks) if (t.owner && w.agents[t.owner]?.status !== 'active' && !['done','cancelled'].includes(t.status)) {

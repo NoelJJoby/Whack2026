@@ -3,7 +3,7 @@
 // passes a fresh clone, so runTick stays pure from the caller's side.
 import type { AgentState, EventType } from '../shared/types';
 import { gossipHop, receiveClaim, seedEventClaim } from './claims';
-import type { Decision, EngineAgent, HopLog, QueuedEvent, World } from './engine-types';
+import type { AppliedEvent, CustomPriceEffect, Decision, EngineAgent, HopLog, QueuedEvent, World } from './engine-types';
 import type { ClaimImpact, Params } from './params';
 import type { Rng, RngFactory } from './rng';
 
@@ -52,7 +52,7 @@ export function applyEvent(
   ev: QueuedEvent,
   p: Params,
   rng: Rng,
-): { type: EventType; is_true: boolean; claim: string } {
+): AppliedEvent {
   const e = p.events[ev.type];
   const isTrue = ev.isTrue ?? e.isTrue;
   const ids = active(world);
@@ -74,10 +74,15 @@ export function applyEvent(
         agent.state.stress = clamp(agent.state.stress + (ev.customEffects.churnRisk ?? 0) * 0.25 * scale);
       }
     }
-    if (typeof ev.customEffects.priceImpact === 'number' && Number.isFinite(ev.customEffects.priceImpact)) {
-      const next = world.price.price * (1 + ev.customEffects.priceImpact * 0.5);
-      world.price.price = clamp(next, p.price.minPrice, p.price.maxPrice);
-    }
+  }
+  // Price effects are returned for updatePrice, which rebuilds the price from its components;
+  // writing world.price here would be discarded.
+  let custom: CustomPriceEffect | undefined;
+  if (ev.customEffects) {
+    const { priceImpact, productivity } = ev.customEffects;
+    custom = { duration: Math.max(1, Math.round(ev.customMeta?.durationTicks ?? 1)) };
+    if (typeof priceImpact === 'number' && Number.isFinite(priceImpact)) custom.impact = priceImpact;
+    if (typeof productivity === 'number' && Number.isFinite(productivity) && productivity !== 0) custom.productivity = productivity;
   }
 
   for (const id of isTrue && !ev.custom ? ids : []) {
@@ -106,7 +111,7 @@ export function applyEvent(
     const r = receiveClaim(world, id, claim.id, source, world.tick, 0, p);
     applyImpact(world.agents[id], r.impact, r.scale, p);
   }
-  return { type: ev.type, is_true: isTrue, claim: claim.id };
+  return { type: ev.type, is_true: isTrue, claim: claim.id, ...(custom ? { custom } : {}) };
 }
 
 // --- Step 3: resolve actions ---------------------------------------------------

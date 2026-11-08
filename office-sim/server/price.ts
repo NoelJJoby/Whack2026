@@ -1,7 +1,7 @@
 import type { BusinessNewsKind } from '../shared/events';
 import type { Action, AgentState, EventType } from '../shared/types';
 import type { PriceDTO } from '../shared/api';
-import { ACTIONS, type EngineAgent, type EngineClaim } from './engine-types';
+import { ACTIONS, type AppliedEvent, type EngineAgent, type EngineClaim } from './engine-types';
 import { type Params, type PriceParams } from './params';
 import type { Rng } from './rng';
 import { applyDelta, clamp } from './rules';
@@ -23,7 +23,10 @@ export interface PriceState {
   ret: number;
   oEma: number;
   news: NewsItem[];
+  /** Custom-event output shifts still in force (optional: older saved runs have none). */
+  shifts?: OutputShift[];
 }
+export interface OutputShift { id: string; factor: number; bornTick: number; untilTick: number }
 export interface FeedbackDelta {
   agent: string;
   requested: { trust_mgmt: number; stress: number };
@@ -35,6 +38,8 @@ export interface PriceRecord {
   price: number;
   ret: number;
   rawOutput: number;
+  /** Product of active custom-event output shifts; present only while one is in force. */
+  outputShift?: number;
   effectiveOutput: number;
   oEma: number;
   outputLog: number;
@@ -50,9 +55,13 @@ export interface PriceRecord {
   guards: { outputFloor: boolean; priceBound: 'min' | 'max' | null; rawLogPrice: number; logPrice: number };
 }
 export interface PriceInput {
-  operating?: { productiveUnits: number; capacity: number; fundamentals: number; news: Array<{ id: string; kind: BusinessNewsKind; isTrue: boolean }> };
+  operating?: {
+    productiveUnits: number; capacity: number; fundamentals: number; news: Array<{ id: string; kind: BusinessNewsKind; isTrue: boolean }>;
+    /** Fixed productive seats (filled or vacant) that productiveUnits is counted over; vacancies lower output. */
+    seats: number;
+  };
   tick: number;
-  events: Array<{ type: EventType; is_true: boolean; claim: string }>;
+  events: AppliedEvent[];
   leaks: Array<{ agent: string; claim: string }>;
   claims: Record<string, EngineClaim>;
   /** One entry per fixed seat; a null action means already vacant before decisions. */
@@ -120,23 +129,37 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   for (const delta of input.feedbackDeltas) for (const d of [delta.requested, delta.actual]) {
     finite(d.stress, 'feedback stress'); finite(d.trust_mgmt, 'feedback trust');
   }
-  const rawOutput = finite(input.operating ? input.operating.productiveUnits/input.seats.length : input.seats.reduce((sum, seat) => {
+  if (input.operating && !(Number.isSafeInteger(input.operating.seats) && input.operating.seats > 0)) throw new Error('Invalid operating seats');
+  // Business mode: numerator and denominator count the same (employee) seats.
+  const baseOutput = finite(input.operating ? finite(input.operating.productiveUnits, 'productive units')/input.operating.seats : input.seats.reduce((sum, seat) => {
     const b = clamp(finite(seat.burnout, 'burnout')) / 100;
     if (seat.action === null) return sum;
     return sum + finite(p.productivity[seat.action], 'productivity') + (seat.action === 'overwork' ? p.overworkBonus * (1 - b) : 0);
   }, 0) / input.seats.length, 'output');
+  // Custom-event productivity shifts last from the announcing tick for their duration.
+  const shifts: OutputShift[] = (previous.shifts ?? []).filter(s => s.untilTick >= input.tick).map(s => ({ ...s }));
+  for (const event of input.events) {
+    const pct = event.custom?.productivity;
+    if (pct === undefined) continue;
+    finite(pct, 'custom productivity'); integer(event.custom!.duration, 'custom duration');
+    if (event.custom!.duration < 1 || pct <= -100) throw new Error('Invalid custom output shift');
+    shifts.push({ id: event.claim, factor: 1 + pct / 100, bornTick: input.tick, untilTick: input.tick + event.custom!.duration - 1 });
+  }
+  const outputShift = shifts.reduce((f, s) => f * s.factor, 1);
+  const rawOutput = finite(baseOutput * outputShift, 'output');
   const oEma = input.officeClosed ? previous.oEma : finite(p.outputAlpha * rawOutput + (1 - p.outputAlpha) * previous.oEma, 'smoothed output');
   const born: NewsItem[] = [];
-  const add = (id: string, kind: NewsItem['kind'], claimId: string, eventTruth?: boolean) => {
+  const add = (id: string, kind: NewsItem['kind'], claimId: string, eventTruth?: boolean, impact?: number) => {
     const claim = input.claims[claimId];
     if (!claim || typeof claim.is_true !== 'boolean' || !claim.rootId) throw new Error(`Invalid price claim ${claimId}`);
     integer(claim.created_tick, 'claim birth');
     if (claim.created_tick > input.tick || (eventTruth !== undefined && eventTruth !== claim.is_true)) throw new Error('Invalid price claim metadata');
     const correctionTick = claim.is_true ? null : claim.created_tick + p.refuteDelay;
     if (correctionTick !== null) integer(correctionTick, 'correction tick');
-    born.push({ id, kind, claimId, rootId: claim.rootId, impact: p.impacts[kind], bornTick: input.tick, isTrue: claim.is_true, correctionTick });
+    born.push({ id, kind, claimId, rootId: claim.rootId, impact: impact ?? p.impacts[kind], bornTick: input.tick, isTrue: claim.is_true, correctionTick });
   };
-  for (const event of input.events) add(event.claim, event.type, event.claim, event.is_true);
+  // A custom event's own impact replaces its base type's (a "good news" custom maps to surprise_bonus).
+  for (const event of input.events) add(event.claim, event.type, event.claim, event.is_true, event.custom?.impact === undefined ? undefined : finite(event.custom.impact, 'custom impact'));
   for (const leak of input.leaks) add(`leak:${input.tick}:${leak.agent}:${leak.claim}`, 'leak', leak.claim);
   for (const event of input.operating?.news ?? []) born.push({ id: event.id, kind: event.kind, claimId: event.id, rootId: event.id, impact: p.impacts[event.kind], bornTick: input.tick, isTrue: event.isTrue, correctionTick: event.isTrue ? null : input.tick+p.refuteDelay });
   const news = [...previous.news.map(item => ({ ...item })), ...born];
@@ -160,8 +183,8 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   const logPrice = clamp(rawLogPrice, Math.log(p.minPrice), Math.log(p.maxPrice));
   const price = clamp(Math.exp(logPrice), p.minPrice, p.maxPrice);
   const ret = logPrice - Math.log(previous.price);
-  const state: PriceState = { tick: input.tick, price, ret, oEma, news };
-  const record: PriceRecord = { ...(input.operating ? { operating: { fundamentals: input.operating.fundamentals, productiveUnits: input.operating.productiveUnits, capacity: input.operating.capacity } } : {}), tick: input.tick, price, ret, rawOutput, effectiveOutput, oEma, outputLog, newsLevel, contributions,
+  const state: PriceState = { tick: input.tick, price, ret, oEma, news, ...(shifts.length || previous.shifts ? { shifts } : {}) };
+  const record: PriceRecord = { ...(input.operating ? { operating: { fundamentals: input.operating.fundamentals, productiveUnits: input.operating.productiveUnits, capacity: input.operating.capacity } } : {}), tick: input.tick, price, ret, rawOutput, ...(shifts.length ? { outputShift } : {}), effectiveOutput, oEma, outputLog, newsLevel, contributions,
     bornIds: born.map(n => n.id), correctedIds, noise, ...workforceReport(input.postQuit), feedback: input.feedback,
     feedbackDeltas: structuredClone(input.feedbackDeltas),
     guards: { outputFloor: oEma < p.outputFloor, priceBound: rawLogPrice < Math.log(p.minPrice) ? 'min' : rawLogPrice > Math.log(p.maxPrice) ? 'max' : null, rawLogPrice, logPrice } };
