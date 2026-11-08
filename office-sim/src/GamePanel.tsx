@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { Sprite, type Person } from './people';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { CEO_MODEL_OPTIONS, metricState, playerText, type Metric } from './hudModel';
+import { WhyButton, type WhyProps } from './Inbox';
 
 export function MenuPanel({ title, onClose, children, wide = false }: { wide?: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -29,6 +30,23 @@ export function MenuPanel({ title, onClose, children, wide = false }: { wide?: b
   }}><div className="tool-heading"><h2 id="tool-title">{title}</h2><button className="close" autoFocus onClick={onClose} aria-label={`Close ${title}`}>×</button></div><div className="tool-content">{children}</div></dialog>;
 }
 
+/** A non-modal panel keeps the rail available, so players can switch tools directly. */
+export function RailPanel({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: ReactNode }) {
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    panel.current?.querySelector<HTMLButtonElement>('.close')?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); }
+    };
+    document.addEventListener('keydown', escape);
+    return () => document.removeEventListener('keydown', escape);
+  }, [onClose]);
+  return <aside ref={panel} id={id} className="rail-panel" role="dialog" aria-labelledby={`${id}-title`}>
+    <div className="rail-panel-heading"><h2 id={`${id}-title`}>{title}</h2><button className="close" onClick={onClose} aria-label={`Close ${title}`}>×</button></div>
+    <div className="rail-panel-content">{children}</div>
+  </aside>;
+}
+
 export function MetricBar({ label, value, threshold }: { label: Metric; value: number; threshold: number }) {
   const status = metricState(label, value, threshold);
   const displayValue = Number(value.toFixed(1));
@@ -46,7 +64,7 @@ function CeoModelSelect({ model, onChange }: { model?: string; onChange?: (model
   </section>;
 }
 
-export function EmployeePanel({ person, threshold, anchor, onClose, onModelChange, business, employeeId, cast = [] }: { business?: Business; employeeId?: string; cast?: AgentProfile[]; person: Person; threshold: number; anchor: HTMLElement | null; onClose: () => void; onModelChange?: (model: string) => void }) {
+export function EmployeePanel({ person, threshold, anchor, onClose, onModelChange, business, employeeId, cast = [], whyFor, onWhy }: WhyProps & { business?: Business; employeeId?: string; cast?: AgentProfile[]; person: Person; threshold: number; anchor: HTMLElement | null; onClose: () => void; onModelChange?: (model: string) => void }) {
   const panel = useRef<HTMLElement>(null);
   const [position, setPosition] = useState({ left: 12, top: 12 });
   useLayoutEffect(() => {
@@ -81,7 +99,7 @@ export function EmployeePanel({ person, threshold, anchor, onClose, onModelChang
     <div className="employee-heading"><div className="portrait" style={{ borderColor: person.color }}><Sprite person={person} quit={person.quit}/></div><div><h2 id="employee-name">{person.name}</h2><p>{person.role}</p></div><button className="close" onClick={onClose} aria-label="Close employee details">×</button></div>
     <div className="employee-content" tabIndex={0} aria-label="Employee statements and metrics"><p className={`current-action ${person.quit ? 'coral' : 'mint'}`}><span className="status-dot"/>{person.action}</p>
       {person.role === 'CEO' && <CeoModelSelect model={person.model} onChange={onModelChange}/>}
-      {business && employeeId && <section className="employee-assignment"><h3>Current work</h3><p>Supervisor: {cast.find(p => p.id === business.positions[employeeId]?.supervisor)?.name ?? business.positions[employeeId]?.supervisor ?? 'Executive owner'}</p>{business.tasks.filter(t => t.owner === employeeId && !['done','cancelled'].includes(t.status)).map(t => <p key={t.id}>{t.title} · {t.status} · Due {timeLabel(t.deadline)} · Priority {t.priority}</p>)}</section>}
+      {business && employeeId && <section className="employee-assignment"><h3>Current work</h3><p>Supervisor: {cast.find(p => p.id === business.positions[employeeId]?.supervisor)?.name ?? business.positions[employeeId]?.supervisor ?? 'Executive owner'}</p>{business.tasks.filter(t => t.owner === employeeId && !['done','cancelled'].includes(t.status)).map(t => <p key={t.id}>{t.title} · {t.status} · Due {timeLabel(t.deadline)} · Priority {t.priority}<WhyButton taskId={t.id} whyFor={whyFor} onWhy={onWhy}/></p>)}</section>}
       <div className="employee-dialogue"><h3>Public statement</h3><blockquote>{person.says ? `“${playerText(person.says)}”` : 'No statement yet'}</blockquote><h3>Private thought</h3><blockquote className="private-thought">{person.thinks ? `“${playerText(person.thinks)}”` : 'No thought recorded'}</blockquote></div>
       <div className="employee-metrics"><MetricBar label="Stress" value={person.stress} threshold={threshold}/><MetricBar label="Burnout" value={person.burnout} threshold={threshold}/><MetricBar label="Trust in management" value={person.trust} threshold={threshold}/><MetricBar label="Workload" value={person.workload} threshold={threshold}/></div>
       <p className="metric-note">Higher stress, burnout and workload mean more pressure. Higher trust is favourable. Burnout rises above {BURNOUT_STRESS_THRESHOLD} stress and recovers below {BURNOUT_RECOVERY_THRESHOLD}. The base burnout exit threshold is {threshold}; recent interviews can lower it.</p>

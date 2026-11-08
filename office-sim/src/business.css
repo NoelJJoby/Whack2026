@@ -8,6 +8,7 @@
 .chip.coral { color: var(--coral); border-color: currentColor; }
 .chip.gold { color: var(--gold); border-color: currentColor; }
 .link { padding: 0; color: var(--mint); text-decoration: underline; }
+.link:disabled { opacity: 0.45; cursor: not-allowed; text-decoration: none; }
 .muted { color: var(--muted); }
 
 /* Objective */
@@ -98,3 +99,5 @@
 .objective-strip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .objective-strip small { color: var(--muted); white-space: nowrap; }
 .dialogue-tag.objective { color: var(--gold); }
+.dialogue-tag.meeting { color: var(--coral); }
+.dialogue-tag.chase { color: var(--gold); }

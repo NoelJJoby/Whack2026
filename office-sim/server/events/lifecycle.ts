@@ -5,6 +5,8 @@ import { dayIndexOf, days, OFFICE_TICKS_PER_DAY, TICKS_PER_DAY, workdayTime } fr
 import { cadenceParams } from '../params';
 import { CATALOG, type EventDefinition } from './catalog';
 import { stream } from '../rng';
+import { collecting } from '../diagnostics/collector';
+import { noteCaseFailed } from '../diagnostics/details';
 export const terminal = (e: BusinessEvent) => ['resolved','failed','cancelled','superseded'].includes(e.status);
 export function managementOwners(w: World) {
   const positions = Object.values(w.business.positions);
@@ -92,6 +94,7 @@ export function updateLifecycle(w: World) {
       e.status = 'failed'; e.outcome = 'Deadline missed; remaining work and obligations retained.';
       e.milestones.push({ tick: w.tick, text: e.outcome });
       if (e.domain === 'delivery') for (const t of tasks) { const c = w.business.contracts.find(c => c.id === t.contractId); if (c) c.status = 'at_risk'; }
+      if (collecting(w)) noteCaseFailed(w, e, tasks);
     }
   }
   w.business.committed = w.eventState.directives.filter(d => d.active).reduce((n,d) => n + d.budget, 0);

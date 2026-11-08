@@ -192,6 +192,8 @@ export interface World {
   speech?: SpeechState;
   /** Live run scorecard (shared/scorecard.ts). Absent on worlds built before it; runTick starts one. */
   scorecard?: import('../shared/scorecard').LiveScorecard;
+  /** Chases, warnings and internal deadlines (server/accountability.ts). Absent until the first business tick. */
+  accountability?: import('./accountability').AccountabilityState;
 }
 
 // --- Voice and speech (server/llm/voice.ts, server/speech.ts) ---------------
@@ -276,6 +278,8 @@ export interface TurnContext {
   triggers?: import('./triggers').Trigger[];
   /** A colleague's line waiting for this agent's reply (server/conversations.ts). */
   incoming?: import('./conversations').Incoming;
+  /** Write the lines for a meeting the rules already decided (server/accountability.ts). */
+  meeting?: import('./llm/meeting-prompt').MeetingBrief;
 }
 
 /** Example small-talk lines for a voice, or null if the call failed. */
@@ -327,6 +331,8 @@ export interface DecisionLog {
   draw: number;
   chosen: { action: Action; target: string | null; claim: string | null; task_id?: string; assignment_version?: number; evidence_id?: string };
   explain: string;
+  /** Situational multipliers applied before the clamp, by source (e.g. being chased). */
+  situational?: { source: string; modifiers: Partial<Record<Action, number>> };
   /** Manner, stance and repetition check for this turn's line (LLM modes). */
   speech?: SpeechLog;
 }
@@ -375,4 +381,6 @@ export interface EngineTickLog {
   /** Example lines fetched this tick. */
   examples?: Record<string, string[]>;
   speech?: SpeechTickLog;
+  /** Stand-up chases and meetings this tick (business mode). */
+  accountability?: import('../shared/accountability').AccountabilityFrame;
 }

@@ -543,6 +543,54 @@ export const DEFAULT_PARAMS = {
   voice: voiceParams,
   cadence: cadenceParams,
   scorecard: scorecardParams,
+  /** Task inbox (server/diagnostics). Read only by diagnostics, never by the simulation. */
+  diagnostics: {
+    /** Work rate for the deadline projection: share of the owner's last N turns spent working. */
+    workRateTurns: 8,
+    /** Defect risk at or above this, when work finishes, raises HIGH_DEFECT_RISK. */
+    defectRiskWarn: 0.08,
+    /** PARTIAL_PROGRESS when more than this many full allocations remain. */
+    partialTurnsWarn: 4,
+    /** CHOSE_OTHER_ACTION becomes a warning at this many non-work turns of the last `choiceWindow`. */
+    choiceWarnTurns: 3,
+    choiceWindow: 4,
+    maxMessagesPerThread: 30,
+  },
+  /** Accountability (server/accountability.ts): internal deadlines, stand-up chases, warning, firing. */
+  accountability: {
+    enabled: true,
+    /** Internal deadlines use this share of the working time available before the case deadline. */
+    strictness: 0.75,
+    /** Office turns added to each task's planned finish. */
+    bufferTurns: 1,
+    /** Behind: assigned and active this many office turns with no progress (one working day). */
+    stallTurns: 5,
+    /** A chase expects this many working days of the task's allocation done by the due-by time (or the task done). */
+    expectDays: 1,
+    /** Owner's fault: at least this share of their counted turns were their own choice... */
+    faultShare: 0.5,
+    /** ...out of at least this many counted (own-choice or blocked) turns. */
+    minFaultTurns: 2,
+    /** A CEO warning stays on file this many working days; another at-fault miss within it is a firing. */
+    warningDays: 5,
+    /** Non-firing meeting cutscenes per in-game day; firings always play. */
+    cutscenesPerDay: 1,
+    /** Chase lines shown on the dialogue bar per stand-up; the rest are in the inbox. */
+    chaseLinesPerStandup: 2,
+    /** Being chased (or warned): multipliers on the bias engine's modifiers, before the clamp. Toward what is in their control. */
+    chased: {
+      modifiers: { work: 2, overwork: 1.8, review_work: 1.3, support_colleague: 0.8, report_issue: 1, slack_off: 0.35, gossip: 0.5, complain: 0.7, verify: 0.7, interview: 0.5, leak: 0.5 } as Partial<Record<Action, number>>,
+      /** Extra push on work and overwork once warned. */
+      warnedBoost: 1.3,
+      /** When the chased task is blocked by something outside their control: raise it with management. */
+      blockedReportIssue: 3,
+      /** Stress when chased: base + impulsivity (0-1) x this. */
+      stress: 4, impulsivityStress: 6,
+    },
+    warning: { stress: 10, loyalty: -4, trust_mgmt: -3 },
+    /** Everyone still employed when someone is fired. */
+    firingWitness: { stress: 3, trust_mgmt: -2 },
+  },
   playback: { quietDwellMs: 1200, ackRetryMs: 1000, tickIntervalMs: 800, dialogueCap: 5, charsPerSecond: 70, punctuationPauseMs: 100, autoBaseMs: 1500, autoPerWordMs: 250, stressJump: 10 },
 };
 

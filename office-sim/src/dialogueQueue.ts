@@ -1,6 +1,7 @@
 // The dialogue bar's round queue and playback state. Pure: no React, no timers.
 import { DEFAULT_PARAMS } from '../server/params';
 import type { TickEvent, TickFrame } from '../shared/api';
+import { OUTCOME_LABEL, type MeetingScene } from '../shared/accountability';
 import { businessNotices, playerText, type BusinessNotice } from './hudModel';
 import type { CompanyActivity } from '../shared/companyTasks';
 import { isSpoken, shortenQuoted } from './companyModel';
@@ -39,7 +40,27 @@ export interface DialogueLine {
   tier: number;
   stress: number;
   stressDelta: number;
+  /** A beat of a meeting cutscene: the boss speaks, then the agent replies (the last beat shows the outcome stamp). */
+  meeting?: { id: string; agent: string; boss: string; stamp: string; last: boolean };
+  /** Show the inner thought even with thoughts off (a meeting reply reveals what they really think). */
+  revealInner?: boolean;
+  /** A manager's stand-up chase. */
+  chase?: boolean;
 }
+
+/** The boss's line, then the agent's reply and inner thought, as dialogue lines. */
+export function meetingLines(scene: MeetingScene, stressOf: (id: string) => number = () => 0, key = `${scene.tick}-${scene.id}`): DialogueLine[] {
+  const cue = (last: boolean) => ({ id: scene.id, agent: scene.agent, boss: scene.boss, stamp: OUTCOME_LABEL[scene.outcome], last });
+  const base = { kind: 'agent' as const, tick: scene.tick, quit: false, tier: 0, stressDelta: 0 };
+  return [
+    { ...base, key: `${key}-boss`, agent: scene.boss, publicLine: playerText(scene.lines.boss), inner: '', action: 'work' as Action, emotion: 'normal' as Emotion, stress: stressOf(scene.boss), meeting: cue(false) },
+    { ...base, key: `${key}-reply`, agent: scene.agent, publicLine: playerText(scene.lines.reply), inner: playerText(scene.lines.inner), action: 'work' as Action,
+      emotion: emotionFor({ quit: scene.outcome === 'fired', action: 'work', stress: stressOf(scene.agent), stressDelta: 10, burnout: 0, trust: 30, events: [] }), stress: stressOf(scene.agent), meeting: cue(true), revealInner: true, quit: scene.outcome === 'fired' },
+  ];
+}
+
+/** Stand-up chases spoken this hour, capped; the rest are in the inbox. */
+export const CHASE_LINE_CAP = DEFAULT_PARAMS.accountability.chaseLinesPerStandup;
 
 /** This round's lines, most dramatic first, capped at DIALOGUE_CAP. */
 export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
@@ -72,8 +93,13 @@ export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
   return [
     ...frame.events.map((event, i) => narrator(event.text, `announcement-${i}`, { announcement: event })),
     ...businessNotices(frame, prev).map(n => narrator(`${n.label}: ${n.text}`, n.key.slice(`${frame.tick}-`.length), { business: n })),
+    ...(frame.accountability?.chases ?? []).slice(0, CHASE_LINE_CAP).map(c => ({
+      kind: 'agent' as const, key: `${frame.tick}-${c.id}`, tick: frame.tick, agent: c.chaser, publicLine: playerText(c.line), inner: '', quit: false,
+      action: 'work' as Action, emotion: 'normal' as Emotion, tier: 0, stress: frame.state.agents[c.chaser]?.stress ?? 0, stressDelta: 0, chase: true,
+    })),
     ...companyLines(frame),
     ...agents,
+    ...(frame.accountability?.meetings ?? []).filter(m => m.cutscene).flatMap(m => meetingLines(m, id => frame.state.agents[id]?.stress ?? 0)),
     ...(frame.day_report ? [
       ...frame.day_report.lines.map((text, i) => narrator(i === 0 ? `Day ${frame.day_report!.day} report. ${text}` : text, `report-${i}`, { report: true })),
       ...frame.day_report.fillerDays.map(day => narrator(`Day ${day}: a routine day; nothing happened.`, `filler-${day}`, { report: true, calendarDay: day })),
@@ -104,7 +130,7 @@ export function typeDelay(text: string, shown: number): number {
 }
 
 export function readingDelay(line: DialogueLine, showThoughts: boolean): number {
-  const text = showThoughts && line.inner ? `${line.publicLine} ${line.inner}` : line.publicLine;
+  const text = (showThoughts || line.revealInner) && line.inner ? `${line.publicLine} ${line.inner}` : line.publicLine;
   return AUTO_BASE_MS + AUTO_PER_WORD_MS * text.split(/\s+/).filter(Boolean).length;
 }
 
@@ -128,6 +154,10 @@ export type PlayerAction =
   /** Auto's reading delay elapsed. */
   | { type: 'auto' }
   | { type: 'skip' }
+  /** Skip past the current meeting cutscene's lines only. */
+  | { type: 'skipMeeting' }
+  /** Play these lines now, then carry on with the rest of the round (a replayed cutscene). */
+  | { type: 'insert'; lines: DialogueLine[]; tick: number }
   | { type: 'clear' };
 
 export const idle: PlayerState = { round: [], index: 0, phase: 'idle', shownPublic: 0, shownInner: 0, tick: null };
@@ -150,12 +180,24 @@ export function playerReducer(state: PlayerState, action: PlayerAction): PlayerS
     case 'round':
       return start(action.lines, action.tick ?? action.lines[0]?.tick ?? null);
     case 'skip': return finish(state);
+    case 'skipMeeting': {
+      const id = line?.meeting?.id;
+      if (!id) return state;
+      let index = state.index;
+      while (state.round[index]?.meeting?.id === id) index++;
+      return index < state.round.length ? { ...state, index, phase: 'public', shownPublic: 0, shownInner: 0 } : finish(state);
+    }
+    case 'insert': {
+      if (!action.lines.length) return state;
+      const rest = state.phase === 'idle' ? [] : state.round.slice(state.index);
+      return { ...idle, round: [...action.lines, ...rest], tick: state.tick ?? action.tick, phase: 'public' };
+    }
     case 'type':
       if (!line) return state;
       if (state.phase === 'public') {
         const shownPublic = state.shownPublic + 1;
         if (shownPublic < line.publicLine.length) return { ...state, shownPublic };
-        return { ...state, shownPublic, phase: action.showThoughts && line.inner ? 'inner' : 'reading' };
+        return { ...state, shownPublic, phase: (action.showThoughts || line.revealInner) && line.inner ? 'inner' : 'reading' };
       }
       if (state.phase === 'inner') {
         const shownInner = state.shownInner + 1;

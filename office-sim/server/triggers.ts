@@ -3,6 +3,7 @@
 import type { EngineAgent, EventType, World } from './engine-types';
 import { CATALOG } from './events/catalog';
 import { terminal } from './events/lifecycle';
+import { chaseTriggers } from './accountability';
 
 export interface Trigger {
   /** Stable key the LLM copies into "cause". */
@@ -71,6 +72,8 @@ export function computeTriggers(w: World, agent: EngineAgent, events: Array<{ ty
       out.push(amplify(agent, { id: `task-${task.id}`, kind: 'task', text: `${task.title} is due soon and behind`, severity: left <= 1 ? 3 : 2 }));
     }
   }
+  // Chased by their manager, or warned by the CEO: they know by when, and what is in their control.
+  out.push(...chaseTriggers(w, agent));
   // How they feel.
   if (agent.state.stress >= 60) out.push({ id: 'state-stress', kind: 'state', text: 'running on stress', severity: agent.state.stress >= 80 ? 3 : 2 });
   if (agent.state.workload >= 80) out.push({ id: 'state-workload', kind: 'state', text: 'workload far above comfortable', severity: 2 });

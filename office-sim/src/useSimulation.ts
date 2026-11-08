@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import type { CompanyTaskSummary } from '../shared/companyTasks';
+import type { InboxThread } from '../shared/inbox';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 import { playerText } from './hudModel';
 
@@ -49,11 +50,15 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
   injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
+  /** "CEO resign": the CEO walks out and the office collapses until everyone has resigned. */
+  ceoResign: () => Promise<boolean>;
   /** The company's objectives this run (the CEO's task), newest last. */
   companyTasks: CompanyTaskSummary[];
   /** Give the CEO an objective; resolves to an error message, or null when accepted. */
   submitObjective: (objective: string, deadlineTicks: number) => Promise<string | null>;
   historyEpoch: number;
+  /** Inbox threads from before the first history frame (shared/inbox.ts). */
+  inboxBase: InboxThread[];
   acknowledge: (tick: number) => Promise<boolean>;
   cast: AgentProfile[];
   maxTicks: number;
@@ -97,6 +102,7 @@ export function useSimulation(): Simulation {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [historyEpoch, setHistoryEpoch] = useState(0);
+  const [inboxBase, setInboxBase] = useState<InboxThread[]>([]);
   const lastTick = useRef(0);
   const currentTick = useRef(0);
   const currentRun = useRef<string | undefined>();
@@ -115,6 +121,7 @@ export function useSimulation(): Simulation {
       const history = orderedFrames(next.history);
       setHistoryEpoch(epoch => epoch + 1);
       lastTick.current = history.at(-1)?.tick ?? next.state.tick;
+      setInboxBase(next.inbox_base ?? []);
       setHistory(history);
       applySnapshot(next, true);
     },
@@ -194,6 +201,7 @@ export function useSimulation(): Simulation {
   return {
     runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
     injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
+    ceoResign: () => post('/sim/ceo-resign'),
     companyTasks: snapshot?.company_tasks ?? [],
     submitObjective: async (objective, deadlineTicks) => {
       if (USE_MOCKS) return 'Mock data mode: the simulation is not connected.';
@@ -205,6 +213,7 @@ export function useSimulation(): Simulation {
       } catch (e) { return errorText(e); }
     },
     historyEpoch,
+    inboxBase,
     acknowledge,
     cast: cast?.agents ?? [],
     speed: snapshot?.speed ?? 1,

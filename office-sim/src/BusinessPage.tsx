@@ -7,11 +7,12 @@ import { Events } from './Events';
 import { money } from './EventDetail';
 import { ObjectivePanel } from './ObjectivePanel';
 import { isActiveObjective, isObjectiveWork, isOpenSituation, shortTitle } from './companyModel';
+import { WhyButton, type WhyProps } from './Inbox';
 import './business.css';
 
-type Tab = 'objective' | 'situations' | 'staff' | 'report';
+export type Tab = 'objective' | 'situations' | 'staff' | 'report';
 
-function Staff({ state, cast, onPerson }: { state: SimulationState | null; cast: AgentProfile[]; onPerson: (id: string) => void }) {
+function Staff({ state, cast, onPerson, whyFor, onWhy }: WhyProps & { state: SimulationState | null; cast: AgentProfile[]; onPerson: (id: string) => void }) {
   const b = state?.business;
   if (!b) return <p className="empty-state">Finances appear when the simulation connects.</p>;
   const people = Object.values(b.positions).filter(p => p.role === 'employee' && state.agents[p.id]?.status === 'active');
@@ -26,7 +27,7 @@ function Staff({ state, cast, onPerson }: { state: SimulationState | null; cast:
         <button className="link" onClick={() => onPerson(p.id)}>{cast.find(a => a.id === p.id)?.name ?? p.id}</button> <small>{p.department}</small>
         {work.length ? <ul>{work.map(t => <li key={t.id} className={t.status}>
           {isObjectiveWork(t.id) && <span className="chip gold">Objective</span>}{shortTitle(t.title).split(':')[0]}
-          <small> · {t.status === 'active' ? 'working' : t.status === 'review' ? 'in review' : t.status === 'paused' ? 'on hold' : 'blocked'}</small>
+          <small> · {t.status === 'active' ? 'working' : t.status === 'review' ? 'in review' : t.status === 'paused' ? 'on hold' : 'blocked'}</small><WhyButton taskId={t.id} whyFor={whyFor} onWhy={onWhy}/>
         </li>)}</ul> : <p className="muted">Free</p>}
       </li>;
     })}</ul>
@@ -34,7 +35,7 @@ function Staff({ state, cast, onPerson }: { state: SimulationState | null; cast:
 }
 
 /** The Business panel: the CEO's objective, business situations, money and staff, and the run report. */
-export function BusinessPage({ state, history, tick, cast, onPerson, initialCase, initialTab, companyTasks, onSubmitObjective, objectiveDisabled, runId, reportStatus }: {
+export function BusinessPage({ state, history, tick, cast, onPerson, initialCase, initialTab, companyTasks, onSubmitObjective, objectiveDisabled, runId, reportStatus, whyFor, onWhy }: WhyProps & {
   state: SimulationState | null; history: TickFrame[]; tick: number; cast: AgentProfile[]; onPerson: (id: string) => void;
   initialTab?: Tab; initialCase: string | null; companyTasks: CompanyTaskSummary[]; onSubmitObjective: (objective: string, deadline: number) => Promise<string | null>;
   objectiveDisabled: boolean; runId?: string; reportStatus?: string;
@@ -47,9 +48,9 @@ export function BusinessPage({ state, history, tick, cast, onPerson, initialCase
     <div className="event-panel-tabs" role="tablist" aria-label="Business">{tabs.map(([id, label]) =>
       <button key={id} role="tab" aria-selected={tab === id} className={`event-panel-tab ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>{label}</button>)}</div>
     <div role="tabpanel">
-      {tab === 'objective' && <ObjectivePanel summaries={companyTasks} state={state} history={history} tick={tick} cast={cast} disabled={objectiveDisabled} onPerson={onPerson} onSubmit={onSubmitObjective}/>}
-      {tab === 'situations' && <Events state={state} cast={cast} onPerson={onPerson} initialId={initialCase} tick={tick}/>}
-      {tab === 'staff' && <Staff state={state} cast={cast} onPerson={onPerson}/>}
+      {tab === 'objective' && <ObjectivePanel summaries={companyTasks} state={state} history={history} tick={tick} cast={cast} disabled={objectiveDisabled} onPerson={onPerson} onSubmit={onSubmitObjective} whyFor={whyFor} onWhy={onWhy}/>}
+      {tab === 'situations' && <Events state={state} cast={cast} onPerson={onPerson} initialId={initialCase} tick={tick} whyFor={whyFor} onWhy={onWhy}/>}
+      {tab === 'staff' && <Staff state={state} cast={cast} onPerson={onPerson} whyFor={whyFor} onWhy={onWhy}/>}
       {tab === 'report' && <BusinessReport runId={runId} tick={tick} status={reportStatus} cast={cast}/>}
     </div>
   </div>;

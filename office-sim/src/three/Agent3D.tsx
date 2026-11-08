@@ -25,7 +25,7 @@ const GOODBYE = 1.8; // seconds spent waving goodbye before heading out
 /** Shared live positions so walkers can avoid each other. */
 export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
 
-export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave' | 'announce';
+export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave' | 'announce' | 'meeting';
 /** Where an agent should be and what they do there, derived from their latest TickRecord. */
 export interface Behaviour {
   goal: string;
@@ -105,7 +105,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
   useEffect(() => {
-    if (latest.kind === 'quit' || latest.kind === 'panic' || latest.kind === 'announce' || behaviour.kind === 'panic' || behaviour.kind === 'announce') setBehaviour(latest);
+    // Being called into (or released from) a meeting interrupts at once, like an announcement.
+    if (latest.kind === 'quit' || latest.kind === 'panic' || latest.kind === 'announce' || latest.kind === 'meeting' || behaviour.kind === 'panic' || behaviour.kind === 'announce' || behaviour.kind === 'meeting') setBehaviour(latest);
   }, [latest.kind]);
   useEffect(() => () => { crowd.delete(person.id); }, [crowd, person.id]);
 
@@ -147,6 +148,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     const holding = m.hold > 0;
     if (holding) m.hold -= Math.min(delta, 0.1);
     const panic = k === 'panic';
+    // Panic wears people out: frantic at first, a stagger as their burnout bar fills.
+    const fatigue = Math.min(1, Math.max(0.3, 1.15 - person.burnout / 100));
     // Give way to anyone walking towards us (lower phase has priority, never for long), and sidestep when close.
     let side = 0, blocked = false;
     const hx = Math.sin(m.heading), hz = Math.cos(m.heading);
@@ -159,7 +162,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       if (m.queue.length && !panic && k !== 'quit' && o.moving && o.phase < phase && ox * hx + oz * hz > 0.2 && d < 0.6) blocked = true;
     }
     m.wait = blocked ? m.wait + dt : 0;
-    const step = holding || (blocked && m.wait < 1.2) ? 0 : dt * WALK * (panic ? PANIC_RUN : 1);
+    const step = holding || (blocked && m.wait < 1.2) ? 0 : dt * WALK * (panic ? PANIC_RUN * fatigue : 1);
     if (m.queue.length) {
       const id = m.queue[0];
       const [px, pz] = nav.pos.get(id)!;
@@ -198,7 +201,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       : packing ? 0 : partner ? Math.atan2(partner.x - m.x, partner.z - m.z) : arrived && behaviour.face !== null ? behaviour.face : m.heading;
     g.rotation.y = lerpAngle(g.rotation.y, facing, Math.min(1, dt * 10));
 
-    const t = m.t, swing = Math.sin(t * (panic ? 16 : 9));
+    const t = m.t, swing = Math.sin(t * (panic ? 9 + 7 * fatigue : 9));
     if (body.current) body.current.position.y = (sitting ? HIP_SIT : HIP_STAND) + (walking ? Math.abs(swing) * (panic ? 0.1 : 0.04) : Math.sin(t * 2) * 0.008);
     legs.forEach((ref, i) => {
       const s = i ? -swing : swing;
@@ -212,7 +215,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       if (waving) { a = i ? -2.9 : 0; out = i ? 0.25 + Math.sin(t * 12) * 0.35 : 0; }
       else if (packing) a = typing(8, i);
       else if (holding) { a = i ? -3.0 + Math.sin(t * 12) * 0.22 : 0.1; out = i ? 0.15 : 0; }
-      else if (panic) { a = -2.6 + Math.sin(t * 20 + i * Math.PI) * 0.8; out = 0.5 + Math.sin(t * 15 + i) * 0.3; }
+      else if (panic) { a = -2.6 * fatigue + Math.sin(t * 20 * fatigue + i * Math.PI) * 0.8 * fatigue; out = (0.5 + Math.sin(t * 15 + i) * 0.3) * fatigue; }
       else if (k === 'quit') a = -1.2;
       else if (walking) a = (i ? swing : -swing) * 0.6;
       else if (k === 'desk') a = typing(14, i);
