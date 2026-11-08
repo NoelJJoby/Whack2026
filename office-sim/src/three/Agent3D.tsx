@@ -17,11 +17,12 @@ const HIP_SIT = 0.55, HIP_STAND = 0.78;
 const PANIC_RUN = 2.4; // panic speed multiplier
 const PERSONAL = 0.75; // agents closer than this sidestep each other
 const CEO_GESTURE = 3; // seconds the resigning CEO stands with a raised fist before walking out
+const GOODBYE = 1.8; // seconds spent waving goodbye before heading out
 
 /** Shared live positions so walkers can avoid each other. */
 export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
 
-export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift';
+export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave';
 /** Where an agent should be and what they do there, derived from their latest TickRecord. */
 export interface Behaviour {
   goal: string;
@@ -31,6 +32,10 @@ export interface Behaviour {
   tag: string | null;
   /** Spread agents sharing a spot along this axis. */
   spread: 'x' | 'z' | null;
+  /** Going home: seconds to keep packing up first, and an optional colleague's spot to say goodbye at. */
+  delay?: number;
+  via?: string | null;
+  viaFace?: number | null;
 }
 
 /** Box positioned by its centre, using the shared unit geometry. */
@@ -54,11 +59,14 @@ function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
-export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, selected, highlighted, line, showThoughts, onSelect }: {
+export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, departing = false, onExit, selected, highlighted, line, showThoughts, onSelect }: {
   person: Person; nav: Nav; crowd: Crowd; behaviour: Behaviour; phase: number; speed: number;
   paused?: boolean;
   /** Starring in the CEO-resigns cutscene: real-time pace and a raised-fist beat before walking out. */
   cinematic?: boolean;
+  /** Went home while this view was open: walk out (or to their car) instead of vanishing. */
+  departing?: boolean;
+  onExit?: () => void;
   selected: boolean; highlighted: boolean; line: DialogueLine | null; showThoughts: boolean; onSelect: (id: string) => void;
 }) {
   const root = useRef<Group>(null);
@@ -67,10 +75,13 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const knees = [useRef<Group>(null), useRef<Group>(null)];
   const arms = [useRef<Group>(null), useRef<Group>(null)];
   const sweat = useRef<Group>(null);
-  // Already gone if they had quit before this view mounted; otherwise they walk out first.
-  const [gone, setGone] = useState(person.quit);
+  // Already gone if they had quit (or gone home) before this view mounted; otherwise they walk out first.
+  const offShift = person.present === false && !person.quit;
+  const startsGone = person.quit || (offShift && !departing);
+  const [gone, setGone] = useState(startsGone);
+  const [leaveStage, setLeaveStage] = useState<'pack' | 'bye' | 'go'>('pack');
   const home = nav.pos.get(seatNode(person.id)) ?? [0, 0];
-  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: person.quit, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null });
+  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: startsGone, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null, leaveT: 0, byeT: 0, stage: 'pack' });
   // Ticks can outpace walking: finish the current move, then switch. Quitting and panic interrupt at once.
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
@@ -81,8 +92,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
 
 
   const k = behaviour.kind;
-  const offShift = person.present === false && !person.quit;
-  const shirt = useMemo(() => offShift ? '#69716c' : k === 'overwork' ? `#${new Color(person.color).lerp(new Color('#d9483b'), 0.5).getHexString()}` : person.color, [k, person.color, offShift]);
+  const shirt = useMemo(() => k === 'overwork' ? `#${new Color(person.color).lerp(new Color('#d9483b'), 0.5).getHexString()}` : person.color, [k, person.color]);
   const inspect = () => {
     document.querySelector<HTMLButtonElement>(`[data-employee="${CSS.escape(person.id)}"]`)?.focus({ preventScroll: true });
     onSelect(person.id);
@@ -90,16 +100,29 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
 
   useFrame((_, delta) => {
     const m = mv.current, g = root.current;
-    if (!g || m.gone || paused || offShift) return;
+    if (!g || m.gone || paused) return;
+    const dt = Math.min(delta, 0.1) * (cinematic ? 1 : speed);
+    // Going home: pack up for a staggered moment, wave goodbye (at a colleague's desk or our own), then leave.
+    const leaving = k === 'leave';
+    let target = behaviour.goal, packing = false, waving = false;
+    if (leaving) {
+      const atTarget = !m.queue.length;
+      if (m.leaveT < (behaviour.delay ?? 0)) { m.leaveT += dt; target = seatNode(person.id); packing = true; }
+      else if (m.byeT < (behaviour.via ? GOODBYE : GOODBYE / 2)) {
+        target = behaviour.via ?? seatNode(person.id);
+        if (atTarget && m.goal === target) { m.byeT += dt; waving = true; }
+      }
+      const stage = packing ? 'pack' : waving ? 'bye' : 'go';
+      if (m.stage !== stage) { m.stage = stage; setLeaveStage(stage); }
+    }
     // Re-route here rather than in an effect, so no frame ever sees a new goal with the old (empty) route.
-    if (m.goal !== behaviour.goal || m.nav !== nav) {
+    if (m.goal !== target || m.nav !== nav) {
       const start = m.queue[0] ?? m.node;
-      const route = nav.route(start, behaviour.goal);
+      const route = nav.route(start, target);
       m.queue = m.queue.length ? [start, ...route.slice(1)] : route.slice(1);
-      m.goal = behaviour.goal; m.nav = nav;
+      m.goal = target; m.nav = nav;
     }
     if (k === 'quit' && cinematic && !m.held) { m.hold = CEO_GESTURE; m.held = true; }
-    const dt = Math.min(delta, 0.1) * (cinematic ? 1 : speed);
     m.t += dt;
     const holding = m.hold > 0;
     if (holding) m.hold -= Math.min(delta, 0.1);
@@ -121,14 +144,17 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       const id = m.queue[0];
       const [px, pz] = nav.pos.get(id)!;
       // Agents sharing a destination stand side by side.
-      const off = m.queue.length === 1 && behaviour.spread ? ((phase % 3) - 1) * 0.5 : 0;
-      const tx = px + (behaviour.spread === 'x' ? off : 0), tz = pz + (behaviour.spread === 'z' ? off : 0);
+      const spread = leaving ? (target === behaviour.via ? 'x' : null) : behaviour.spread;
+      const off = m.queue.length === 1 && spread ? ((phase % 3) - 1) * 0.5 : 0;
+      const tx = px + (spread === 'x' ? off : 0), tz = pz + (spread === 'z' ? off : 0);
       const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
       if (d <= step) { m.x = tx; m.z = tz; m.node = id; m.queue.shift(); }
       else { m.x += (dx / d) * step; m.z += (dz / d) * step; m.heading = Math.atan2(dx, dz); }
     }
     let arrived = !m.queue.length;
-    if (arrived && k === 'quit') { m.gone = true; crowd.delete(person.id); setGone(true); return; }
+    if (arrived && (k === 'quit' || (leaving && m.goal === behaviour.goal))) {
+      m.gone = true; crowd.delete(person.id); setGone(true); if (leaving) onExit?.(); return;
+    }
     // Panic: keep running to random open-floor spots.
     if (arrived && panic) {
       const next = PANIC_NODES[Math.floor(Math.random() * PANIC_NODES.length)];
@@ -138,13 +164,14 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     m.dwell = arrived ? m.dwell + dt : 0;
     if (arrived && m.dwell > DWELL && key(latest) !== key(behaviour)) { m.dwell = 0; setBehaviour(latest); }
     const walking = !arrived && !holding;
-    const sitting = arrived && (k === 'desk' || k === 'overwork' || k === 'sofa');
+    const sitting = arrived && (k === 'desk' || k === 'overwork' || k === 'sofa' || packing);
     crowd.set(person.id, { x: m.x, z: m.z, phase, moving: walking });
     // Sidestep only while walking (drawn offset; the logical path stays on the waypoint graph).
     m.side += ((walking ? Math.max(-0.35, Math.min(0.35, side)) : 0) - m.side) * Math.min(1, dt * 6);
     g.position.set(m.x + hz * m.side, FLOOR, m.z - hx * m.side);
     // The resigning CEO turns to face the camera for their moment.
-    const facing = holding ? 0.35 : arrived && behaviour.face !== null ? behaviour.face : m.heading;
+    const facing = holding ? 0.35 : waving ? (behaviour.via ? behaviour.viaFace ?? m.heading : 0.35)
+      : packing ? 0 : arrived && behaviour.face !== null ? behaviour.face : m.heading;
     g.rotation.y = lerpAngle(g.rotation.y, facing, Math.min(1, dt * 10));
 
     const t = m.t, swing = Math.sin(t * (panic ? 16 : 9));
@@ -158,7 +185,9 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     arms.forEach((ref, i) => {
       if (!ref.current) return;
       let a = Math.sin(t * 1.5 + i) * 0.05, out = 0;
-      if (holding) { a = i ? -3.0 + Math.sin(t * 12) * 0.22 : 0.1; out = i ? 0.15 : 0; }
+      if (waving) { a = i ? -2.9 : 0; out = i ? 0.25 + Math.sin(t * 12) * 0.35 : 0; }
+      else if (packing) a = typing(8, i);
+      else if (holding) { a = i ? -3.0 + Math.sin(t * 12) * 0.22 : 0.1; out = i ? 0.15 : 0; }
       else if (panic) { a = -2.6 + Math.sin(t * 20 + i * Math.PI) * 0.8; out = 0.5 + Math.sin(t * 15 + i) * 0.3; }
       else if (k === 'quit') a = -1.2;
       else if (walking) a = (i ? swing : -swing) * 0.6;
@@ -182,10 +211,11 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const label = <Html position={[0, gone ? 0.65 : 1.85, 0]} center zIndexRange={[3, 0]} className="o3-person-anchor">
     <button className={`o3-person ${offShift || gone ? 'off-shift' : ''}`} data-employee={person.id}
       aria-label={`Inspect ${person.name}`} aria-haspopup="dialog" aria-expanded={selected} onClick={event => { event.stopPropagation(); inspect(); }}>
-      {person.name}{(person.quit || offShift || person.late) && <small>{person.quit ? person.action : offShift ? 'Left for the day' : 'Working late'}</small>}
+      {person.name}{(person.quit || (offShift && gone) || person.late) && <small>{person.quit ? person.action : offShift ? 'Left for the day' : 'Working late'}</small>}
     </button>
   </Html>;
-  if (gone) return <group position={[home[0], FLOOR, home[1]]}>{label}</group>;
+  // Keyed so React doesn't reuse the walking group (which was moved off to the exit or car) for the desk label.
+  if (gone) return <group key="gone" position={[home[0], FLOOR, home[1]]}>{label}</group>;
   const ring = selected ? '#d7b66c' : highlighted ? '#fff2cf' : line ? '#8abca2' : null;
   return <group ref={root} position={[home[0], FLOOR, home[1]]}
     onClick={e => { e.stopPropagation(); inspect(); }}
@@ -208,15 +238,15 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       {[-0.34, 0.34].map((x, i) =>
         <group key={x} ref={arms[i] as RefObject<Group>} position={[x, 0.52, 0]}>
           <Part p={[0, -0.2, 0]} s={[0.15, 0.42, 0.17]} c={shirt} />
-          <Part p={[0, -0.45, 0]} s={[0.13, 0.1, 0.15]} c={offShift ? '#9a9f99' : person.skin} />
+          <Part p={[0, -0.45, 0]} s={[0.13, 0.1, 0.15]} c={person.skin} />
           {i === 1 && k === 'leak' && <Part p={[0, -0.5, 0.1]} s={[0.08, 0.22, 0.04]} c="#15171c" />}
         </group>)}
       {k === 'quit' && (person.role === 'CEO'
         ? <><Part p={[0, 0.15, 0.36]} s={[0.6, 0.42, 0.16]} c="#3b2a20" /><Part p={[0, 0.4, 0.36]} s={[0.2, 0.08, 0.06]} c="#d7b66c" /></>
         : <><Part p={[0, 0.2, 0.42]} s={[0.55, 0.36, 0.42]} c={BOX} /><Part p={[0.05, 0.4, 0.42]} s={[0.14, 0.08, 0.1]} c="#5f9e45" /></>)}
-      <Part p={[0, 0.88, 0]} s={[0.5, 0.5, 0.46]} c={offShift ? '#9a9f99' : person.skin} />
-      <Part p={[0, 1.16, -0.02]} s={[0.54, 0.12, 0.52]} c={offShift ? '#565c57' : person.hair} />
-      <Part p={[0, 0.94, -0.22]} s={[0.54, 0.4, 0.1]} c={offShift ? '#565c57' : person.hair} />
+      <Part p={[0, 0.88, 0]} s={[0.5, 0.5, 0.46]} c={person.skin} />
+      <Part p={[0, 1.16, -0.02]} s={[0.54, 0.12, 0.52]} c={person.hair} />
+      <Part p={[0, 0.94, -0.22]} s={[0.54, 0.4, 0.1]} c={person.hair} />
       <Part p={[-0.1, 0.9, 0.235]} s={[0.08, 0.08, 0.02]} c={EYES} />
       <Part p={[0.1, 0.9, 0.235]} s={[0.08, 0.08, 0.02]} c={EYES} />
     </group>
@@ -226,7 +256,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     </group>
     {line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
       : behaviour.tag && <Html position={[0, 2.05, 0]} zIndexRange={[4, 0]} className="o3-anchor">
-        <div className={`o3-tag ${k}`}>{behaviour.tag}</div>
+        <div className={`o3-tag ${k}`}>{k === 'leave' ? (leaveStage === 'bye' ? 'bye!' : leaveStage === 'pack' ? 'packing up' : behaviour.tag) : behaviour.tag}</div>
       </Html>}
   </group>;
 }

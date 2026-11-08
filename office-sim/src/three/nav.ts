@@ -17,13 +17,15 @@ const BASE: Record<string, P> = {
   fL: [-10.2, AISLE_FRONT], fLounge: [-6.8, AISLE_FRONT], fCol: [-5.6, AISLE_FRONT], fDoor: [0.25, AISLE_FRONT], fR: [6.6, AISLE_FRONT],
   sofaPathR: [-6.8, 1.0], sofaA: [-8.0, 0.15], sofaPathL: [-10.2, 1.0], sofaB: [-9.4, 0.15], winLounge: [-10.4, 2.3],
   doorIn: [0, 4.6], doorOut: [0, 5.9], path: [0, 7.6], interview: [1.0, 7.6], pave: [0, 10.75], exit: [-17.5, 10.75],
+  // Pavement to the two parked cars' driver doors (right-hand drive, so the door faces the walkway).
+  pave0: [9.35, 10.75], car0: [9.35, 8.6], pave1: [11.95, 10.75], car1: [11.95, 8.6],
   // CEO office: through the glass door, round the desk.
   ceoDoor: [7.5, -1.6], ceoA: [6.2, -2.6], ceoB: [6.2, -5.4], ceoBack: [8, -5.4],
 };
 const EDGES = `aL-lc lc-mL mL-fCol lc-meetIn meetIn-meet meet-meetBack meetBack-meetCorner meetCorner-winMeet
   aC-mC mD-fDoor mR-fR ceoOut-ceoDoor ceoDoor-ceoA ceoA-ceoB ceoB-ceoBack
   fLounge-sofaPathR sofaPathR-sofaA fL-sofaPathL sofaPathL-sofaB fL-winLounge
-  fDoor-doorIn doorIn-doorOut doorOut-path path-interview path-pave pave-exit`;
+  fDoor-doorIn doorIn-doorOut doorOut-path path-interview path-pave pave-exit pave-pave0 pave0-car0 pave0-pave1 pave1-car1`;
 
 /** Open-floor spots panicking agents run between (indoors, clear of furniture). */
 export const PANIC_NODES = ['aL', 'aC', 'coffee', 'cooler', 'mL', 'mC', 'mD', 'mR', 'lc', 'fCol', 'fDoor', 'fLounge', 'fR', 'fL'];
