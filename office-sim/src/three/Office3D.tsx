@@ -1,7 +1,7 @@
 // 3D office scene, driven exclusively by the application's presented state.
-import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ElementRef, type RefObject, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
+import { OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type Group, type OrthographicCamera } from 'three';
 import type { Person } from '../people';
 import type { DialogueLine } from '../dialogueQueue';
@@ -196,7 +196,7 @@ function Cars({ cars, boarded, speed, paused }: { cars: CarState[]; boarded: Set
   </group>)}</>;
 }
 
-export default function Office3D({ people: cast, tick, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, fallback }: {
+export default function Office3D({ people: cast, tick, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, fallback, onArrivalChange }: {
   people: Person[];
   /** The same presented simulation tick as the workday clock and employee presence. */
   tick: number;
@@ -213,6 +213,8 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   /** Part B: the CEO's official announcement in the presented hour, if any. */
   announcement?: TickEvent | null;
   paused?: boolean;
+  /** Hold dialogue until every arriving employee has crossed the inside doorway. */
+  onArrivalChange?: (waiting: boolean) => void;
   fallback?: ReactNode;
   /** Placeholder reaction to a catastrophic event: everyone still employed runs about flailing. */
   panic?: boolean;
@@ -241,12 +243,17 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   const presence = useRef(new Map(people.map(p => [p.id, p.present !== false])));
   const previousTick = useRef(tick);
   const arriving = useRef(new Set<string>());
+  const pendingArrivals = useRef(new Set<string>());
+  const [, refreshArrivals] = useState(0);
   const departing = useRef(new Set<string>());
   const cars = useRef<CarState[]>(CARS.map(() => ({ owner: null, stage: 'parked', t: 0, s: 0 })));
   const boarded = useMemo(() => new Set<string>(), []);
   for (const p of people) {
-    if (!p.quit && walksIn(presence.current.get(p.id), p.present !== false, previousTick.current, tick)) arriving.current.add(p.id);
-    if (p.present === false || p.quit) arriving.current.delete(p.id);
+    if (!p.quit && !arriving.current.has(p.id) && walksIn(presence.current.get(p.id), p.present !== false, previousTick.current, tick)) {
+      arriving.current.add(p.id);
+      pendingArrivals.current.add(p.id);
+    }
+    if (p.present === false || p.quit) { arriving.current.delete(p.id); pendingArrivals.current.delete(p.id); }
     if (presence.current.get(p.id) && p.present === false && !p.quit && !departing.current.has(p.id)) {
       departing.current.add(p.id);
       const free = cars.current.find(c => !c.owner && c.stage === 'parked');
@@ -254,6 +261,10 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
     }
     if (p.present !== false || p.quit) departing.current.delete(p.id);
   }
+  for (const id of pendingArrivals.current) if (!people.some(p => p.id === id)) pendingArrivals.current.delete(id);
+  const waitingForEntry = pendingArrivals.current.size > 0;
+  // Notify before paint, so the first arrival frame cannot show or start dialogue.
+  useLayoutEffect(() => { onArrivalChange?.(waitingForEntry); }, [onArrivalChange, waitingForEntry]);
   for (const c of cars.current) {
     const owner = c.owner && people.find(p => p.id === c.owner);
     if (c.owner && (!owner || owner.present !== false)) { boarded.delete(c.owner); c.owner = null; }
@@ -343,6 +354,7 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
           <Agent3D key={`${p.id}:${p.present !== false || p.quit}:${arriving.current.has(p.id)}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} arriving={arriving.current.has(p.id)} onExit={() => boarded.add(p.id)}
+            onEnter={() => { if (pendingArrivals.current.delete(p.id)) refreshArrivals(value => value + 1); }}
             emote={emoteFor(p)} attend={hearsCeo(p.id)} faceTowards={hearsCeo(p.id) ? ceo!.id : EMOTES ? faceTowards.get(p.id) ?? null : null}
             convLine={announcing ? announcement!.text : focusSpeakers.find(r => r.agent === p.id)?.public_line ?? null}
             convDelay={(() => { const mine = focusSpeakers.find(r => r.agent === p.id); return mine?.conversation?.role === 'reply' && focusSpeakers.some(r => r.agent !== p.id && r.conversation?.id === mine.conversation?.id) ? 1.5 : 0; })()} selected={selected === p.id} highlighted={highlight.includes(p.id)}
@@ -353,7 +365,6 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
       <Director focus={focus} crowd={crowd} controls={controls} onLost={cutscene ? endCutscene : () => setFollow(null)} />
-      {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
     {cutscene && <div className={`o3-cutscene ${cutscene.ending ? 'out' : ''}`} role="status">
       <i className="bar top" /><i className="bar bottom" />

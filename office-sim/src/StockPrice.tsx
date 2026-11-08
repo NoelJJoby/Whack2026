@@ -45,7 +45,7 @@ export function StockPrice({ history, current, initialPrice = 100, onOpen, expan
   const change = 100 * (price / initialPrice - 1);
   return <>
     <button className="stock-ticker" onClick={() => onOpen ? onOpen() : setOpen(true)} aria-haspopup="dialog" aria-expanded={onOpen ? expanded : open} aria-label={`Open CHAOS stock chart, price $${price.toFixed(2)}`} title="Open stock chart">
-      <span>CHAOS</span>
+      <span>$CHAOS price</span>
       <strong>${price.toFixed(2)} <em className={change >= 0 ? 'mint' : 'coral'}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</em></strong>
     </button>
     {!onOpen && open && <MenuPanel title="CHAOS stock" onClose={() => setOpen(false)}><StockChart history={history} current={current} initialPrice={initialPrice}/></MenuPanel>}

@@ -95,8 +95,8 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
 
   useBabble({ state, line, active: voices && line?.kind === 'agent' && !reduced && !paused && !fastForward, showThoughts, archetypeOf });
 
-  const next = useCallback(() => dispatch({ type: 'next', auto: latest.current.auto }), []);
-  const skip = useCallback(() => dispatch({ type: 'skip' }), []);
+  const next = useCallback(() => { if (!latest.current.paused) dispatch({ type: 'next', auto: latest.current.auto }); }, []);
+  const skip = useCallback(() => { if (!latest.current.paused) dispatch({ type: 'skip' }); }, []);
 
   // Space pause/play, Enter or N next, S skip round, A auto, M voices. Ignored while typing, with modifiers, or under a menu.
   useEffect(() => {

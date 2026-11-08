@@ -1,4 +1,4 @@
-# The Daily Grind UI overhaul
+# Agentic Chaos UI overhaul
 
 Implemented against `ui-overhaul-prompt.md`, with the subsequent reference-image update for the icon dock and visible stock price. Desktop is the acceptance scope; mobile was explicitly excluded by the user.
 
@@ -55,6 +55,6 @@ Start the Vite client, then run the desktop browser harness using a locally avai
 node --import tsx scripts/verify-ui.mts
 ```
 
-The harness accepts `PLAYWRIGHT_MODULE` (module name or absolute module path), `CHROMIUM_EXECUTABLE`, `UI_URL` and `UI_ARTIFACT_DIR`. Screenshots default to the operating system temporary directory under `daily-grind-ui`. API requests and EventSource messages use fixtures; this harness does not advance or reset the real server.
+The harness accepts `PLAYWRIGHT_MODULE` (module name or absolute module path), `CHROMIUM_EXECUTABLE`, `UI_URL` and `UI_ARTIFACT_DIR`. Screenshots default to the operating system temporary directory under `agentic-chaos-ui`. API requests and EventSource messages use fixtures; this harness does not advance or reset the real server.
 
 No outstanding desktop acceptance failures. Browser automation was run in Chromium; other browser engines were not included in this verification.

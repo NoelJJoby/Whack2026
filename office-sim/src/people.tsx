@@ -35,6 +35,8 @@ export interface Person extends Look {
     quit: boolean;
     present?: boolean;
     late?: boolean;
+    /** Display-only model selection for the CEO. */
+    model?: string;
 }
 /** Portrait expression by stress band. */
 export type Mood = 'calm' | 'stretched' | 'snapping';

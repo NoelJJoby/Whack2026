@@ -38,6 +38,10 @@ export interface LeaderboardRun {
 }
 export interface LeaderboardFile {
   schemaVersion: 1;
+  /** Fictional sample results, rather than measured simulation runs. */
+  demo?: boolean;
+  /** Starting share price, used to display the return across runs. */
+  initialPrice?: number;
   /** Null until the batch has run. */
   generatedAt: string | null;
   mode: string; ticks: number; seeds: number[];

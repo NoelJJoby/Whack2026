@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
-const artifacts = process.env.UI_ARTIFACT_DIR ?? join(tmpdir(), 'daily-grind-ui');
+const artifacts = process.env.UI_ARTIFACT_DIR ?? join(tmpdir(), 'agentic-chaos-ui');
 mkdirSync(artifacts, { recursive: true });
 import { mockCast, mockHistory, mockResponse } from '../src/mocks.ts';
 import assert from 'node:assert/strict';

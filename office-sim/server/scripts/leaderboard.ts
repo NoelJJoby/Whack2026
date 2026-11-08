@@ -61,7 +61,7 @@ async function one(entry: string, seed: number): Promise<LeaderboardRun> {
 // Keep other entries' results when rerunning a subset, unless the setup changed.
 const scenario = LEADERBOARD_SCENARIO.map(({ tick, type, templateId }) => ({ tick, type, ...(templateId ? { templateId } : {}) }));
 const previous: LeaderboardFile | null = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : null;
-const sameSetup = previous && previous.ticks === ticks && JSON.stringify(previous.seeds) === JSON.stringify(seeds) && JSON.stringify(previous.scenario) === JSON.stringify(scenario);
+const sameSetup = previous && !previous.demo && previous.ticks === ticks && JSON.stringify(previous.seeds) === JSON.stringify(seeds) && JSON.stringify(previous.scenario) === JSON.stringify(scenario);
 const runs: LeaderboardRun[] = sameSetup ? previous.runs.filter(r => !selected.includes(r.entry)) : [];
 
 const jobs = selected.flatMap(entry => seeds.map(seed => ({ entry, seed })));
@@ -80,7 +80,7 @@ await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, wor
 const order = ENTRIES.map(e => e.id);
 runs.sort((a, b) => order.indexOf(a.entry) - order.indexOf(b.entry) || a.seed - b.seed);
 const file: LeaderboardFile = {
-  schemaVersion: 1, generatedAt: new Date().toISOString(), mode: MODE, ticks, seeds, scenario,
+  schemaVersion: 1, initialPrice: P.price.initialPrice, generatedAt: new Date().toISOString(), mode: MODE, ticks, seeds, scenario,
   entries: ENTRIES.filter(e => runs.some(r => r.entry === e.id)), runs,
   usage: { ...(sameSetup ? previous.usage : {}), ...usage },
 };

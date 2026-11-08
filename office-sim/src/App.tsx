@@ -12,7 +12,7 @@ import { Scorecard } from './Scorecard';
 import { Leaderboard } from './leaderboard/Leaderboard';
 import { StockPrice, StockChart } from './StockPrice';
 import { EmployeePanel, MenuPanel } from './GamePanel';
-import { ACTION_LABEL, engineLabel, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
+import { ACTION_LABEL, CEO_MODEL_OPTIONS, engineLabel, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
 import { quitParams } from '../server/params';
 import { RUN_LENGTHS, useSimulation } from './useSimulation';
 import { useDialogue } from './useDialogue';
@@ -42,6 +42,7 @@ function ToolIcon({ tool }: { tool: Tool }) {
 export default function App() {
   const sim = useSimulation();
   const { cast } = sim;
+  const [ceoModel, setCeoModel] = useState<string>(CEO_MODEL_OPTIONS[0].id);
   const [selected, setSelected] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string[]>([]);
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -73,9 +74,14 @@ export default function App() {
   const disabled = !live || sim.busy;
   const running = sim.state?.running ?? false;
   const music = useBackgroundMusic();
+  const [arrivalStatus, setArrivalStatus] = useState({ epoch: sim.historyEpoch, waiting: true });
+  const waitingForEntry = arrivalStatus.epoch !== sim.historyEpoch || arrivalStatus.waiting;
+  const onArrivalChange = useCallback((waiting: boolean) => {
+    setArrivalStatus(current => current.epoch === sim.historyEpoch && current.waiting === waiting ? current : { epoch: sim.historyEpoch, waiting });
+  }, [sim.historyEpoch]);
   const dialogue = useDialogue({
     frame: presentation.frame, previous: presentation.previous, playing: presentation.playing && presentation.epoch === sim.historyEpoch,
-    epoch: sim.historyEpoch, speed: sim.speed, onDone: presentation.done, paused: menu !== null || playbackPaused, blocked: menu !== null,
+    epoch: sim.historyEpoch, speed: sim.speed, onDone: presentation.done, paused: menu !== null || playbackPaused || waitingForEntry, blocked: menu !== null,
     onSpace: () => toggle(), archetypeOf: id => cast.find(p => p.id === id)?.archetype,
   });
   useEffect(() => {
@@ -107,11 +113,12 @@ export default function App() {
     const present = presentation.frame ? presentedPresence(presentation.frame, presentation.previous, profile.id, presenceFinished) : s?.present !== false;
     const late = present && isOvertime(hour);
     return { ...lookFor(profile.archetype, index), id: profile.id, name: profile.name, role: profile.archetype,
+      model: profile.archetype === 'CEO' ? ceoModel : undefined,
       stress: (s?.stress ?? 0), workload: (s?.workload ?? 0), burnout: (s?.burnout ?? 0), trust: (s?.trust_mgmt ?? 0), present, late,
       action: s?.status === 'laid_off' ? 'Laid off' : s?.status === 'quit' ? 'Resigned' : !present ? 'Left for the day' : late ? 'Working late' : record ? ACTION_LABEL[record.action] : 'Waiting',
       says: record?.public_line ?? '', thinks: record?.inner_monologue ?? '', quit: s?.status === 'quit' || s?.status === 'laid_off',
     };
-  }), [cast, latest, state, presentation.frame, presentation.previous, presenceFinished, hour]);
+  }), [cast, latest, state, presentation.frame, presentation.previous, presenceFinished, hour, ceoModel]);
   const entries = useMemo(() => feedEntries(history, EMOTES ? { names: Object.fromEntries(cast.map(c => [c.id, c.name])), emoji: FEED_EMOJI } : undefined), [history, cast]);
   const objective = sim.companyTasks.find(t => isActiveObjective(t.status));
   const objectiveWork = objective ? (state?.business?.tasks ?? []).filter(t => t.id.startsWith(objectiveWorkPrefix(objective.id))) : [];
@@ -147,45 +154,50 @@ export default function App() {
   function openMenu(next: Menu, businessCase: string | null = null, report = false) { setBusinessTab(report ? 'report' : 'objective'); setSelected(null); setHighlight([]); setCaseId(businessCase); setMenu(next); }
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = engineLabel(sim.mode, sim.modeReason);
-  return <main className="game-window" aria-label="The Daily Grind">
+  return <main className="game-window" aria-label="Agentic Chaos">
     <OfficeView key={sim.historyEpoch} people={people} tick={hour} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
+      onArrivalChange={onArrivalChange}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}
       announcement={presentation.frame?.events.find(e => e.official) ?? null}/>
     <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
-    <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
-    {sim.phase && !presentation.playing && <div className="management-phase" role="status">{sim.phase}…</div>}
-    {sim.storageError && <div className="storage-error" role="alert">{sim.storageError}</div>}
     {showSyncDebug && <aside className="sync-debug" aria-label="Time synchronization debug">
       <strong>SYNC DEBUG</strong><span>presented: {presentation.tick} · {timeLabel(presentation.tick)}</span><span>latest: {sim.state?.tick ?? 0}</span><span>line: {dialogue.line?.tick ?? '—'}</span><span>waiting: {sim.history.filter(frame => frame.tick > presentation.tick).length}</span><span>lag: {Math.max(0, (sim.state?.tick ?? 0) - presentation.tick)}</span>
     </aside>}
-    {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>{announcement.announcement.official ? '📢 CEO' : 'Announcement'}</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
-    {announcement?.business && announcement.key !== dismissedAnnouncement && <section className={`announcement business tone-${announcement.business.tone}`} aria-label="Business event">
-      <div role="status"><span>{announcement.business.label}</span><p>{announcement.business.text}</p>
-        <button className="view-case" onClick={() => openMenu('events', announcement.business!.caseId)}>View case</button></div>
-      <button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss business event">×</button></section>}
-    <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
-      <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
-      {complete && <button className="report-entry" onClick={() => openMenu('quarter')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
-      {objective && <button className="objective-strip" onClick={() => openMenu('events')} aria-label={`Objective: ${objective.objective}. Open Business`}>
-        <b>Objective</b><span>{objective.objective}</span>
-        <small>{objectiveWork.length ? `${objectiveWork.filter(t => t.status === 'done').length}/${objectiveWork.length} · ` : ''}{objective.deadlineTick !== undefined ? dueIn(objective.deadlineTick, hour) : OBJECTIVE_STATUS[objective.status].text}</small>
-      </button>}
-      <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
-        {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
-          const content = <><div className="feed-meta"><span className={entry.tone ?? (entry.label === 'Resignation' ? 'coral' : '')}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
-          return entry.ids.length ? <button className={`feed-entry${entry.reply ? ' reply' : ''}`} key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
-        })}
-        {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
-      </div>
-    </aside>
-    <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null}
+    <div className="time-notifications">
+      <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
+      {sim.phase && !presentation.playing && <div className="management-phase" role="status">{sim.phase}…</div>}
+      {sim.storageError && <div className="storage-error" role="alert">{sim.storageError}</div>}
+      {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>{announcement.announcement.official ? '📢 CEO' : 'Announcement'}</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
+      {announcement?.business && announcement.key !== dismissedAnnouncement && <section className={`announcement business tone-${announcement.business.tone}`} aria-label="Business event">
+        <div role="status"><span>{announcement.business.label}</span><p>{announcement.business.text}</p>
+          <button className="view-case" onClick={() => openMenu('events', announcement.business!.caseId)}>View case</button></div>
+        <button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss business event">×</button></section>}
+    </div>
+    <div className={`office-sidebar ${expanded ? 'expanded' : ''}`}>
+      <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
+        <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
+        {complete && <button className="report-entry" onClick={() => openMenu('quarter')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
+        {objective && <button className="objective-strip" onClick={() => openMenu('events')} aria-label={`Objective: ${objective.objective}. Open Business`}>
+          <b>Objective</b><span>{objective.objective}</span>
+          <small>{objectiveWork.length ? `${objectiveWork.filter(t => t.status === 'done').length}/${objectiveWork.length} · ` : ''}{objective.deadlineTick !== undefined ? dueIn(objective.deadlineTick, hour) : OBJECTIVE_STATUS[objective.status].text}</small>
+        </button>}
+        <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
+          {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
+            const content = <><div className="feed-meta"><span className={entry.tone ?? (entry.label === 'Resignation' ? 'coral' : '')}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
+            return entry.ids.length ? <button className={`feed-entry${entry.reply ? ' reply' : ''}`} key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
+          })}
+          {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
+        </div>
+      </aside>
+      <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company', 'scorecard', 'leaderboard'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
+    </div>
+    <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null || waitingForEntry}
       onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onVoices={() => dialogue.setVoices(!dialogue.voices)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
-    {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
-    <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company', 'scorecard', 'leaderboard'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
+    {person && <EmployeePanel key={person.id} person={person} onModelChange={setCeoModel} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel key={menu} wide={menu === 'quarter'} title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
       {menu === 'quarter' && sim.runId ? <QuarterReport key={sim.runId} runId={sim.runId} status={sim.reportStatus} onClose={() => setMenu(null)} onFullReport={() => openMenu('events',null,true)} onNewRun={() => { setMenu(null); setPlaybackPaused(false); void sim.newSeed(); }}/> : menu === 'events' ? <BusinessPage initialTab={businessTab} state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId}

@@ -4,7 +4,7 @@ Rebuild the existing UI around one principle: **the office scene is the game; ev
 
 ## Layout and hierarchy
 
-- Make **The Daily Grind** fill the browser viewport. Use the available width and height, keeping all three office floors and every character visible and clickable.
+- Make **Agentic Chaos** fill the browser viewport. Use the available width and height, keeping all three office floors and every character visible and clickable.
 - Eliminate page scrolling in both directions. Resize the scene responsively rather than cropping it or hiding overflowing controls.
 - Keep the office visible behind secondary interfaces. Submenus and expanded history may scroll internally.
 - Replace the dashboard layout with compact overlays and button-accessed menus. Remove the large header, standalone timeline, bottom sections, and decorative footer.
