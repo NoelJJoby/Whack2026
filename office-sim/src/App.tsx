@@ -1,7 +1,8 @@
 import { Events } from './Events';
 import { BusinessReport } from './BusinessReport';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Office, lookFor, type Person } from './design/Office';
+import { lookFor, type Person } from './design/Office';
+import { OfficeView } from './three/OfficeView';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
 import { EventComposer } from './EventComposer';
@@ -98,12 +99,21 @@ export default function App() {
     returnFocus.current = document.querySelector<HTMLButtonElement>(`[data-employee="${CSS.escape(id)}"]`);
     setMenu(null); setSelected(id); setHighlight([]);
   };
-  const closeEmployee = useCallback(() => { setSelected(null); returnFocus.current?.focus(); }, []);
+  const closeEmployee = useCallback(() => {
+    setSelected(null);
+    const previous = returnFocus.current;
+    const id = previous?.dataset.employee;
+    const target = previous?.isConnected ? previous : id ? document.querySelector<HTMLElement>(`[data-employee="${CSS.escape(id)}"]`) : null;
+    target?.focus({ preventScroll: true });
+  }, []);
   function openMenu(next: Menu) { setSelected(null); setHighlight([]); setMenu(next); }
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
   return <main className="game-window" aria-label="The Daily Grind">
-    <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>
+    <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
+      ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
+      line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
+      showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}/>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}

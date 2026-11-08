@@ -1,0 +1,59 @@
+/* 3D view only. Bubbles live inside .office-scene (isolated), so the HUD always paints over them. */
+.o3-scene { background: #14203a; inset: 0; }
+.o3-scene canvas { touch-action: none; }
+.o3-anchor { pointer-events: none; }
+.o3-person-anchor { pointer-events: none; }
+.o3-person { pointer-events: auto; display: block; min-width: 48px; padding: 3px 6px; white-space: nowrap; font-size: 11px; color: #f2e6bf; background: #1d2928e8; border: 1px solid #536457; }
+.o3-person small { display: block; margin-top: 2px; font-size: 9px; color: var(--muted); }
+.o3-person.off-shift { color: #a1aaa4; }
+.o3-bubble { position: relative; width: max-content; max-width: 150px; padding: 4px 7px 5px; font: 10px/1.3 "VCR OSD Mono", monospace; }
+/* Stack sits bottom-centre on the head anchor. */
+.o3-stack { display: flex; flex-direction: column; align-items: center; gap: 14px; transform: translate(-50%, -100%); }
+.o3-bubble small { display: block; font-size: 9px; letter-spacing: .04em; margin-bottom: 2px; opacity: .7; }
+.o3-bubble.speech { background: #fbf7ec; color: #1d2928; border: 2px solid #1d2928; box-shadow: 3px 3px 0 #10192b88; }
+.o3-bubble.speech::after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -5px; border: 5px solid transparent; border-top: 5px solid #1d2928; border-bottom: 0; }
+.o3-bubble.thought { background: #2a3550e6; color: #c9cfdc; font-style: italic; border: 1px dashed #8e9bb8; border-radius: 12px; }
+.o3-bubble.thought::before, .o3-bubble.thought::after { content: ''; position: absolute; left: 50%; border-radius: 50%; background: #2a3550e6; border: 1px dashed #8e9bb8; }
+.o3-bubble.thought::before { width: 8px; height: 8px; bottom: -11px; margin-left: -6px; }
+.o3-bubble.thought::after { width: 4px; height: 4px; bottom: -17px; margin-left: -1px; }
+.o3-stats { top: auto !important; bottom: 8px; left: auto !important; right: 8px; }
+/* Action tags over heads (hidden while that agent is speaking). */
+.o3-tag { transform: translate(-50%, -100%); width: max-content; padding: 2px 6px; font: 10px/1.3 "VCR OSD Mono", monospace; color: #1d2928; background: #d7b66c; border: 1px solid #1d2928; }
+.o3-tag.complain { background: #e8947f; }
+.o3-tag.gossip { background: #c9a6e0; }
+.o3-tag.verify { background: #8fd3f5; font-weight: 700; }
+.o3-tag.leak { background: #f04a3a; color: #fff; animation: o3-blink .6s steps(2) infinite; }
+.o3-tag.quit { background: #7a2b26; color: #ffd8cf; }
+.o3-tag.sofa, .o3-tag.idle { background: #b5bfb0; }
+.o3-tag.overwork { background: #e05b3b; color: #fff; }
+@keyframes o3-blink { 50% { opacity: .25; } }
+
+/* Zoom buttons and hint, bottom-right (above the dev fps meter). */
+.o3-zoom { position: absolute; right: 16px; bottom: 76px; display: flex; flex-direction: column; gap: 8px; }
+.o3-zoom button { width: 40px; height: 40px; font-size: 24px; line-height: 1; color: #d7b66c; background: #13203aeb; border: 1px solid #d7b66c; border-radius: 6px; }
+.o3-zoom button:hover { background: #1d2d4f; }
+.o3-hint { position: absolute; right: 16px; bottom: 56px; margin: 0; font-size: 11px; color: #b5bfb0; pointer-events: none; }
+@media (max-width: 1300px) { .o3-hint { display: none; } }
+
+.o3-tag.panic { background: #f04a3a; color: #fff; font-weight: 700; animation: o3-blink .3s steps(2) infinite; }
+
+/* CEO-resigns cutscene: letterbox bars and a breaking-news headline. */
+.o3-cutscene { position: absolute; inset: 0; z-index: 5; pointer-events: none; } /* above agent tags (z ≤ 4) */
+.o3-cutscene .bar { position: absolute; left: 0; right: 0; height: 9vh; background: #05080f; animation: o3-bar .6s ease-out both; }
+.o3-cutscene .bar.top { top: 0; transform-origin: top; }
+.o3-cutscene .bar.bottom { bottom: 0; transform-origin: bottom; }
+.o3-headline { position: absolute; left: 50%; top: max(17%, 112px); transform: translateX(-50%); text-align: center; animation: o3-slam .5s 1.4s cubic-bezier(.2, 1.6, .4, 1) both; }
+.o3-headline span { display: inline-block; padding: 4px 12px; background: #d8352a; color: #fff; font-size: 16px; letter-spacing: .2em; text-transform: uppercase; animation: o3-blink 1s steps(2) 1.9s infinite; }
+.o3-headline strong { display: block; margin-top: 8px; padding: 6px 28px 10px; background: #fbf7ec; color: #14203a; border: 3px solid #14203a; box-shadow: 8px 8px 0 #d8352a; font: 400 clamp(40px, 6.5vw, 88px)/1 'VCR OSD Mono', monospace; text-transform: uppercase; white-space: nowrap; }
+.o3-headline em { display: inline-block; margin-top: 12px; padding: 4px 10px; background: #13203aeb; border: 1px solid #d7b66c; color: #e3e5d5; font-style: normal; font-size: 15px; }
+.o3-cutscene.out .bar, .o3-cutscene.out .o3-headline { animation: o3-fade 1.2s ease-in forwards; }
+@keyframes o3-bar { from { transform: scaleY(0); } }
+@keyframes o3-slam { from { opacity: 0; transform: translateX(-50%) scale(2.2); } }
+@keyframes o3-fade { to { opacity: 0; } }
+
+/* Follow mode badge with exit, bottom-left (clear of the rail and the dialogue bar). */
+.o3-follow { position: absolute; left: 24px; bottom: 24px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; background: #13203aeb; border: 1px solid #d7b66c; border-radius: 6px; font-size: 12px; box-shadow: 0 6px 18px #070d1a80; }
+.o3-follow i { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #d8352a; animation: o3-blink 1s steps(2) infinite; }
+.o3-follow b { color: #d7b66c; font-weight: 400; }
+.o3-follow button { padding: 6px 10px; color: #14203a; background: #d7b66c; border-radius: 4px; font-size: 12px; }
+.o3-follow button:hover:not(:disabled) { color: #14203a; background: #eed38f; }
