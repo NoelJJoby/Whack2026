@@ -28,7 +28,7 @@ export function createStubProvider(runSeed: number, opts: StubOptions = {}): Tur
     if (opts.nullFor?.(agent.id, ctx.tick)) return null;
     if (opts.invalidFor?.(agent.id, ctx.tick)) return '{"proposals": [{"action": "work_norm';
 
-    if (ctx.management) return ctx.management.kind === 'ceo' ? fallbackCeo(ctx.management) : fallbackOps(ctx.management);
+    if (ctx.management) return ctx.management.kind === 'ceo' ? fallbackCeo(ctx.management) : fallbackOps(ctx.management, ctx.companySchedule);
     if (ctx.work) {
       const task = ctx.work.reviewable[0] ?? ctx.work.assignments[0];
       return { proposals: [task ? { action: ctx.work.reviewable.includes(task) ? 'review_work' : 'work', task_id: task.id, assignment_version: task.version, weight: 1 } : { action: 'slack_off', weight: 1 }], public_line: 'I will follow the current work plan.', inner_monologue: 'I should check the acceptance criteria.', beliefs: Object.fromEntries(ctx.claims.map(c => [c.id,50])) };

@@ -1,3 +1,6 @@
+import { activeCompanyTask, newCompanyTask, submissionSchema, taskSummary } from './company-tasks/state';
+import type { CompanyTaskDetail, CompanyTaskList } from '../shared/companyTasks';
+import type { EngineTickLog } from './engine-types';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { RunStore } from './run-store';
@@ -118,6 +121,28 @@ function enrichRecords(r: TickResult): TickRecord[] {
   });
 }
 
+function tickEvents(result: TickResult): TickFrame['events'] {
+  const events = result.log.events.map((e) => ({
+    type: e.type,
+    is_true: e.is_true,
+    text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
+    ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
+  }));
+  // The office banner follows disclosure, not the spectator's private case list.
+  const shared = result.world.eventState.decisions.filter(d => d.tick === result.world.tick)
+    .flatMap(d => d.choices.filter(c => c.communicate.length).map(c => ({ choice: c, author: d.author })));
+  for (const e of result.world.eventState.cases) {
+    const disclosure = shared.find(s => s.choice.eventId === e.id);
+    if (!disclosure && e.publicTick !== result.world.tick) continue;
+    const recipients = disclosure?.choice.communicate ?? ['public'];
+    const told = recipients.includes('public') ? 'the public' : recipients.map(id => result.world.agents[id]?.profile.name ?? 'a colleague').join(', ');
+    const evidence = result.world.eventState.evidence.filter(x => x.eventId === e.id && x.tick === result.world.tick && x.source === disclosure?.author && x.recipients.some(id => recipients.includes(id)));
+    const text = evidence.map(x => x.text).join(' ') || disclosure?.choice.acceptance;
+    if (text) events.push({ type: 'new_management', is_true: e.truth, text: `Shared with ${told}: ${text}`, business_id: e.id, custom: e.origin === 'injection' } as typeof events[number]);
+  }
+  return events;
+}
+
 type Listener = (message: StreamMessage) => void;
 
 export class OfficeSimManager {
@@ -204,9 +229,33 @@ export class OfficeSimManager {
     this.phase = null; this.storageError = null;
     this.frames = [];
     this.feed = [recoverId ? 'Recovered committed run. Playback is paused.' : 'Simulation ready.'];
+    if (recoverId && this.world.companyTasks?.length) this.recoverCompanyFrames(recoverId);
     this.customHeadlines = new Set([...Object.values(this.world.claims).filter(c => c.custom).map(c => headlineKey(c.text)),...this.world.queue.filter(e => e.custom && e.text).map(e => headlineKey(e.text!))]);
     this.started = this.world.tick > 0;
     this.running = false;
+  }
+
+  private recoverCompanyFrames(runId: string) {
+    for (const tx of this.store.read(runId)) {
+      const log = (tx.audit as { log?: EngineTickLog } | null)?.log;
+      if (tx.kind !== 'tick' || !log) continue;
+      const result: TickResult = {
+        world: tx.world, log, records: log.decisions.map(d => ({
+          tick: tx.tick, event: log.events[0]?.type ?? null, action: d.chosen.action, agent: d.agent, target: d.chosen.target,
+          summary: `${tx.world.agents[d.agent].profile.name}: ${tx.world.business.work.find(r => r.id === `work-${tx.tick}-${d.agent}`)?.outcome ?? 'No assigned work'}.`,
+        })),
+      };
+      const records = enrichRecords(result);
+      const events = tickEvents(result);
+      const frame: TickFrame = {
+        price: toPriceDTO(log.price), tick: tx.tick, records, events,
+        state: { ...toSimulationState(tx.world), started: true, running: false, mode: this.mode },
+        ...(log.companyActivity ? { company_activity: log.companyActivity } : {}),
+      };
+      frame.day_report = dayReport(tx.world, [...this.frames, frame]);
+      this.frames.push(frame);
+    }
+    this.frames = this.frames.slice(-MAX_HISTORY);
   }
 
   reseed(seed?: number) {
@@ -255,7 +304,8 @@ export class OfficeSimManager {
       feedback: this.priceFeedback, markers: [], guards: { outputFloor: false, priceBound: null, rawLogPrice: Math.log(current.price), logPrice: Math.log(current.price) },
     };
     const report = this.store.reports(this.runId).at(-1);
-    return { run_id: this.runId, revision: this.world.tick, phase: this.phase, storage_error: this.storageError,
+    return { ...(this.world.companyTasks ? { company_tasks: this.world.companyTasks.map(taskSummary) } : {}),
+      run_id: this.runId, revision: this.world.tick, phase: this.phase, storage_error: this.storageError,
       report_status: this.reporting.pending(this.runId) ? 'pending' : report?.status ?? 'none', report_id: report?.id ?? null,
       mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
   }
@@ -317,14 +367,18 @@ export class OfficeSimManager {
   private async advance() {
     const generation = this.generation;
     const queueLength = this.world.queue.length;
+    const companyCount = this.world.companyTasks?.length ?? 0;
     const result = await runTick(this.world, this.provider, { ...this.tickConfig(),
       isCurrent: () => generation === this.generation,
+      endOfRun: () => this.world.tick + 1 >= this.maxTicks,
       onPhase: phase => { if (generation === this.generation) { this.phase = phase; this.emitState(); } },
     }).catch(error => { if (generation !== this.generation) return null; throw error; });
     if (!result || generation !== this.generation) return;
 
     // Injections accepted during a phase belong to the next tick, never disappear on commit.
     result.world.queue.push(...this.world.queue.slice(queueLength));
+    const additions = this.world.companyTasks?.slice(companyCount);
+    if (additions?.length) (result.world.companyTasks ??= []).push(...additions);
     try { this.store.commit(this.runId,result.world,'tick',{ log: result.log, settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } }); }
     catch (error) {
       this.storageError = 'History storage failed. The previous tick is retained; retry after restoring storage.';
@@ -332,24 +386,7 @@ export class OfficeSimManager {
     }
     this.world = result.world; this.phase = null; this.storageError = null;
     const records = enrichRecords(result);
-    const events = result.log.events.map((e) => ({
-      type: e.type,
-      is_true: e.is_true,
-      text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
-      ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
-    }));
-    // The office banner follows disclosure, not the spectator's private case list.
-    const shared = result.world.eventState.decisions.filter(d => d.tick === result.world.tick)
-      .flatMap(d => d.choices.filter(c => c.communicate.length).map(c => ({ choice: c, author: d.author })));
-    for (const e of result.world.eventState.cases) {
-      const disclosure = shared.find(s => s.choice.eventId === e.id);
-      if (!disclosure && e.publicTick !== result.world.tick) continue;
-      const recipients = disclosure?.choice.communicate ?? ['public'];
-      const told = recipients.includes('public') ? 'the public' : recipients.map(id => result.world.agents[id]?.profile.name ?? 'a colleague').join(', ');
-      const evidence = result.world.eventState.evidence.filter(x => x.eventId === e.id && x.tick === result.world.tick && x.source === disclosure?.author && x.recipients.some(id => recipients.includes(id)));
-      const text = evidence.map(x => x.text).join(' ') || disclosure?.choice.acceptance;
-      if (text) events.push({ type: 'new_management', is_true: e.truth, text: `Shared with ${told}: ${text}`, business_id: e.id, custom: e.origin === 'injection' } as typeof events[number]);
-    }
+    const events = tickEvents(result);
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
 
     // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.
@@ -370,7 +407,10 @@ export class OfficeSimManager {
       this.clearTimer();
     }
 
-    const frame: TickFrame = { price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state() };
+    const frame: TickFrame = {
+      price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state(),
+      ...(result.log.companyActivity ? { company_activity: result.log.companyActivity } : {}),
+    };
     frame.day_report = dayReport(this.world, [...this.frames, frame]);
     this.frames.push(frame);
     if (this.frames.length > MAX_HISTORY) this.frames.shift();
@@ -453,6 +493,9 @@ export class OfficeSimManager {
     if (max_ticks < this.world.tick) {
       throw new ApiFailure(409, 'below_current_tick', `The run is already at tick ${this.world.tick}; the run length can't go below that.`);
     }
+    if (max_ticks === this.world.tick && activeCompanyTask(this.world)) {
+      throw new ApiFailure(409, 'company_task_active', 'Leave at least one tick to record the active objective’s final outcome.');
+    }
     this.maxTicks = max_ticks;
     this.priceFeedback = priceFeedback;
     if (this.world.tick >= this.maxTicks && this.running) {
@@ -480,6 +523,43 @@ export class OfficeSimManager {
     catch (error) { this.storageError = 'History storage failed. Input was not accepted; restore storage and retry.'; this.running = false; this.clearTimer(); this.emitState(); throw error; }
     this.world = next;
   }
+  submitCompanyTask(body: unknown) {
+    const parsed = submissionSchema.safeParse(body);
+    if (!parsed.success) throw new ApiFailure(400, 'invalid_company_task', 'Expected a run ID, idempotency key, hypothetical objective and optional deadline in ticks.', parsed.error.issues);
+    const input = parsed.data;
+    if (input.run_id !== this.runId) throw new ApiFailure(409, 'run_changed', 'This objective belongs to another run.');
+    const previous = this.world.companyTasks?.find(task => task.idempotencyKey === input.idempotency_key);
+    if (previous) {
+      if (previous.objective !== input.objective || previous.requestedDeadline !== input.deadline_ticks) {
+        throw new ApiFailure(409, 'idempotency_conflict', 'This idempotency key already identifies a different submission.');
+      }
+      return { created: false, task: taskSummary(previous) };
+    }
+    this.assertNotComplete();
+    if (activeCompanyTask(this.world)) throw new ApiFailure(409, 'company_task_active', 'The company already has an active or queued objective.');
+    if (this.inFlight && this.world.tick + 1 >= this.maxTicks) throw new ApiFailure(409, 'run_complete', 'The final tick is already in progress.');
+    const task = newCompanyTask(input, this.world);
+    this.persistInput({ ...this.world, companyTasks: [...this.world.companyTasks ?? [], task] }, { companyTask: input });
+    this.emitState();
+    return { created: true, task: taskSummary(task) };
+  }
+
+  listCompanyTasks(): CompanyTaskList {
+    return { run_id: this.runId, tasks: (this.world.companyTasks ?? []).map(taskSummary) };
+  }
+
+  companyTask(id: string): CompanyTaskDetail {
+    const task = this.world.companyTasks?.find(t => t.id === id);
+    if (!task) throw new ApiFailure(404, 'company_task_not_found', 'That company objective is unavailable in the current run.');
+    const { idempotencyKey: _key, ...detail } = task;
+    const recordedWork = new Set(task.activity.map(a => a.workResultId));
+    return {
+      ...detail,
+      canonicalWork: this.world.business.tasks.filter(t => task.work[t.id]),
+      workResults: this.world.business.work.filter(r => recordedWork.has(r.id) || r.taskId && task.work[r.taskId]),
+    };
+  }
+
   inject(body: unknown) {
     const parsed = injectSchema.safeParse(body);
     if (!parsed.success) {
@@ -625,6 +705,12 @@ app.post('/api/sim/new-seed', async (request) => {
 });
 app.post('/api/sim/step', async () => sim.step());
 app.post('/api/sim/presented', async request => sim.acknowledge(request.body));
+app.post('/api/sim/company-tasks', { bodyLimit: 12_288 }, async (request, reply) => {
+  const result = sim.submitCompanyTask(request.body);
+  return reply.status(result.created ? 202 : 200).send(result.task);
+});
+app.get('/api/sim/company-tasks', async () => sim.listCompanyTasks());
+app.get<{ Params: { id: string } }>('/api/sim/company-tasks/:id', async request => sim.companyTask(request.params.id));
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
 app.post('/api/sim/inject-business', async request => sim.injectBusiness(request.body));
 app.get('/api/event-catalog', async () => CATALOG);

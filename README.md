@@ -71,3 +71,9 @@ Each tick represents one hour ending at the displayed time. Hours ending at 18:0
 ## Autonomous business demo
 
 Run `pnpm dev` from `office-sim` and open http://localhost:5173. The API runs on port 3010. For a built single-server deployment, use `pnpm build && pnpm start` (port 3010 by default). See [implementation and run notes](docs/events-implementation-status.md) for event stories, durable reports, configuration and measured verification.
+
+## Company objectives
+
+Submit a hypothetical objective to `POST /api/sim/company-tasks` using the current run ID and an idempotency key. Inspect its brief, work, findings, and outcome through the company-task API and committed SSE frames.
+
+From `office-sim`, run `node --import tsx server/scripts/company-task-demo.ts` for a rules-mode launch scenario. See the [implementation plan and release notes](docs/task-driven-company-implementation-plan.md#release-implementation-and-verification) for the request body, route details, and verification results.
