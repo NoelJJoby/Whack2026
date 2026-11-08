@@ -12,6 +12,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "test": "tsx --test \"server/**/*.test.ts\" \"src/**/*.test.ts\"",
     "test:watch": "tsx --watch --test \"server/**/*.test.ts\"",
+    "benchmark:quarter": "node --import tsx server/scripts/benchmark-quarter.ts",
     "start": "node --import tsx server/index.ts"
   },
   "dependencies": {

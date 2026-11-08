@@ -71,13 +71,15 @@ function ConvBubble({ name, text, delay, pinned = false }: { name: string; text:
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
-export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, departing = false, onExit, emote, convLine = null, convDelay = 0, faceTowards = null, attend = false, selected, highlighted, line, showThoughts, onSelect }: {
+export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, departing = false, arriving = false, onExit, emote, convLine = null, convDelay = 0, faceTowards = null, attend = false, selected, highlighted, line, showThoughts, onSelect }: {
   person: Person; nav: Nav; crowd: Crowd; behaviour: Behaviour; phase: number; speed: number;
   paused?: boolean;
   /** Starring in the CEO-resigns cutscene: real-time pace and a raised-fist beat before walking out. */
   cinematic?: boolean;
   /** Went home while this view was open: walk out (or to their car) instead of vanishing. */
   departing?: boolean;
+  /** Returning this morning: enter from the pavement and walk through the front door. */
+  arriving?: boolean;
   onExit?: () => void;
   /** Part A: emotion icon and gesture; a focused conversation line; who to face while talking or listening. */
   emote?: Emote;
@@ -112,7 +114,9 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const [gone, setGone] = useState(startsGone);
   const [leaveStage, setLeaveStage] = useState<'pack' | 'bye' | 'go'>('pack');
   const home = nav.pos.get(seatNode(person.id)) ?? [0, 0];
-  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: startsGone, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null, leaveT: 0, byeT: 0, stage: 'pack', emoteT: 0 });
+  const startNode = arriving ? 'exit' : seatNode(person.id);
+  const start = nav.pos.get(startNode) ?? home;
+  const mv = useRef({ x: start[0], z: start[1], node: startNode, queue: [] as string[], heading: 0, t: phase, gone: startsGone, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null, leaveT: 0, byeT: 0, stage: 'pack', emoteT: 0, arrivalDelay: arriving ? phase * 0.35 : 0 });
   // Ticks can outpace walking: finish the current move, then switch. Quitting and panic interrupt at once.
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
@@ -133,6 +137,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     const m = mv.current, g = root.current;
     if (!g || m.gone || paused) return;
     const dt = Math.min(delta, 0.1) * (cinematic ? 1 : speed);
+    if (m.arrivalDelay > 0 && k !== 'quit' && k !== 'panic') { m.arrivalDelay -= dt; return; }
     // Going home: pack up for a staggered moment, wave goodbye (at a colleague's desk or our own), then leave.
     const leaving = k === 'leave';
     let target = behaviour.goal, packing = false, waving = false;
@@ -314,7 +319,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   // Keyed so React doesn't reuse the walking group (which was moved off to the exit or car) for the desk label.
   if (gone) return <group key="gone" position={[home[0], FLOOR, home[1]]}>{label}</group>;
   const ring = selected ? '#d7b66c' : highlighted ? '#fff2cf' : line ? '#8abca2' : null;
-  return <group ref={root} position={[home[0], FLOOR, home[1]]}
+  return <group ref={root} position={[start[0], FLOOR, start[1]]}
     onClick={e => { e.stopPropagation(); inspect(); }}
     onPointerOver={e => { e.stopPropagation(); document.body.style.cursor = 'pointer'; }}
     onPointerOut={() => { document.body.style.cursor = ''; }}>

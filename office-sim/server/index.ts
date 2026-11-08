@@ -36,6 +36,7 @@ import {
   type GeneratedCustomEvent,
 } from '../shared/customEvent';
 import { TICKS_PER_QUARTER } from '../shared/workday';
+import { FAST_TICK_MS, isFastForward, PLAYBACK_SPEEDS } from '../shared/playback';
 import { createTurnProvider } from './llm';
 import { createCustomEventGenerator } from './llm/customEvent';
 import { createHeadlineReviewer, type HeadlineReviewer } from './llm/moderation';
@@ -194,9 +195,9 @@ export class OfficeSimManager {
   private generation = 0;
   private presented = 0;
 
-  constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider } = {}) {
+  constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider; recapProvider?: import('./reporting').ReportProvider } = {}) {
     this.store = new RunStore(directory);
-    this.reporting = new Reporting(this.store,this.overrides.reportProvider);
+    this.reporting = new Reporting(this.store,this.overrides.reportProvider,this.overrides.recapProvider);
     const latest = this.store.list().find(r => r.status === 'active' || r.status === 'complete');
     this.init(latest?.seed ?? this.seed,latest?.id);
     if (latest) {
@@ -204,6 +205,7 @@ export class OfficeSimManager {
       if (audit?.settings) { this.maxTicks = audit.settings.maxTicks; this.priceFeedback = audit.settings.priceFeedback; this.speed = audit.settings.speed; }
       else if (latest.status === 'complete') this.maxTicks = latest.tick;
     }
+    this.reporting.recoverPending(() => this.emitState());
   }
 
   get listenerCount() {
@@ -315,8 +317,12 @@ export class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true, diagnostics: INBOX_ENABLED };
+    return { mode: this.effectiveMode(), scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true, diagnostics: INBOX_ENABLED };
   }
+
+  private effectiveMode(): SimulationMode { return isFastForward(this.speed) ? 'rules' : this.mode; }
+  private tickInterval(): number { return isFastForward(this.speed) ? FAST_TICK_MS : TICK_INTERVAL_MS / this.speed; }
+  private waitingForViewer(): boolean { return !isFastForward(this.speed) && this.world.tick - this.presented >= 1; }
 
   state(): SimulationState {
     const lastEvent = [...this.frames].reverse().find((f) => f.events.length > 0)?.events.at(-1)?.type ?? null;
@@ -325,7 +331,7 @@ export class OfficeSimManager {
       started: this.started,
       running: this.running,
       event: lastEvent,
-      mode: this.mode,
+      mode: this.effectiveMode(),
     };
   }
 
@@ -341,7 +347,7 @@ export class OfficeSimManager {
     return { ...(this.world.companyTasks ? { company_tasks: this.world.companyTasks.map(taskSummary) } : {}),
       run_id: this.runId, revision: this.world.tick, phase: this.phase, storage_error: this.storageError,
       report_status: this.reporting.pending(this.runId) ? 'pending' : report?.status ?? 'none', report_id: report?.id ?? null,
-      mode: this.mode, mode_reason: this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
+      mode: this.effectiveMode(), mode_reason: isFastForward(this.speed) ? 'fast_forward' : this.modeReason, max_ticks: this.maxTicks, speed: this.speed, state: this.state(), price, price_feedback: this.priceFeedback, initial_price: DEFAULT_PARAMS.price.initialPrice, params: DEFAULT_PARAMS };
   }
 
   history(): HistoryResponse {
@@ -363,7 +369,7 @@ export class OfficeSimManager {
   }
 
   private schedule(delayMs: number) {
-    if (this.timer || !this.running || this.world.tick - this.presented >= 1) return;
+    if (this.timer || !this.running || this.waitingForViewer()) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.loop();
@@ -376,7 +382,7 @@ export class OfficeSimManager {
   }
 
   private async loop() {
-    if (!this.running || this.world.tick - this.presented >= 1) return;
+    if (!this.running || this.waitingForViewer()) return;
     const started = performance.now();
     try {
       await this.runOne();
@@ -387,7 +393,7 @@ export class OfficeSimManager {
       return;
     }
     // Playback sets the interval between tick starts, not extra idle time after AI finishes.
-    this.schedule(Math.max(0,TICK_INTERVAL_MS / this.speed - (performance.now()-started)));
+    this.schedule(Math.max(0,this.tickInterval() - (performance.now()-started)));
   }
 
   /** At most one tick in flight; concurrent callers share it. */
@@ -402,7 +408,8 @@ export class OfficeSimManager {
     const generation = this.generation;
     const queueLength = this.world.queue.length;
     const companyCount = this.world.companyTasks?.length ?? 0;
-    const result = await runTick(this.world, this.provider, { ...this.tickConfig(),
+    const fastForward = isFastForward(this.speed);
+    const result = await runTick(this.world, fastForward ? null : this.provider, { ...this.tickConfig(),
       isCurrent: () => generation === this.generation,
       endOfRun: () => this.world.tick + 1 >= this.maxTicks,
       onPhase: phase => { if (generation === this.generation) { this.phase = phase; this.emitState(); } },
@@ -428,7 +435,7 @@ export class OfficeSimManager {
     // Demo safety: if every agent fell back because the LLM failed, run on rules from now on.
     const decisions = result.log.decisions;
     if (
-      this.mode !== 'rules' &&
+      !fastForward && this.mode !== 'rules' &&
       decisions.length > 0 &&
       decisions.every((d) => d.fallback !== null && d.fallback !== 'llm_proposed_only_masked_actions') &&
       !result.world.eventState.decisions.some(d => d.tick === result.world.tick && d.fallback === null)
@@ -459,10 +466,11 @@ export class OfficeSimManager {
     const status = this.store.metadata(this.runId).status;
     if (status !== 'complete') this.store.commit(this.runId,this.world,'archive',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
   }
+  publishReportUpdate(runId: string) { if (this.runId === runId) this.emitState(); }
   private complete() {
     const id = this.runId;
     this.store.commit(id,this.world,'complete',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
-    void this.reporting.generate(id).then(() => { if (this.runId === id) this.emitState(); }).catch(() => {
+    void this.reporting.completeRun(id, () => { if (this.runId === id) this.emitState(); }).then(() => { if (this.runId === id) this.emitState(); }).catch(() => {
       if (this.runId === id) { this.storageError = 'Report could not be saved. Committed run evidence remains available for retry.'; this.emitState(); }
     });
     this.emitState();
@@ -494,7 +502,7 @@ export class OfficeSimManager {
     if (!parsed.success || parsed.data.tick > this.world.tick) throw new ApiFailure(400, 'invalid_presented', 'Expected an already computed hour.');
     if (parsed.data.run_id && parsed.data.run_id !== this.runId) throw new ApiFailure(409, 'run_changed', 'This acknowledgement belongs to a previous run.');
     this.presented = Math.max(this.presented, parsed.data.tick);
-    if (!this.inFlight) this.schedule(0);
+    if (!this.inFlight && !isFastForward(this.speed)) this.schedule(0);
     return this.response();
   }
 
@@ -545,12 +553,12 @@ export class OfficeSimManager {
   }
 
   setSpeed(body: unknown) {
-    const parsed = z.object({ speed: z.union([z.literal(0.5), z.literal(1), z.literal(2), z.literal(4)]) }).strict().safeParse(body);
-    if (!parsed.success) throw new ApiFailure(400, 'invalid_speed', 'Choose a speed of 0.5, 1, 2 or 4.');
+    const parsed = z.object({ speed: z.number().refine(value => PLAYBACK_SPEEDS.some(speed => speed === value)) }).strict().safeParse(body);
+    if (!parsed.success) throw new ApiFailure(400, 'invalid_speed', 'Choose a speed of 0.5, 1, 2, 4 or 8 (two-minute fast-forward).');
     this.speed = parsed.data.speed;
     this.clearTimer();
     // The active tick finishes first; its loop schedules the next one at the new rate.
-    if (!this.inFlight) this.schedule(TICK_INTERVAL_MS / this.speed);
+    if (!this.inFlight) this.schedule(this.tickInterval());
     this.emitState();
     return this.response();
   }
@@ -772,6 +780,10 @@ app.post<{ Params: { id: string } }>('/api/runs/:id/report', async (request,repl
   const input = z.object({ regenerate: z.boolean().optional() }).strict().safeParse(request.body ?? {});
   if (!input.success) throw new ApiFailure(400,'invalid_report_request','Expected an optional regenerate boolean.');
   return sim.reporting.generate(request.params.id,input.data.regenerate ?? false);
+});
+app.post<{ Params: { id: string } }>('/api/runs/:id/recap', async (request,reply) => {
+  try { sim.store.metadata(request.params.id); } catch { return reply.status(404).send(errorBody('run_not_found','Run is unavailable.')); }
+  return sim.reporting.retryRecap(request.params.id, () => { sim.publishReportUpdate(request.params.id); });
 });
 app.get<{ Params: { id: string; reportId: string }; Querystring: { format?: string } }>('/api/runs/:id/reports/:reportId', async (request,reply) => {
   const report = sim.store.reports(request.params.id).find(r => r.id === request.params.reportId);

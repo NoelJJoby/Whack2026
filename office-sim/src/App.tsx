@@ -1,3 +1,4 @@
+import { QuarterReport } from './QuarterReport';
 import { BusinessPage, type Tab as BusinessTab } from './BusinessPage';
 import { Inbox, InboxToastView } from './Inbox';
 import { inboxAt, loadRead, messageIds, newToasts, openThreadFor, saveRead, unreadCount } from './inboxModel';
@@ -21,14 +22,16 @@ import { useDialogue } from './useDialogue';
 import { usePresentation } from './usePresentation';
 import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
+import { isFastForward } from '../shared/playback';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import { EMOTES, FEED_EMOJI } from './emotes';
+import { useBackgroundMusic } from './useBackgroundMusic';
 import './index.css';
 import './inbox.css';
 
 type RailTool = 'events' | 'inbox' | 'rumours' | 'company' | 'scorecard' | 'leaderboard' | 'settings';
-type Menu = RailTool | 'stock' | 'business';
-const MENU_LABEL: Record<Menu, string> = { events: 'Events', inbox: 'Inbox', company: 'Wellbeing', rumours: 'Rumour meter', settings: 'Simulation settings', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss', business: 'Business' };
+type Menu = RailTool | 'stock' | 'business' | 'quarter';
+const MENU_LABEL: Record<Menu, string> = { quarter: 'End of Quarter', events: 'Events', inbox: 'Inbox', company: 'Wellbeing', rumours: 'Rumour meter', settings: 'Simulation settings', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss', business: 'Business' };
 const RAIL_GROUPS: Array<{ label: string; tools: RailTool[] }> = [
   { label: 'Act', tools: ['events'] },
   { label: 'Monitor', tools: ['inbox', 'rumours', 'company'] },
@@ -60,19 +63,34 @@ export default function App() {
   const [read, setRead] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<{ items: InboxToast[]; at: number } | null>(null);
   const toastSeen = useRef({ epoch: -1, tick: 0 });
+  const openedCompletions = useRef(new Set<string>());
+  const previousRun = useRef(sim.runId);
   const [expanded, setExpanded] = useState(false);
   const [truth, setTruth] = useState(false);
   const [showSyncDebug, setShowSyncDebug] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [playbackPaused, setPlaybackPaused] = useState(false);
-  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused);
+  const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused, isFastForward(sim.speed));
   const { state, history } = presentation;
   const hour = presentation.tick;
   const complete = hour >= sim.maxTicks && !presentation.playing;
+  // The End of Quarter report opens once per completed run, unless the player is busy in a panel.
+  useEffect(() => {
+    if (previousRun.current !== sim.runId) {
+      previousRun.current = sim.runId;
+      setMenu(current => current === 'quarter' ? null : current);
+      return;
+    }
+    if (!complete) { setMenu(current => current === 'quarter' ? null : current); return; }
+    const key = `${sim.runId}:${sim.maxTicks}`;
+    if (!sim.runId || menu || selected || openedCompletions.current.has(key)) return;
+    openedCompletions.current.add(key); setMenu('quarter');
+  }, [complete, sim.runId, sim.maxTicks, menu, selected]);
   const serverComplete = (sim.state?.tick ?? 0) >= sim.maxTicks;
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
   const running = sim.state?.running ?? false;
+  const music = useBackgroundMusic();
   const dialogue = useDialogue({
     frame: presentation.frame, previous: presentation.previous, playing: presentation.playing && presentation.epoch === sim.historyEpoch,
     epoch: sim.historyEpoch, speed: sim.speed, onDone: presentation.done, paused: menu !== null || playbackPaused, blocked: menu !== null,
@@ -134,7 +152,7 @@ export default function App() {
   }), [cast, latest, state, presentation.frame, presentation.previous, presenceFinished, hour]);
   const rumourAlert = (state?.metrics.false_reach ?? 0) > 0;
   const wellbeingAlert = people.some(person => !person.quit && person.burnout >= (cast.find(profile => profile.id === person.id)?.traits.quit_threshold ?? quitParams.defaultBurnoutThreshold));
-  const railMenu = menu && menu !== 'stock' && menu !== 'business' ? menu : null;
+  const railMenu = menu && menu !== 'stock' && menu !== 'business' && menu !== 'quarter' ? menu : null;
   const entries = useMemo(() => feedEntries(history, EMOTES ? { names: Object.fromEntries(cast.map(c => [c.id, c.name])), emoji: FEED_EMOJI } : undefined), [history, cast]);
   const objective = sim.companyTasks.find(t => isActiveObjective(t.status));
   const objectiveWork = objective ? (state?.business?.tasks ?? []).filter(t => t.id.startsWith(objectiveWorkPrefix(objective.id))) : [];
@@ -198,7 +216,7 @@ export default function App() {
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
   const diagnostic = engineLabel(sim.mode, sim.modeReason);
   return <main className="game-window" aria-label="The Daily Grind">
-    <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
+    <OfficeView key={sim.historyEpoch} people={people} tick={hour} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null} showDebug={showSyncDebug}
@@ -220,7 +238,7 @@ export default function App() {
     <div className="hud-left">
     <aside className={`office-wire ${expanded ? 'expanded' : ''} ${railMenu ? 'collapsed-for-panel' : ''}`} aria-label="Office wire" aria-hidden={Boolean(railMenu)}>
       <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('business')}>Business</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
-      {complete && <button className="report-entry" onClick={() => openMenu('business')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
+      {complete && <button className="report-entry" onClick={() => openMenu('quarter')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
       {objective && <button className="objective-strip" onClick={() => openMenu('business')} aria-label={`Objective: ${objective.objective}. Open Business`}>
         <b>Objective</b><span>{objective.objective}</span>
         <small>{objectiveWork.length ? `${objectiveWork.filter(t => t.status === 'done').length}/${objectiveWork.length} · ` : ''}{objective.deadlineTick !== undefined ? dueIn(objective.deadlineTick, hour) : OBJECTIVE_STATUS[objective.status].text}</small>
@@ -255,13 +273,15 @@ export default function App() {
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
           <label><input type="checkbox" checked={dialogue.voices} onChange={e => dialogue.setVoices(e.target.checked)}/> Voices</label>
+          <label><input type="checkbox" checked={music.enabled} onChange={e => music.setEnabled(e.target.checked)}/> Background music</label>
           <label><input type="checkbox" checked={dialogue.showThoughts} onChange={e => dialogue.setShowThoughts(e.target.checked)}/> Show inner thoughts</label>
         </fieldset>
         <div className="diagnostics"><h3>Connection & engine</h3><dl><div><dt>Connection</dt><dd>{live ? 'Connected' : connectionText}</dd></div><div><dt>Engine</dt><dd>{diagnostic}</dd></div><div><dt>Seed</dt><dd>{state?.seed ?? '—'}</dd></div></dl>{sim.error && <p role="status" className="coral">{playerText(sim.error)}</p>}</div>
       </>}
     </RailPanel>}
-    {(menu === 'business' || menu === 'stock') && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'business'
+    {(menu === 'business' || menu === 'stock' || menu === 'quarter') && <MenuPanel key={menu} wide={menu === 'quarter'} title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
+      {menu === 'quarter' ? (sim.runId ? <QuarterReport key={sim.runId} runId={sim.runId} status={sim.reportStatus} onClose={() => setMenu(null)} onFullReport={() => openMenu('business', null, 'report')} onNewRun={() => { setMenu(null); setPlaybackPaused(false); void sim.newSeed(); }}/> : null)
+        : menu === 'business'
         ? <BusinessPage state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId} initialTab={businessTab} whyFor={whyFor} onWhy={openThread}
           companyTasks={sim.companyTasks} onSubmitObjective={sim.submitObjective} objectiveDisabled={!live || serverComplete} runId={sim.runId} reportStatus={sim.reportStatus}/>
         : <StockChart history={history} current={price} initialPrice={sim.initialPrice}/>

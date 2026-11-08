@@ -287,7 +287,7 @@ describe('api routes', () => {
 describe('playback speed', () => {
   test('accepts supported rates without advancing a paused simulation', async () => {
     await post('/api/sim/reset');
-    for (const speed of [0.5, 1, 2, 4]) {
+    for (const speed of [0.5, 1, 2, 4, 8]) {
       const response = await post('/api/sim/speed', { speed });
       assert.equal(response.statusCode, 200);
       assert.equal(response.json().speed, speed);

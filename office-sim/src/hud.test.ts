@@ -166,6 +166,7 @@ test('the engine badge names the decision-maker for each mode and reason', async
   assert.equal(engineLabel('rules', 'no_api_key'), 'Rules mode · No API key');
   assert.equal(engineLabel('rules', 'llm_failed'), 'Rules mode · LLM unavailable');
   assert.equal(engineLabel('rules', 'configured'), 'Rules mode');
+  assert.equal(engineLabel('rules', 'fast_forward'), 'Fast-forward · Rules mode');
 });
 
 test('a failed case shows its reason in the event detail, not just the status word', async () => {
@@ -178,4 +179,16 @@ test('a failed case shows its reason in the event detail, not just the status wo
   assert.match(html, /Missed its deadline/);
   assert.match(html, /<h4>Result<\/h4>/);
   assert.match(html, /No active CEO or operations manager/);
+});
+
+test('the CEO panel offers a mock model dropdown; other employees do not', async () => {
+  const { EmployeePanel } = await import('./GamePanel');
+  const { CEO_MODEL_OPTIONS } = await import('./hudModel');
+  const base = { id: 'x', name: 'Ada', role: 'Engineer', color: '#fff', action: 'Working', says: '', thinks: '', stress: 10, burnout: 10, workload: 40, trust: 60, quit: false, present: true } as import('./people').Person;
+  const anchor = null as unknown as HTMLElement;
+  const ceo = renderToStaticMarkup(createElement(EmployeePanel, { person: { ...base, id: 'ceo', name: 'Pat', role: 'CEO' }, threshold: 80, anchor, onClose: () => {} }));
+  assert.match(ceo, /id="ceo-model"/);
+  for (const o of CEO_MODEL_OPTIONS) assert.match(ceo, new RegExp(`value="${o.id}"`));
+  const staff = renderToStaticMarkup(createElement(EmployeePanel, { person: base, threshold: 80, anchor, onClose: () => {} }));
+  assert.doesNotMatch(staff, /ceo-model/);
 });

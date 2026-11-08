@@ -11,3 +11,9 @@ export const employeeProposalSchema = z.union([
 ]);
 export const employeeSchema = z.object({ proposals: z.array(employeeProposalSchema).min(1).max(3), public_line: z.string().max(400), inner_monologue: z.string().max(400), beliefs: z.record(z.number().min(0).max(100)), emotion: z.string().max(20).optional(), cause: z.string().max(80).optional(), reply_to: z.string().max(80).optional() }).strict();
 export const reportSchema = z.object({ schemaVersion: z.literal(1), kind: z.literal('report'), sections: z.array(z.object({ title: z.string().max(120), observations: z.array(z.object({ evidenceIds: z.array(z.string()).min(1).max(12), metricIds: z.array(z.string()).max(12), assessment: z.enum(['observed','recommendation']), text: z.string().min(1).max(600) }).strict()).min(1).max(12) }).strict()).min(1).max(8) }).strict();
+
+const recapHighlight = z.object({ candidateId: z.string(), title: z.string().min(1).max(80), explanation: z.string().min(1).max(600), evidenceIds: z.array(z.string()).min(1).max(12), metricIds: z.array(z.string()).max(8) }).strict();
+export const quarterRecapSchema = z.object({ schemaVersion: z.literal(1), kind: z.literal('quarter_recap'),
+  summary: z.string().min(1).max(500), bestMove: recapHighlight.nullable(), biggestBlunder: recapHighlight.nullable(),
+  lessons: z.array(z.object({ text: z.string().min(1).max(200), evidenceIds: z.array(z.string()).min(1).max(8) }).strict()).max(3),
+}).strict();

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { DEFAULT_PARAMS } from '../server/params';
 import type { TickFrame } from '../shared/api';
+import { FAST_TICK_MS, isFastForward } from '../shared/playback';
 import { buildRound, current, idle, playerReducer, readingDelay, typeDelay } from './dialogueQueue';
 import { useBabble } from './voice/useBabble';
 
@@ -46,40 +47,53 @@ export function useDialogue({ frame, previous, playing, epoch, speed, onDone, pa
   const [showThoughts, setShowThoughts] = useState(true);
   const [voices, setVoices] = useState(true);
   const reduced = useReducedMotion();
+  const fastForward = isFastForward(speed);
   const line = current(state);
   const latest = useRef({ auto, paused, blocked, onSpace, onDone });
   latest.current = { auto, paused, blocked, onSpace, onDone };
 
   useEffect(() => {
     if (!playing || !frame) { dispatch({ type: 'clear' }); return; }
-    dispatch({ type: 'round', lines: buildRound(frame, previous), tick: frame.tick });
-  }, [frame, playing, epoch]);
+    const lines = buildRound(frame, previous);
+    dispatch({ type: 'round', lines: fastForward ? lines.slice(0, 1) : lines, tick: frame.tick });
+  }, [frame, playing, epoch, fastForward]);
+
+  // A brief fully revealed highlight replaces the long dialogue queue in fast-forward.
+  // The full round remains in the committed history and Office wire.
+  useEffect(() => {
+    if (!fastForward || !playing || !frame || paused) return;
+    const timer = setTimeout(() => {
+      dispatch({ type: 'skip' });
+      latest.current.onDone(frame.tick);
+    }, FAST_TICK_MS);
+    return () => clearTimeout(timer);
+  }, [fastForward, playing, frame, paused]);
 
   useEffect(() => {
-    if (!playing || !frame || paused || state.tick !== frame.tick || state.phase !== 'idle') return;
+    if (fastForward || !playing || !frame || paused || state.tick !== frame.tick || state.phase !== 'idle') return;
     const delay = state.round.length ? 0 : DEFAULT_PARAMS.playback.quietDwellMs / speed;
     const timer = setTimeout(() => latest.current.onDone(frame.tick), delay);
     return () => clearTimeout(timer);
-  }, [frame, playing, paused, state.tick, state.phase, state.round.length, speed]);
+  }, [frame, playing, paused, state.tick, state.phase, state.round.length, speed, fastForward]);
 
   const typingPhase = state.phase === 'public' || state.phase === 'inner';
   useEffect(() => {
     if (!line || paused || !typingPhase) return;
-    if (reduced || (state.phase === 'inner' && !showThoughts)) { dispatch({ type: 'complete' }); return; }
+    if (fastForward || reduced || (state.phase === 'inner' && !showThoughts)) { dispatch({ type: 'complete' }); return; }
     const text = state.phase === 'public' ? line.publicLine : line.inner;
     const shown = state.phase === 'public' ? state.shownPublic : state.shownInner;
     const timer = setTimeout(() => dispatch({ type: 'type', showThoughts }), typeDelay(text, shown) / speed);
     return () => clearTimeout(timer);
-  }, [line, typingPhase, state.phase, state.shownPublic, state.shownInner, paused, reduced, showThoughts, speed]);
+  }, [line, typingPhase, state.phase, state.shownPublic, state.shownInner, paused, reduced, showThoughts, speed, fastForward]);
 
   // Auto's reading delay starts only once typing has finished.
   useEffect(() => {
-    if (!line || !auto || paused || state.phase !== 'reading') return;
+    if (fastForward || !line || !auto || paused || state.phase !== 'reading') return;
     const timer = setTimeout(() => dispatch({ type: 'auto' }), readingDelay(line, showThoughts) / speed);
     return () => clearTimeout(timer);
-  }, [line, auto, paused, state.phase, showThoughts, speed]);
+  }, [line, auto, paused, state.phase, showThoughts, speed, fastForward]);
 
-  useBabble({ state, line, active: voices && line?.kind === 'agent' && !reduced && !paused, showThoughts, archetypeOf });
+  useBabble({ state, line, active: voices && line?.kind === 'agent' && !reduced && !paused && !fastForward, showThoughts, archetypeOf });
 
   const next = useCallback(() => dispatch({ type: 'next', auto: latest.current.auto }), []);
   const skip = useCallback(() => dispatch({ type: 'skip' }), []);
