@@ -70,13 +70,4 @@
 .view-3d .game-tools button svg { width: 30px; height: 30px; }
 .view-3d .connection-status { top: 158px; }
 
-/* Compass: rotates with the camera; click resets the view. */
-.o3-compass { position: absolute; right: 66px; bottom: 76px; width: 88px; height: 88px; padding: 0; border-radius: 50%; background: #13203aeb; border: 1px solid #d7b66c; color: #e3e5d5; }
-.o3-compass > div { position: absolute; inset: 0; }
-.o3-compass span { position: absolute; font-size: 11px; line-height: 1; }
-.o3-compass .n { top: 6px; left: 50%; transform: translateX(-50%); color: #d7b66c; }
-.o3-compass .s { bottom: 6px; left: 50%; transform: translateX(-50%); }
-.o3-compass .e { right: 7px; top: 50%; transform: translateY(-50%); }
-.o3-compass .w { left: 7px; top: 50%; transform: translateY(-50%); }
-.o3-compass i { position: absolute; left: 50%; top: 50%; width: 0; height: 0; margin: -18px 0 0 -7px; border: 7px solid transparent; border-bottom: 18px solid #d7b66c; border-top: 0; }
-@media (max-width: 700px) { .o3-compass { display: none; } }
+.o3-tag.panic { background: #f04a3a; color: #fff; font-weight: 700; animation: o3-blink .3s steps(2) infinite; }

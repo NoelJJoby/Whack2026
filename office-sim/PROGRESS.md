@@ -11,8 +11,11 @@
 - Pass 3: `.view-3d` on <main> scopes navy/gold restyle (office3d.css). Rail = People / Shake / Charts /
   Settings (three/Hud3D.tsx: PeopleDrawer, ChartDrawer with crack order). StockPrice `sparkline` prop
   (3D only, last 20 recorded prices). Zoom +/− and hint inside Office3D.
-- Pass 4: drei PerformanceMonitor drops dpr 1.5→1 on fps decline. Compass (rotates with camera, click =
-  reset view). Higgsfield had no generations → ASSETS_TODO.md (5 hero assets). M1: 60 fps, p95 17 ms.
+- Pass 4: drei PerformanceMonitor drops dpr 1.5→1 on fps decline. Higgsfield had no generations →
+  ASSETS_TODO.md. M1: 60 fps, p95 17 ms. Compass removed (user).
+- Tweaks: walkers sidestep/yield via shared `crowd`; complain = arms up (not typing); CEO quits with a
+  briefcase + 'CEO resigns'; Office3D `panic` prop (placeholder flail/run, not wired to events yet).
+  Dev previews: `?preview=panic`, `?preview=ceo-quit`.
 
 ## Next
 - Feature freeze from 05:30. Flip default to 3D only on the user's say-so (VITE_VIEW=3d).

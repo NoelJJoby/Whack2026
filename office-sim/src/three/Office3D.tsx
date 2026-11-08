@@ -1,13 +1,13 @@
 // 3D isometric voxel office (VITE_VIEW=3d). Same props as the 2D <Office>; renders only what it is given.
-import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState, type ElementRef } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
 import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, type OrthographicCamera } from 'three';
 import type { Person } from '../design/Office';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
-import { Agent3D, type Behaviour } from './Agent3D';
-import { DESK_OFFSET, FLOOR, seatFor, type Seat } from './layout';
+import { Agent3D, type Behaviour, type Crowd } from './Agent3D';
+import { DESK_OFFSET, FLOOR, SEAT_LIST, seatFor, type Seat } from './layout';
 import { accessNode, buildNav, seatNode, type Nav } from './nav';
 import { glass, glow, solid } from './world';
 import { bake } from './voxel';
@@ -29,10 +29,14 @@ const lampPool = new MeshBasicMaterial({ color: '#ffd36b', transparent: true, op
 
 const name = (people: Person[], id: string) => people.find(p => p.id === id)?.name ?? id;
 
+/** Dev only: `?preview=panic` or `?preview=ceo-quit` plays that animation 3 s after load, without engine data. */
+const PREVIEW = import.meta.env.DEV ? new URLSearchParams(location.search).get('preview') : null;
+
 /** Action -> where to go and what to show. Only reads the record; invents nothing. */
-function behaviourFor(p: Person, rec: TickRecord | undefined, i: number, people: Person[], nav: Nav, seats: Map<string, Seat>): Behaviour {
+function behaviourFor(p: Person, rec: TickRecord | undefined, i: number, people: Person[], nav: Nav, seats: Map<string, Seat>, panic: boolean): Behaviour {
   const desk: Behaviour = { goal: seatNode(p.id), face: 0, kind: 'desk', tag: null, spread: null };
-  if (p.quit) return { goal: 'exit', face: null, kind: 'quit', tag: 'resigned', spread: null };
+  if (p.quit) return { goal: 'exit', face: null, kind: 'quit', tag: p.role === 'CEO' ? 'CEO resigns' : 'resigned', spread: null };
+  if (panic) return { goal: 'mC', face: null, kind: 'panic', tag: '!!', spread: null };
   if (!rec) return desk;
   const target = rec.target && rec.target !== p.id && seats.has(rec.target) ? rec.target : null;
   // Visit: stand in the aisle behind the target's chair, facing them.
@@ -74,16 +78,7 @@ function FitZoom() {
   return null;
 }
 
-/** Keeps the HTML compass needle pointing north as the camera orbits. */
-function CompassSync({ controls, needle }: { controls: RefObject<ElementRef<typeof OrbitControls>>; needle: RefObject<HTMLDivElement> }) {
-  useFrame(() => {
-    const c = controls.current, n = needle.current;
-    if (c && n) n.style.transform = `rotate(${c.getAzimuthalAngle()}rad)`;
-  });
-  return null;
-}
-
-export default function Office3D({ people, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1 }: {
+export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, panic = false }: {
   people: Person[];
   selected: string | null;
   onSelect: (id: string) => void;
@@ -95,23 +90,28 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
   records?: Record<string, TickRecord>;
   /** Playback speed: scales walking and animation only. */
   speed?: number;
+  /** Placeholder reaction to a catastrophic event: everyone still employed runs about flailing. */
+  panic?: boolean;
 }) {
+  const [previewing, setPreviewing] = useState(false);
+  useEffect(() => { if (PREVIEW) { const id = setTimeout(() => setPreviewing(true), 3000); return () => clearTimeout(id); } }, []);
+  const people = useMemo(() => previewing && PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: true } : p) : cast, [cast, previewing]);
+  const panicking = panic || (previewing && PREVIEW === 'panic');
   const layoutKey = people.map(p => `${p.id}:${p.role}`).join();
-  const seats = useMemo(() => new Map(people.map((p, i) => [p.id, seatFor(p.role, i)])), [layoutKey]);
+  // One desk each, even if two people share an archetype.
+  const seats = useMemo(() => {
+    const taken = new Set<Seat>();
+    return new Map(people.map((p, i) => {
+      let seat = seatFor(p.role, i);
+      if (taken.has(seat)) seat = SEAT_LIST.find(s => !taken.has(s)) ?? seat;
+      taken.add(seat);
+      return [p.id, seat];
+    }));
+  }, [layoutKey]);
+  const crowd = useMemo<Crowd>(() => new Map(), []);
   const controls = useRef<ElementRef<typeof OrbitControls>>(null);
-  const needle = useRef<HTMLDivElement>(null);
   // Integrated GPUs: drop to 1x pixels if the frame rate falls.
   const [maxDpr, setMaxDpr] = useState(1.5);
-  const resetView = () => {
-    const c = controls.current;
-    if (!c) return;
-    c.object.position.set(...CAMERA);
-    c.target.set(...TARGET);
-    // Drop any leftover orbit momentum so the reset lands exactly.
-    c.enableDamping = false;
-    c.update();
-    c.enableDamping = true;
-  };
   const zoom = (factor: number) => {
     const c = controls.current;
     if (!c) return;
@@ -132,7 +132,7 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
       <World />
       {people.map((p, i) => {
         const seat = seats.get(p.id)!;
-        const b = behaviourFor(p, records[p.id], i, people, nav, seats);
+        const b = behaviourFor(p, records[p.id], i, people, nav, seats, panicking);
         const dz = seat.z + DESK_OFFSET;
         return <group key={p.id}>
           <mesh position={[seat.x + 0.4, FLOOR + 1.08, dz + 0.035]} scale={[0.58, 0.32, 0.01]} material={p.quit ? screenOff : screenOn}>
@@ -142,19 +142,15 @@ export default function Office3D({ people, selected, onSelect, highlight, line =
             <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
-          <Agent3D person={p} nav={nav} behaviour={b} phase={i} speed={speed} selected={selected === p.id} highlighted={highlight.includes(p.id)}
+          <Agent3D person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} selected={selected === p.id} highlighted={highlight.includes(p.id)}
             line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={onSelect} />
         </group>;
       })}
       <OrbitControls ref={controls} makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
-      <CompassSync controls={controls} needle={needle} />
       {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
-    <button className="o3-compass" onClick={resetView} aria-label="Reset view" title="Reset view">
-      <div ref={needle}><span className="n">N</span><span className="e">E</span><span className="s">S</span><span className="w">W</span><i /></div>
-    </button>
     <div className="o3-zoom">
       <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>
       <button onClick={() => zoom(0.8)} aria-label="Zoom out">−</button>

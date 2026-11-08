@@ -25,6 +25,9 @@ const EDGES = `aL-lc lc-mL mL-fCol lc-meetIn meetIn-meet meet-meetBack meetBack-
   fLounge-sofaPathR sofaPathR-sofaA fL-sofaPathL sofaPathL-sofaB fL-winLounge
   fDoor-doorIn doorIn-doorOut doorOut-path path-interview path-pave pave-exit`;
 
+/** Open-floor spots panicking agents run between (indoors, clear of furniture). */
+export const PANIC_NODES = ['aL', 'aC', 'coffee', 'cooler', 'mL', 'mC', 'mD', 'mR', 'lc', 'fCol', 'fDoor', 'fLounge', 'fR', 'fL'];
+
 export interface Nav {
   pos: Map<string, P>;
   /** Shortest route from one node to another, both ends included. */

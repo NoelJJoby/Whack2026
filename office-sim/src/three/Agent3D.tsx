@@ -6,7 +6,7 @@ import type { Person } from '../design/Office';
 import type { DialogueLine } from '../dialogueQueue';
 import { playerText } from '../hudModel';
 import { FLOOR } from './layout';
-import { seatNode, type Nav } from './nav';
+import { PANIC_NODES, seatNode, type Nav } from './nav';
 import { mat, unitBox } from './voxel';
 
 const PANTS = '#2c3040', SHOES = '#1c1d22', EYES = '#241c22', SWEAT = '#d6f1ff', BOX = '#c08a4e';
@@ -14,8 +14,13 @@ const WALK = 2.6; // units per second at 1x
 /** Seconds (at 1x) an agent stays put before taking their newest behaviour, so moves stay readable. */
 const DWELL = 2;
 const HIP_SIT = 0.55, HIP_STAND = 0.78;
+const PANIC_RUN = 2.4; // panic speed multiplier
+const PERSONAL = 0.75; // agents closer than this sidestep each other
 
-export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit';
+/** Shared live positions so walkers can avoid each other. */
+export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
+
+export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic';
 /** Where an agent should be and what they do there, derived from their latest TickRecord. */
 export interface Behaviour {
   goal: string;
@@ -48,8 +53,8 @@ function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
-export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected, highlighted, line, showThoughts, onSelect }: {
-  person: Person; nav: Nav; behaviour: Behaviour; phase: number; speed: number;
+export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, selected, highlighted, line, showThoughts, onSelect }: {
+  person: Person; nav: Nav; crowd: Crowd; behaviour: Behaviour; phase: number; speed: number;
   selected: boolean; highlighted: boolean; line: DialogueLine | null; showThoughts: boolean; onSelect: (id: string) => void;
 }) {
   const root = useRef<Group>(null);
@@ -61,11 +66,14 @@ export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected
   // Already gone if they had quit before this view mounted; otherwise they walk out first.
   const [gone, setGone] = useState(person.quit);
   const home = nav.pos.get(seatNode(person.id)) ?? [0, 0];
-  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: person.quit, dwell: 0 });
-  // Ticks can outpace walking: finish the current move, then switch (quitting interrupts at once).
+  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: person.quit, dwell: 0, wait: 0, side: 0 });
+  // Ticks can outpace walking: finish the current move, then switch. Quitting and panic interrupt at once.
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
-  useEffect(() => { if (latest.kind === 'quit') setBehaviour(latest); }, [latest.kind]);
+  useEffect(() => {
+    if (latest.kind === 'quit' || latest.kind === 'panic' || behaviour.kind === 'panic') setBehaviour(latest);
+  }, [latest.kind]);
+  useEffect(() => () => { crowd.delete(person.id); }, [crowd, person.id]);
 
   useEffect(() => {
     const m = mv.current;
@@ -82,7 +90,20 @@ export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected
     if (!g || m.gone) return;
     const dt = Math.min(delta, 0.1) * speed;
     m.t += dt;
-    const step = dt * WALK;
+    const panic = k === 'panic';
+    // Give way to anyone walking towards us (lower phase has priority, never for long), and sidestep when close.
+    let side = 0, blocked = false;
+    const hx = Math.sin(m.heading), hz = Math.cos(m.heading);
+    for (const [id, o] of crowd) {
+      if (id === person.id) continue;
+      const ox = o.x - m.x, oz = o.z - m.z, d = Math.hypot(ox, oz);
+      if (d >= PERSONAL || d < 1e-3) continue;
+      const across = hz * ox - hx * oz;
+      side -= Math.sign(across || (phase % 2 ? 1 : -1)) * (PERSONAL - d);
+      if (m.queue.length && !panic && k !== 'quit' && o.moving && o.phase < phase && ox * hx + oz * hz > 0.2 && d < 0.6) blocked = true;
+    }
+    m.wait = blocked ? m.wait + dt : 0;
+    const step = blocked && m.wait < 1.2 ? 0 : dt * WALK * (panic ? PANIC_RUN : 1);
     if (m.queue.length) {
       const id = m.queue[0];
       const [px, pz] = nav.pos.get(id)!;
@@ -93,36 +114,48 @@ export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected
       if (d <= step) { m.x = tx; m.z = tz; m.node = id; m.queue.shift(); }
       else { m.x += (dx / d) * step; m.z += (dz / d) * step; m.heading = Math.atan2(dx, dz); }
     }
-    const arrived = !m.queue.length;
-    if (arrived && k === 'quit') { m.gone = true; setGone(true); return; }
+    let arrived = !m.queue.length;
+    if (arrived && k === 'quit') { m.gone = true; crowd.delete(person.id); setGone(true); return; }
+    // Panic: keep running to random open-floor spots.
+    if (arrived && panic) {
+      const next = PANIC_NODES[Math.floor(Math.random() * PANIC_NODES.length)];
+      m.queue = nav.route(m.node, next).slice(1);
+      arrived = !m.queue.length;
+    }
     m.dwell = arrived ? m.dwell + dt : 0;
     if (arrived && m.dwell > DWELL && key(latest) !== key(behaviour)) { m.dwell = 0; setBehaviour(latest); }
     const walking = !arrived;
     const sitting = arrived && (k === 'desk' || k === 'overwork' || k === 'sofa');
-    g.position.set(m.x, FLOOR, m.z);
+    crowd.set(person.id, { x: m.x, z: m.z, phase, moving: walking });
+    // Sidestep only while walking (drawn offset; the logical path stays on the waypoint graph).
+    m.side += ((walking ? Math.max(-0.35, Math.min(0.35, side)) : 0) - m.side) * Math.min(1, dt * 6);
+    g.position.set(m.x + hz * m.side, FLOOR, m.z - hx * m.side);
     g.rotation.y = lerpAngle(g.rotation.y, arrived && behaviour.face !== null ? behaviour.face : m.heading, Math.min(1, dt * 10));
 
-    const t = m.t, swing = Math.sin(t * 9);
-    if (body.current) body.current.position.y = (sitting ? HIP_SIT : HIP_STAND) + (walking ? Math.abs(swing) * 0.04 : Math.sin(t * 2) * 0.008);
+    const t = m.t, swing = Math.sin(t * (panic ? 16 : 9));
+    if (body.current) body.current.position.y = (sitting ? HIP_SIT : HIP_STAND) + (walking ? Math.abs(swing) * (panic ? 0.1 : 0.04) : Math.sin(t * 2) * 0.008);
     legs.forEach((ref, i) => {
       const s = i ? -swing : swing;
-      if (ref.current) ref.current.rotation.x = sitting ? -Math.PI / 2 : walking ? s * 0.6 : 0;
+      if (ref.current) ref.current.rotation.x = sitting ? -Math.PI / 2 : walking ? s * (panic ? 0.9 : 0.6) : 0;
       if (knees[i].current) knees[i].current!.rotation.x = sitting ? Math.PI / 2 : walking ? Math.max(0, -s) * 0.7 : 0;
     });
     const typing = (rate: number, i: number) => -1.15 + Math.sin(t * rate + i * 1.6) * 0.08;
     arms.forEach((ref, i) => {
       if (!ref.current) return;
-      let a = Math.sin(t * 1.5 + i) * 0.05;
-      if (k === 'quit') a = -1.2;
+      let a = Math.sin(t * 1.5 + i) * 0.05, out = 0;
+      if (panic) { a = -2.6 + Math.sin(t * 20 + i * Math.PI) * 0.8; out = 0.5 + Math.sin(t * 15 + i) * 0.3; }
+      else if (k === 'quit') a = -1.2;
       else if (walking) a = (i ? swing : -swing) * 0.6;
       else if (k === 'desk') a = typing(14, i);
       else if (k === 'overwork') a = typing(26, i);
       else if (k === 'sofa') a = -0.4;
       else if (k === 'leak') a = i ? -2.7 : 0;
       else if (k === 'gossip') a = i ? -2.3 : 0.1;
-      else if (k === 'complain') a = -0.9 + Math.sin(t * 10 + i * Math.PI) * 0.5;
+      // Exasperated: both arms up in a V, shaking (not in front, so it can't read as typing).
+      else if (k === 'complain') { a = -2.8 + Math.sin(t * 12 + i * Math.PI) * 0.25; out = 0.35; }
       else if (k === 'verify') a = i ? -1.5 : 0;
       ref.current.rotation.x = a;
+      ref.current.rotation.z = i ? out : -out;
     });
     if (sweat.current) {
       sweat.current.visible = k === 'overwork' && sitting;
@@ -155,7 +188,9 @@ export function Agent3D({ person, nav, behaviour: latest, phase, speed, selected
           <Part p={[0, -0.45, 0]} s={[0.13, 0.1, 0.15]} c={person.skin} />
           {i === 1 && k === 'leak' && <Part p={[0, -0.5, 0.1]} s={[0.08, 0.22, 0.04]} c="#15171c" />}
         </group>)}
-      {k === 'quit' && <><Part p={[0, 0.2, 0.42]} s={[0.55, 0.36, 0.42]} c={BOX} /><Part p={[0.05, 0.4, 0.42]} s={[0.14, 0.08, 0.1]} c="#5f9e45" /></>}
+      {k === 'quit' && (person.role === 'CEO'
+        ? <><Part p={[0, 0.15, 0.36]} s={[0.6, 0.42, 0.16]} c="#3b2a20" /><Part p={[0, 0.4, 0.36]} s={[0.2, 0.08, 0.06]} c="#d7b66c" /></>
+        : <><Part p={[0, 0.2, 0.42]} s={[0.55, 0.36, 0.42]} c={BOX} /><Part p={[0.05, 0.4, 0.42]} s={[0.14, 0.08, 0.1]} c="#5f9e45" /></>)}
       <Part p={[0, 0.88, 0]} s={[0.5, 0.5, 0.46]} c={person.skin} />
       <Part p={[0, 1.16, -0.02]} s={[0.54, 0.12, 0.52]} c={person.hair} />
       <Part p={[0, 0.94, -0.22]} s={[0.54, 0.4, 0.1]} c={person.hair} />
