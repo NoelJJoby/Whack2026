@@ -13,6 +13,8 @@ import { DESK_OFFSET, FLOOR, SEAT_LIST, seatFor, type Seat } from './layout';
 import { accessNode, buildNav, seatNode, type Nav } from './nav';
 import { carBoxes, glass, glow, solid } from './world';
 import { bake } from './voxel';
+import { DayNight } from './DayNight';
+import { walksIn } from './daylight';
 import './office3d.css';
 
 const TARGET: [number, number, number] = [0, 0, 1.5];
@@ -194,8 +196,10 @@ function Cars({ cars, boarded, speed, paused }: { cars: CarState[]; boarded: Set
   </group>)}</>;
 }
 
-export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, fallback }: {
+export default function Office3D({ people: cast, tick, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, announcement = null, panic = false, paused = false, fallback }: {
   people: Person[];
+  /** The same presented simulation tick as the workday clock and employee presence. */
+  tick: number;
   selected: string | null;
   onSelect: (id: string) => void;
   highlight: string[];
@@ -235,10 +239,14 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
   // Going home: anyone seen in the office who is now marked as left walks out (absent on load: already gone).
   // The first two to leave each day take the parked cars; a car is back in its bay once its driver returns.
   const presence = useRef(new Map(people.map(p => [p.id, p.present !== false])));
+  const previousTick = useRef(tick);
+  const arriving = useRef(new Set<string>());
   const departing = useRef(new Set<string>());
   const cars = useRef<CarState[]>(CARS.map(() => ({ owner: null, stage: 'parked', t: 0, s: 0 })));
   const boarded = useMemo(() => new Set<string>(), []);
   for (const p of people) {
+    if (!p.quit && walksIn(presence.current.get(p.id), p.present !== false, previousTick.current, tick)) arriving.current.add(p.id);
+    if (p.present === false || p.quit) arriving.current.delete(p.id);
     if (presence.current.get(p.id) && p.present === false && !p.quit && !departing.current.has(p.id)) {
       departing.current.add(p.id);
       const free = cars.current.find(c => !c.owner && c.stage === 'parked');
@@ -250,7 +258,10 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     const owner = c.owner && people.find(p => p.id === c.owner);
     if (c.owner && (!owner || owner.present !== false)) { boarded.delete(c.owner); c.owner = null; }
   }
-  useEffect(() => { for (const p of people) presence.current.set(p.id, p.present !== false); });
+  useEffect(() => {
+    for (const p of people) presence.current.set(p.id, p.present !== false);
+    previousTick.current = tick;
+  });
   // The CEO resigning mid-session (not already gone when the view loads) triggers the cutscene.
   const [cutscene, setCutscene] = useState<Cutscene | null>(null);
   const ceo = people.find(p => p.role === 'CEO');
@@ -312,12 +323,8 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
   const nav = useMemo(() => buildNav(people.map(p => ({ id: p.id, seat: seats.get(p.id)!, ceo: p.role === 'CEO' }))), [seats]);
   return <div className="o3-scene">
     <Canvas fallback={fallback} orthographic shadows flat dpr={[1, maxDpr]} camera={{ position: CAMERA, zoom: 30, near: 1, far: 300 }}>
-      <color attach="background" args={['#14203a']} />
       <PerformanceMonitor onDecline={() => setMaxDpr(1)} />
-      <hemisphereLight args={['#c9d6ff', '#6b4a2a', 1.4]} />
-      <directionalLight position={[-14, 26, 16]} color="#ffe0b0" intensity={2.4} castShadow
-        shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004} shadow-normalBias={0.03}
-        shadow-camera-left={-22} shadow-camera-right={22} shadow-camera-top={22} shadow-camera-bottom={-22} shadow-camera-far={90} />
+      <DayNight tick={tick} speed={speed} paused={paused} />
       <World />
       <Cars cars={cars.current} boarded={boarded} speed={speed} paused={paused} />
       {people.map((p, i) => {
@@ -335,7 +342,7 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
             <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
-          <Agent3D key={`${p.id}:${p.present !== false || p.quit}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} onExit={() => boarded.add(p.id)}
+          <Agent3D key={`${p.id}:${p.present !== false || p.quit}:${arriving.current.has(p.id)}`} person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} paused={paused} cinematic={cutscene?.id === p.id} departing={isLeaving} arriving={arriving.current.has(p.id)} onExit={() => boarded.add(p.id)}
             emote={emoteFor(p)} attend={hearsCeo(p.id)} faceTowards={hearsCeo(p.id) ? ceo!.id : EMOTES ? faceTowards.get(p.id) ?? null : null}
             convLine={announcing ? announcement!.text : focusSpeakers.find(r => r.agent === p.id)?.public_line ?? null}
             convDelay={(() => { const mine = focusSpeakers.find(r => r.agent === p.id); return mine?.conversation?.role === 'reply' && focusSpeakers.some(r => r.agent !== p.id && r.conversation?.id === mine.conversation?.id) ? 1.5 : 0; })()} selected={selected === p.id} highlighted={highlight.includes(p.id)}
