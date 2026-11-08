@@ -199,14 +199,14 @@ describe('tick loop: events and ablations', () => {
 });
 
 describe('workday hours', () => {
-  it('runs 5 ticks per standard workday (09:00 to 17:00) without forced daily overtime penalties', async () => {
+  it('applies no overtime penalty in office hours (09:00 to 17:00, and 09:00 the next day)', async () => {
     const params = structuredClone(P);
     params.rules.passive.stressRelax = 0;
     params.rules.passive.burnoutGain = 0;
     params.rules.passive.burnoutGainPerStress = 0;
     params.rules.passive.burnoutDecay = 0;
     const provider = async () => ({ proposals: [{ action: 'work', weight: 1 }], public_line: '', inner_monologue: '', beliefs: {} });
-    for (const tick of [1, 2, 3, 4, 5, 6] as const) {
+    for (const tick of [1, 2, 3, 4, 5, 9] as const) {
       const world = createWorld(fixtureCast(42), 42, params);
       world.tick = tick - 1;
       world.price.tick = tick - 1;

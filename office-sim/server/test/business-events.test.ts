@@ -13,7 +13,7 @@ import { RunStore } from '../run-store';
 import { Reporting, factsFor, validateReport } from '../reporting';
 import { DEFAULT_PARAMS } from '../params';
 import { BUSINESS_PARAMS, makeTask, openBusinessTick, validateOrganisation } from '../business';
-import { calendarSpan, TICKS_PER_MONTH } from '../../shared/workday';
+import { calendarSpan, days, isOfficeHour, TICKS_PER_DAY, TICKS_PER_MONTH } from '../../shared/workday';
 import { CATALOG, eligible } from '../events/catalog';
 import { employeeSchema } from '../llm/schemas';
 import { toLlmOutput } from '../llm-adapter';
@@ -24,8 +24,12 @@ import type { ManagementContext } from '../../shared/events';
 import type { TurnContext, TurnProvider, World } from '../engine-types';
 const config = { mode: 'llm_raw' as const, scenario: [], gossip: true, billboard: false, business: true };
 function world(seed = 42) { return createWorld(fixtureCast(seed,DEFAULT_PARAMS,false),seed); }
-async function advance(w: World, ticks: number, provider: TurnProvider | null = createStubProvider(w.seed)) {
-  for (let i = 0; i < ticks; i++) w = (await runTick(w,provider,config)).world;
+/** Run `hours` office hours (09:00-17:00), plus any evening hours in between: step counts here are in working hours. */
+async function advance(w: World, hours: number, provider: TurnProvider | null = createStubProvider(w.seed)) {
+  for (let i = 0; i < hours;) {
+    w = (await runTick(w,provider,config)).world;
+    if (isOfficeHour(w.tick)) i++;
+  }
   return w;
 }
 const temp = () => mkdtempSync(join(tmpdir(),'business-events-'));
@@ -36,7 +40,7 @@ describe('business model invariants', () => {
     const w = world();
     const salary = Object.values(w.business.positions).reduce((n,p) => n+p.dailySalary,0);
     for (let tick = 1; tick <= TICKS_PER_MONTH; tick++) { w.tick = tick; openBusinessTick(w); }
-    assert.equal(calendarSpan(0,50),30);
+    assert.equal(calendarSpan(0,TICKS_PER_MONTH),30);
     assert.equal(w.business.ledger.filter(l => l.category === 'payroll').reduce((n,l) => n+l.amount,0),salary*30);
     const count = w.business.ledger.length; openBusinessTick(w); assert.equal(w.business.ledger.length,count);
     assert.throws(() => validateOrganisation({ a: { ...w.business.positions.ceo,id:'a',supervisor:'a' } }));
@@ -51,7 +55,7 @@ describe('business model invariants', () => {
     assert.equal(eligible(w,CATALOG.find(d => d.id === 'client_win')!),false);
     for (let seed = 1; seed <= 100; seed++) for (let index = 0; index < 30; index++) {
       const c = interval(seed,'common',index); const r = interval(seed,'rare',index);
-      assert.ok(c >= 10 && c <= 20); assert.ok(r >= 40 && r <= 60);
+      assert.ok(c >= days(2) && c <= days(4)); assert.ok(r >= days(8) && r <= days(12));
     }
   });
 });
@@ -155,7 +159,7 @@ describe('causal management and information boundaries', () => {
     assert.ok(laid.business.tasks.filter(t => t.status !== 'done').every(t => t.owner !== 'loyalist'));
     const payrollBefore = laid.business.ledger.filter(l => l.category === 'payroll').at(-1)!.amount;
     laid = await advance(laid,1,provider);
-    assert.equal(laid.business.ledger.filter(l => l.category === 'payroll').at(-1)!.amount,payrollBefore-salary/5);
+    assert.equal(laid.business.ledger.filter(l => l.category === 'payroll').at(-1)!.amount,payrollBefore-salary/TICKS_PER_DAY);
   });
   it('uses safe role fallbacks and acting management without discretionary layoffs', async () => {
     let w = world(); w.agents.ceo.status = 'quit'; openEvent(w,'cost_review');

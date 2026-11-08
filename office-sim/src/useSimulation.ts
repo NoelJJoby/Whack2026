@@ -1,5 +1,6 @@
 // The one way the client talks to the server: `api()` for requests and
 // `useSimulation()` for the SSE stream and the controls.
+import { TICKS_PER_MONTH, TICKS_PER_QUARTER, TICKS_PER_WEEK } from '../shared/workday';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
@@ -8,8 +9,8 @@ import { mockCast, mockHistory, mockResponse } from './mocks';
 import { createAnnouncements, type Announcement } from './announcement';
 import { playerText } from './hudModel';
 
-/** Run lengths offered in the UI: 1 week (25), 1 month (50), 2 months (100), 1 quarter (150). */
-export const RUN_LENGTHS = [25, 50, 100, 150];
+/** Run lengths offered in the UI: 1 workweek, 1 month, 2 months, 1 quarter (40, 80, 160, 240 ticks). */
+export const RUN_LENGTHS = [TICKS_PER_WEEK, TICKS_PER_MONTH, TICKS_PER_MONTH * 2, TICKS_PER_QUARTER];
 
 /** Dev only: `VITE_USE_MOCKS=true` renders the design mock data instead of the server. */
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';

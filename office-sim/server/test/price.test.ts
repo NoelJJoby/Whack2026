@@ -170,5 +170,7 @@ test('feedback off preserves the versioned legacy fixture over ten seeds and thi
   }
   const digest = createHash('sha256').update(JSON.stringify(results)).digest('hex');
   // v2: false announcements no longer apply factual shocks; added employee actions are explicitly masked.
-  assert.equal(digest, 'ac6a3919c62da8922c0af0f1647c94ee446eeae7933ec26e7e02273c6dbf8865');
+  // v3: the day runs to 23:00 (8 ticks); after 17:00 only people working late act. The first office day
+  // (ticks 1-5) still reproduces v2 exactly; only the evening hours differ.
+  assert.equal(digest, '5acc29e7de96308689f98d58141ccd64736dddb7f4e11cf302b1ce6653bc7b58');
 });

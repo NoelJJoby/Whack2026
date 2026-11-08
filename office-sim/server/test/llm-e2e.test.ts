@@ -233,14 +233,15 @@ describe('LLM provider x engine: full run through the real provider chain', () =
       assert.ok(r.logs.some((l) => l.hops.length > 0) || r.logs.some((l) => l.events.length > 0), 'at least one live event or gossip step happened');
       assert.ok(captured.some((c) => c.ctx.claims.some((x) => r.world.claims[x.id].parentId !== null)) || r.logs.some((l) => l.events.length > 0), 'the model saw a real claim or the run processed scheduled events');
 
-      // Beliefs from the model are stored on every held, unverified claim the
-      // agent has had a turn since hearing (gossip on the last tick lands after the last turn).
-      const lastHops = new Set(r.logs.at(-1)!.hops.map((h) => `${h.to}:${h.delivered}`));
+      // Beliefs from the model are stored on every held, unverified claim the agent has
+      // had a turn since hearing. Gossip lands after the hour's turns, and people who go
+      // home at 17:00 have no turn until the next morning.
+      const turnedAfter = (id: string, tick: number) => r.logs.some((l) => l.tick > tick && l.order.includes(id));
       for (const id of r.world.ids) {
         const a = r.world.agents[id];
         if (a.status !== 'active') continue;
         for (const h of a.claims) {
-          if (h.verified || lastHops.has(`${id}:${h.claimId}`)) continue;
+          if (h.verified || !turnedAfter(id, h.tickHeard)) continue;
           assert.notEqual(h.belief, null, `${id} ${h.claimId}`);
         }
       }

@@ -60,6 +60,8 @@ export interface PriceInput {
   postQuit: Array<{ id: string; active: boolean; state: Pick<AgentState, 'stress' | 'burnout' | 'trust_mgmt'> }>;
   feedback: boolean;
   feedbackDeltas: FeedbackDelta[];
+  /** Overtime hours: most desks are empty by design, so smoothed output holds instead of updating. */
+  officeClosed?: boolean;
 }
 const finite = (x: number, name: string) => {
   if (!Number.isFinite(x)) throw new Error(`Invalid price ${name}: must be finite`);
@@ -123,7 +125,7 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
     if (seat.action === null) return sum;
     return sum + finite(p.productivity[seat.action], 'productivity') + (seat.action === 'overwork' ? p.overworkBonus * (1 - b) : 0);
   }, 0) / input.seats.length, 'output');
-  const oEma = finite(p.outputAlpha * rawOutput + (1 - p.outputAlpha) * previous.oEma, 'smoothed output');
+  const oEma = input.officeClosed ? previous.oEma : finite(p.outputAlpha * rawOutput + (1 - p.outputAlpha) * previous.oEma, 'smoothed output');
   const born: NewsItem[] = [];
   const add = (id: string, kind: NewsItem['kind'], claimId: string, eventTruth?: boolean) => {
     const claim = input.claims[claimId];

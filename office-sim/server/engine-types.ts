@@ -111,6 +111,8 @@ export interface EngineAgent {
   /** Workload the agent drifts back to; policies move it. */
   baselineWorkload: number;
   claims: HeldClaim[];
+  /** In the office this hour (server/presence.ts). Undefined counts as present. */
+  present?: boolean;
 }
 
 // --- Claims and events ------------------------------------------------------
@@ -333,6 +335,8 @@ export interface EngineTickLog {
   quits: string[];
   states: Record<string, AgentState & { status: AgentStatus }>;
   reach: { true_holders: number; false_holders: number };
+  /** Who stayed late and who went home after this hour (17:00 to 23:00 only). */
+  presence?: import('./presence').PresenceLog;
   /** Voice cards created this tick (tick 1, or a newcomer's). */
   voices?: Record<string, VoiceCard>;
   /** Example lines fetched this tick. */

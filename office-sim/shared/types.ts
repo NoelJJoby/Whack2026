@@ -70,6 +70,8 @@ export interface AgentState {
 export interface AgentRuntimeState extends AgentState {
   status: AgentStatus;
   quit_tick: number | null;
+  /** In the office this hour; after 17:00 only people working late. */
+  present?: boolean;
 }
 
 export interface Claim {

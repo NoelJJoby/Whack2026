@@ -1,6 +1,7 @@
 import type { Rarity } from '../../shared/events';
 import type { World } from '../engine-types';
 import { stream } from '../rng';
+import { dayIndexOf } from '../../shared/workday';
 import { CATALOG, eligible } from './catalog';
 import { interval, openEvent, terminal } from './lifecycle';
 export function consumeSlot(w: World, rarity: Rarity, reason: string, eventId?: string) {
@@ -14,7 +15,7 @@ export function scheduleEvents(w: World) {
   for (const rarity of ['common','rare'] as const) {
     const s = w.eventState; const slot = s.scheduler[rarity]; if (w.tick < slot.due) continue;
     let reason: string | null = null;
-    if (s.cases.some(e => e.origin === 'external' && Math.floor((e.openedTick-1)/5) === Math.floor((w.tick-1)/5))) reason = 'active_day_limit';
+    if (s.cases.some(e => e.origin === 'external' && dayIndexOf(e.openedTick) === dayIndexOf(w.tick))) reason = 'active_day_limit';
     if (s.cases.filter(e => e.severity === 'high' && !terminal(e)).length >= 2) reason = 'high_severity_capacity';
     let pool = CATALOG.filter(d => d.rarity === rarity && eligible(w,d));
     if (!pool.length) reason ??= 'no_eligible_template';

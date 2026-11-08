@@ -1,6 +1,6 @@
 import type { Business, LedgerEntry, Task } from '../shared/business';
 import type { World, EngineAgent } from './engine-types';
-import { calendarSpan, workdayTime } from '../shared/workday';
+import { calendarSpan, dayIndexOf, days, isDayStart, workdayTime } from '../shared/workday';
 
 export const BUSINESS_PARAMS = {
   currency: 'GBP', salesTarget: 100_000_000, startingCash: 50_000_000,
@@ -29,13 +29,13 @@ export function initialiseBusiness(agents: Record<string, EngineAgent>): Busines
   for (let i = 0; i < 3; i++) {
     const id = `existing-${i}`;
     b.contracts.push({ id, client: ['Northstar', 'Willow', 'Bracken'][i], value: 24_000_000, recognised: 0, collected: 0, signedTick: 0, paymentTick: null, status: 'delivering', quarter: 1, target: BUSINESS_PARAMS.salesTarget });
-    b.tasks.push(makeTask(`service-${i}`, 'delivery', 'Engineering', `Deliver ${b.contracts[i].client} service`, 4, 20 + i * 5, null, id));
+    b.tasks.push(makeTask(`service-${i}`, 'delivery', 'Engineering', `Deliver ${b.contracts[i].client} service`, 4, days(4 + i), null, id));
   }
-  b.tasks.push(makeTask('initial-release', 'release', 'Engineering', 'Release with access controls checked', 4, 16));
-  b.tasks.push(makeTask('initial-collection', 'collection', 'Operations', 'Collect existing receivable', 2, 12));
+  b.tasks.push(makeTask('initial-release', 'release', 'Engineering', 'Release with access controls checked', 4, days(3.2)));
+  b.tasks.push(makeTask('initial-collection', 'collection', 'Operations', 'Collect existing receivable', 2, days(2.4)));
   // Existing delivered service is a starting receivable, not new run revenue.
   b.receivables = 3_000_000;
-  b.tasks.push(makeTask('initial-sales', 'sales', 'Sales', 'Qualify the next client opportunity', 4, 12));
+  b.tasks.push(makeTask('initial-sales', 'sales', 'Sales', 'Qualify the next client opportunity', 4, days(2.4)));
   return b;
 }
 export function validateOrganisation(positions: Business['positions']) {
@@ -66,12 +66,12 @@ export function post(world: World, entry: LedgerEntry): boolean {
   return true;
 }
 export function openBusinessTick(w: World) {
-  const b = w.business; const days = calendarSpan(w.tick - 1, w.tick);
+  const b = w.business; const span = calendarSpan(w.tick - 1, w.tick);
   const quarter = workdayTime(w.tick).quarter;
   if (!b.quarters.some(q => q.quarter === quarter)) b.quarters.push({ quarter, salesTarget: BUSINESS_PARAMS.salesTarget });
   const salaries = Object.values(b.positions).filter(p => w.agents[p.id].status === 'active').reduce((n,p) => n + p.dailySalary, 0);
-  post(w, { id: `payroll-${w.tick}`, tick: w.tick, category: 'payroll', amount: Math.round(salaries * days), source: 'operations', calendarDays: days });
-  post(w, { id: `infra-${w.tick}`, tick: w.tick, category: 'infrastructure', amount: Math.round((b.dailyInfrastructure + b.dailyDiscretionary) * days), source: 'operations', calendarDays: days });
+  post(w, { id: `payroll-${w.tick}`, tick: w.tick, category: 'payroll', amount: Math.round(salaries * span), source: 'operations', calendarDays: span });
+  post(w, { id: `infra-${w.tick}`, tick: w.tick, category: 'infrastructure', amount: Math.round((b.dailyInfrastructure + b.dailyDiscretionary) * span), source: 'operations', calendarDays: span });
   for (const c of b.contracts) {
     if (c.status === 'earned' && c.paymentTick !== null && c.paymentTick <= w.tick) {
       const amount = c.recognised - c.collected;
@@ -80,16 +80,18 @@ export function openBusinessTick(w: World) {
     }
   }
   // Established clients generate recurring service obligations, with real capacity costs.
-  if (w.tick % 10 === 1) {
+  // Every second workday, at 09:00.
+  if (isDayStart(w.tick) && dayIndexOf(w.tick) % 2 === 0) {
     const id = `routine-${w.tick}`;
     for (const [kind, dept, title] of [['sales', 'Sales', 'Develop qualified pipeline'], ['release', 'Engineering', 'Maintain product release'], ['process', 'Operations', 'Improve service process']] as const)
-      b.tasks.push(makeTask(`${id}-${kind}`, kind, dept, title, 3, w.tick + 15));
+      b.tasks.push(makeTask(`${id}-${kind}`, kind, dept, title, 3, w.tick + days(3)));
     if (b.opportunities.filter(o => o.stage === 'qualified').length < 4) b.opportunities.push({ id: `op-${w.tick}`, client: `Client ${w.tick}`, value: 4_000_000, stage: 'qualified', owner: null });
   }
   for (const t of b.tasks) if (t.owner && w.agents[t.owner]?.status !== 'active' && !['done','cancelled'].includes(t.status)) {
     t.owner = null; t.status = 'blocked'; t.version++;
   }
-  b.used = 0; b.available = Object.values(b.positions).filter(p => p.role === 'employee' && w.agents[p.id].status === 'active').reduce((n,p) => n + p.capacity, 0);
+  // Only people in the office this hour count as capacity (after 17:00, the ones working late).
+  b.used = 0; b.available = Object.values(b.positions).filter(p => p.role === 'employee' && w.agents[p.id].status === 'active' && w.agents[p.id].present !== false).reduce((n,p) => n + p.capacity, 0);
 }
 export function signContract(w: World, eventId: string, opportunityId: string, value?: number) {
   const b = w.business; const op = b.opportunities.find(o => o.id === opportunityId && o.stage === 'qualified');

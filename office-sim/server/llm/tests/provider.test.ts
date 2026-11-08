@@ -61,7 +61,7 @@ try {
   const prompt = prompts[0];
   assert.ok(prompt.startsWith('You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.'));
   assert.ok(prompt.includes("You've had a headache since this morning and can't get through your list."));
-  assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, this morning. you generally trust them.'));
+  assert.ok(prompt.includes('"The office may close." (key: c1), from Rae, yesterday evening. you generally trust them.'));
   assert.ok(prompt.includes('A new manager starts today.'));
   assert.ok(prompt.includes('Colleagues still here: Rae'));
   const actions = prompt.split('What you can do:\n')[1].split('\n\n')[0]

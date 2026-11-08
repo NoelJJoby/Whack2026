@@ -236,6 +236,8 @@ export const ruleParams = {
     leak: { trust_mgmt: -8, leakerStress: 5 },
   },
   overtime: { stress: 2, burnout: 1 },
+  /** After 17:00 an agent stays for the next hour if they overwork or their workload is at least this. */
+  stayLate: { workloadMin: 65 },
   passive: {
     /**
      * Stress relaxes toward target = stressBase + stressPerExcessWorkload * max(0, workload - comfortable),

@@ -1,8 +1,9 @@
+import { calendarDaysElapsed, TICKS_PER_MONTH, TICKS_PER_QUARTER, TICKS_PER_WEEK } from '../shared/workday';
 function durationLabel(ticks: number) {
-  if (ticks === 25) return '2 weeks (15d)';
-  if (ticks === 50) return '1 month (30d)';
-  if (ticks === 100) return '2 months (60d)';
-  if (ticks === 150) return '1 quarter (90d)';
+  if (ticks === TICKS_PER_WEEK) return '2 weeks (15d)';
+  if (ticks === TICKS_PER_MONTH) return '1 month (30d)';
+  if (ticks === TICKS_PER_MONTH * 2) return '2 months (60d)';
+  if (ticks === TICKS_PER_QUARTER) return '1 quarter (90d)';
   return `${ticks} work periods`;
 }
 interface ControlsProps {
@@ -12,7 +13,7 @@ interface ControlsProps {
 export function Controls({ running, complete, disabled, tick = 0, runLength, runLengths = [], onRunLength, onStep, onReset, onNewSeed }: ControlsProps) {
   return <div className="simulation-controls">
     <fieldset><legend>Run duration</legend><div className="duration-options">{runLengths.map(n => <button key={n} aria-pressed={runLength === n} disabled={disabled || n < tick} onClick={() => onRunLength?.(n)}>{durationLabel(n)}</button>)}</div></fieldset>
-    <p>{Math.floor(tick / 5) * 3} of {Math.floor((runLength ?? 150) / 5) * 3} calendar days completed ({tick} of {runLength} work periods)</p>
+    <p>{Math.floor(calendarDaysElapsed(tick))} of {Math.floor(calendarDaysElapsed(runLength ?? TICKS_PER_QUARTER))} calendar days completed ({tick} of {runLength} work periods)</p>
     <button disabled={disabled || running || complete} onClick={onStep}>Advance one work period</button>
     <div className="reset-controls"><button onClick={onReset}>Reset run</button><button onClick={onNewSeed}>New run</button></div>
   </div>;

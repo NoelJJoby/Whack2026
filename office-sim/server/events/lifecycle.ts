@@ -1,7 +1,7 @@
 import type { BusinessEvent, Evidence, EventState, Rarity } from '../../shared/events';
 import type { World } from '../engine-types';
 import { makeTask, signContract } from '../business';
-import { workdayTime } from '../../shared/workday';
+import { days, workdayTime } from '../../shared/workday';
 import { CATALOG, type EventDefinition } from './catalog';
 import { stream } from '../rng';
 export const terminal = (e: BusinessEvent) => ['resolved','failed','cancelled','superseded'].includes(e.status);
@@ -12,7 +12,8 @@ export function managementOwners(w: World) {
   return { ceo: ceo ?? ops, ops: ops ?? ceo, acting: !ceo };
 }
 export function interval(seed: number, rarity: Rarity, index: number) {
-  return (rarity === 'common' ? 10 : 40) + stream(seed, index, `arrivals-${rarity}`, 'event').int(21 - (rarity === 'common' ? 10 : 0));
+  // Common every 2-4 workdays, rare every 8-12 (calibrated at 5 ticks a day as 10-20 and 40-60 ticks).
+  return (rarity === 'common' ? days(2) : days(8)) + stream(seed, index, `arrivals-${rarity}`, 'event').int((rarity === 'common' ? days(2) : days(4)) + 1);
 }
 export function initialEvents(seed: number): EventState {
   const common = interval(seed, 'common', 0); const rare = interval(seed, 'rare', 0);
@@ -45,8 +46,8 @@ export function openEvent(w: World, definition: EventDefinition | string, origin
     b.tasks.push(task); event.tasks.push(task.id);
     event.milestones.push({ tick: w.tick, text: `Contract booked against frozen Q${quarter} target; revenue and collection require delivery.` });
   }
-  if (truth && ['supplier_interruption','supplier_withdrawal'].includes(d.id)) b.supplierAvailableAt = w.tick + (d.rarity === 'rare' ? 9 : 4);
-  if (event.exposure) w.eventState.incidents.push({ eventId: id, detectedAt: hidden ? w.tick + 1 : w.tick, materialAt: w.tick + 5, employee: origin === 'employee' ? entityId ?? null : null });
+  if (truth && ['supplier_interruption','supplier_withdrawal'].includes(d.id)) b.supplierAvailableAt = w.tick + (d.rarity === 'rare' ? days(1.8) : days(0.8));
+  if (event.exposure) w.eventState.incidents.push({ eventId: id, detectedAt: hidden ? w.tick + 1 : w.tick, materialAt: w.tick + days(1), employee: origin === 'employee' ? entityId ?? null : null });
   return event;
 }
 export function ensureResponseTasks(w: World, e: BusinessEvent, optionKind: string) {
@@ -59,11 +60,11 @@ export function ensureResponseTasks(w: World, e: BusinessEvent, optionKind: stri
 export function updateLifecycle(w: World) {
   for (const e of w.eventState.cases.filter(e => !terminal(e))) {
     const tasks = w.business.tasks.filter(t => e.tasks.includes(t.id));
-    if (!e.truth) { if (w.tick > e.openedTick + 5) { e.status = 'resolved'; e.outcome = 'Unconfirmed information archived; no factual business effects.'; } continue; }
+    if (!e.truth) { if (w.tick > e.openedTick + days(1)) { e.status = 'resolved'; e.outcome = 'Unconfirmed information archived; no factual business effects.'; } continue; }
     if (e.status === 'responding' && tasks.length && tasks.every(t => t.status === 'done')) {
       if (e.domain === 'supplier' && w.tick < w.business.supplierAvailableAt) { e.status = 'monitoring'; continue; }
       if (e.domain === 'security' && e.contained && !tasks.some(t => t.kind === 'recovery')) {
-        const recovery = makeTask(`recovery-${e.id}`, 'recovery', 'Engineering', 'Verify recovery and client impact', 3, w.tick + 10, e.id);
+        const recovery = makeTask(`recovery-${e.id}`, 'recovery', 'Engineering', 'Verify recovery and client impact', 3, w.tick + days(2), e.id);
         recovery.priority = 1; w.business.tasks.push(recovery); e.tasks.push(recovery.id); e.status = 'monitoring';
         addEvidence(w, e, 'Exposure contained. Recovery and client impact remain under review.', 'monitoring', [managementOwners(w).ceo, managementOwners(w).ops].filter((x): x is string => !!x));
         continue;

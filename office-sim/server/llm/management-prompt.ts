@@ -1,7 +1,8 @@
 import type { ManagementContext } from '../../shared/events';
+import { days } from '../../shared/workday';
 export function buildManagementPrompt(ctx: ManagementContext) {
   const shape = ctx.kind === 'ceo'
-    ? { schemaVersion: 1, kind: 'ceo', revision: ctx.revision, choices: [{ eventId: 'shown event id', optionId: 'shown option id', priority: 1, budget: 0, deadline: ctx.revision + 10, acceptance: 'Observable work acceptance', communicate: [], reviewTick: ctx.revision + 5 }], rationale: 'Explain concrete priorities and trade-offs.' }
+    ? { schemaVersion: 1, kind: 'ceo', revision: ctx.revision, choices: [{ eventId: 'shown event id', optionId: 'shown option id', priority: 1, budget: 0, deadline: ctx.revision + days(2), acceptance: 'Observable work acceptance', communicate: [], reviewTick: ctx.revision + days(1) }], rationale: 'Explain concrete priorities and trade-offs.' }
     : { schemaVersion: 1, kind: 'ops', revision: ctx.revision, assignments: [{ taskId: 'shown task id', employeeId: 'shown employee id', state: 'active', allocation: 1 }], infeasible: [], rationale: 'Explain displaced work and capacity.' };
   return [
     `You are the ${ctx.kind === 'ceo' ? 'chief executive' : 'operations manager'} of a B2B software/services company. Act professionally within your authority.`,
