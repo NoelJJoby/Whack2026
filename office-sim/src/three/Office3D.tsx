@@ -81,42 +81,48 @@ function FitZoom() {
 interface Cutscene { id: string; name: string; ending: boolean }
 type Controls = ElementRef<typeof OrbitControls>;
 
-/** CEO-resigns camera: zoom onto the CEO, follow them out, then ease back to the player's view. */
-function Director({ cutscene, crowd, controls, onDone }: {
-  cutscene: Cutscene | null; crowd: Crowd; controls: RefObject<Controls>; onDone: () => void;
+/** What the camera is locked onto: the CEO cutscene or a followed agent. */
+interface Focus { id: string; zoom: number; lowerThird: boolean; holdZoom: boolean; graceSeconds: number }
+
+/** Focus camera: ease onto an agent and track them, then ease back to the player's view when released. */
+function Director({ focus, crowd, controls, onLost }: {
+  focus: Focus | null; crowd: Crowd; controls: RefObject<Controls>; onLost: () => void;
 }) {
   const saved = useRef<{ zoom: number; target: Vector3; position: Vector3 } | null>(null);
-  const started = useRef(0);
+  const started = useRef({ id: '', at: 0, zoomed: false });
   const goal = useMemo(() => new Vector3(), []);
   useFrame(({ clock }, delta) => {
     const c = controls.current;
     if (!c) return;
     const cam = c.object as OrthographicCamera;
     const ease = 1 - Math.exp(-Math.min(delta, 0.1) * 3);
-    let zoomTo: number;
-    if (cutscene && !cutscene.ending) {
-      if (!saved.current) { saved.current = { zoom: cam.zoom, target: c.target.clone(), position: cam.position.clone() }; started.current = clock.elapsedTime; }
-      const star = crowd.get(cutscene.id);
-      // The CEO leaves the crowd once they are off the plot: the scene is over.
-      if (!star) { if (clock.elapsedTime - started.current > 3) onDone(); return; }
-      // Aim a little beyond the CEO so they sit in the lower third, clear of the headline.
-      const az = c.getAzimuthalAngle();
-      goal.set(star.x - Math.sin(az) * 2, 1, star.z - Math.cos(az) * 2);
-      zoomTo = saved.current.zoom * 2.4;
+    let zoomTo: number | null = null;
+    if (focus) {
+      if (!saved.current) saved.current = { zoom: cam.zoom, target: c.target.clone(), position: cam.position.clone() };
+      if (started.current.id !== focus.id) started.current = { id: focus.id, at: clock.elapsedTime, zoomed: false };
+      const star = crowd.get(focus.id);
+      // Gone from the crowd (walked off the plot, or never there): release.
+      if (!star) { if (clock.elapsedTime - started.current.at > focus.graceSeconds) onLost(); return; }
+      // Lower third keeps the CEO clear of the headline.
+      const az = c.getAzimuthalAngle(), lead = focus.lowerThird ? 2 : 0;
+      goal.set(star.x - Math.sin(az) * lead, 1, star.z - Math.cos(az) * lead);
+      const want = saved.current.zoom * focus.zoom;
+      // Followers may scroll-zoom once the camera has arrived; the cutscene holds its framing.
+      if (focus.holdZoom || !started.current.zoomed) zoomTo = want;
+      if (Math.abs(cam.zoom - want) < 0.5) started.current.zoomed = true;
     } else if (saved.current) {
       goal.copy(saved.current.target);
       zoomTo = saved.current.zoom;
       if (c.target.distanceTo(goal) < 0.05 && Math.abs(cam.zoom - zoomTo) < 0.2) {
         cam.position.copy(saved.current.position); c.target.copy(goal); cam.zoom = zoomTo;
-        cam.updateProjectionMatrix(); c.update(); saved.current = null;
+        cam.updateProjectionMatrix(); c.update(); saved.current = null; started.current.id = '';
         return;
       }
     } else return;
     // Move camera and target together so the viewing angle never changes.
     const shift = goal.clone().sub(c.target).multiplyScalar(ease);
     c.target.add(shift); cam.position.add(shift);
-    cam.zoom += (zoomTo - cam.zoom) * ease;
-    cam.updateProjectionMatrix();
+    if (zoomTo !== null) { cam.zoom += (zoomTo - cam.zoom) * ease; cam.updateProjectionMatrix(); }
     c.update();
   });
   return null;
@@ -170,6 +176,20 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     setCutscene(c => c && { ...c, ending: true });
     setTimeout(() => setCutscene(null), 1500);
   };
+  // Follow mode: selecting someone (scene, Office wire or People drawer) locks the camera onto them.
+  const [follow, setFollow] = useState<string | null>(null);
+  useEffect(() => { if (selected) setFollow(selected); }, [selected]);
+  useEffect(() => { if (cutscene) setFollow(null); }, [cutscene]);
+  useEffect(() => {
+    if (!follow) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFollow(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [follow]);
+  const followed = people.find(p => p.id === follow);
+  const focus: Focus | null = cutscene && !cutscene.ending
+    ? { id: cutscene.id, zoom: 2.4, lowerThird: true, holdZoom: true, graceSeconds: 3 }
+    : follow && !cutscene ? { id: follow, zoom: 2.2, lowerThird: false, holdZoom: false, graceSeconds: 1 } : null;
   const controls = useRef<ElementRef<typeof OrbitControls>>(null);
   // Integrated GPUs: drop to 1x pixels if the frame rate falls.
   const [maxDpr, setMaxDpr] = useState(1.5);
@@ -204,18 +224,22 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
           <Agent3D person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} cinematic={cutscene?.id === p.id} selected={selected === p.id} highlighted={highlight.includes(p.id)}
-            line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={onSelect} />
+            line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={id => { setFollow(id); onSelect(id); }} />
         </group>;
       })}
       <OrbitControls ref={controls} makeDefault enabled={!cutscene} target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
-      <Director cutscene={cutscene} crowd={crowd} controls={controls} onDone={endCutscene} />
+      <Director focus={focus} crowd={crowd} controls={controls} onLost={cutscene ? endCutscene : () => setFollow(null)} />
       {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
     {cutscene && <div className={`o3-cutscene ${cutscene.ending ? 'out' : ''}`} role="status">
       <i className="bar top" /><i className="bar bottom" />
       <div className="o3-headline"><span>Breaking news</span><strong>CEO resigns</strong><em>{cutscene.name} walks out of the office</em></div>
+    </div>}
+    {followed && !cutscene && <div className="o3-follow" role="status">
+      <span><i />Following <b>{followed.name}</b></span>
+      <button onClick={() => setFollow(null)} aria-label={`Stop following ${followed.name}`}>Exit ✕</button>
     </div>}
     <div className="o3-zoom">
       <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>

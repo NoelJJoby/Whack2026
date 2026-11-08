@@ -16,7 +16,8 @@
 - Tweaks: walkers sidestep/yield via shared `crowd`; complain = arms up (not typing); CEO quits with a
   briefcase + 'CEO resigns'; Office3D `panic` prop (placeholder flail/run, not wired to events yet).
   CEO quit mid-session = cutscene (Director in Office3D: lock orbit, zoom+follow, letterbox, headline;
-  CEO raises fist 3 s, real-time pace). Dev previews: `?preview=panic`, `?preview=ceo-quit`.
+  CEO raises fist 3 s, real-time pace). Same Director does follow mode: selecting anyone zooms 2.2x
+  and tracks them; Exit badge bottom-left or Esc; clicking someone else switches. Dev previews: `?preview=panic`, `?preview=ceo-quit`.
 
 ## Next
 - Feature freeze from 05:30. Flip default to 3D only on the user's say-so (VITE_VIEW=3d).

@@ -85,3 +85,10 @@
 @keyframes o3-bar { from { transform: scaleY(0); } }
 @keyframes o3-slam { from { opacity: 0; transform: translateX(-50%) scale(2.2); } }
 @keyframes o3-fade { to { opacity: 0; } }
+
+/* Follow mode badge with exit, bottom-left (clear of the rail and the dialogue bar). */
+.o3-follow { position: absolute; left: 24px; bottom: 24px; display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; background: #13203aeb; border: 1px solid #d7b66c; border-radius: 6px; font-size: 12px; box-shadow: 0 6px 18px #070d1a80; }
+.o3-follow i { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #d8352a; animation: o3-blink 1s steps(2) infinite; }
+.o3-follow b { color: #d7b66c; font-weight: 400; }
+.o3-follow button { padding: 6px 10px; color: #14203a; background: #d7b66c; border-radius: 4px; font-size: 12px; }
+.o3-follow button:hover:not(:disabled) { color: #14203a; background: #eed38f; }
