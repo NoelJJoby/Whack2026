@@ -103,6 +103,7 @@ export function buildTurnPrompt(
     beliefs: Object.fromEntries(ctx.claims.map(claim => [keys.get(claim.id), 50])),
   };
   const limit = speech?.minimal ? `This time: one to ${v.words.minimalMax === 4 ? 'four' : v.words.minimalMax} words.` : '';
+  const clock = workdayTime(ctx.tick);
 
   return [
     'You are a professional employee in a B2B software and services company. Choose how to use your finite work time. Normal work is the baseline; personality, trust and pressure influence effort, care and communication.',
@@ -114,7 +115,7 @@ export function buildTurnPrompt(
       ethicsSentence(traits.ethics), sociabilitySentence(traits.sociability),
       impulsivitySentence(traits.impulsivity),
     ].join(' ')}`,
-    `It is day ${workdayTime(ctx.tick).day}, ${String(workdayTime(ctx.tick).hour).padStart(2, '0')}:00.${isOvertime(ctx.tick) ? ' The current hour is overtime.' : ''}`,
+    `It is day ${clock.day}, ${String(clock.hour).padStart(2, '0')}:00.${isOvertime(ctx.tick) ? ' The current hour is overtime.' : ''}`,
     `How you feel right now: ${stateParagraph(ctx.state, speech?.feelings)}\nThese describe how you feel. Don't reuse their wording.`,
     `What you've heard:\n${claims.length ? claims.join('\n') : "You haven't heard anything new."}`,
     ctx.events.length

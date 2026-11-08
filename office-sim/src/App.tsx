@@ -1,6 +1,6 @@
 import { Events } from './Events';
 import { BusinessReport } from './BusinessReport';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lookFor, type Person } from './design/Office';
 import { OfficeView } from './three/OfficeView';
 import { Workday } from './Workday';
@@ -39,6 +39,7 @@ export default function App() {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [truth, setTruth] = useState(false);
+  const [showSyncDebug, setShowSyncDebug] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const [playbackPaused, setPlaybackPaused] = useState(false);
   const presentation = usePresentation(sim.history, sim.historyEpoch, sim.state, sim.acknowledge, playbackPaused);
@@ -54,6 +55,17 @@ export default function App() {
     epoch: sim.historyEpoch, speed: sim.speed, onDone: presentation.done, paused: menu !== null || playbackPaused, blocked: menu !== null,
     onSpace: () => toggle(), archetypeOf: id => cast.find(p => p.id === id)?.archetype,
   });
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'Backquote' || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      event.preventDefault();
+      setShowSyncDebug(value => !value);
+    };
+    window.addEventListener('keydown', down);
+    return () => window.removeEventListener('keydown', down);
+  }, []);
   function toggle() {
     if (disabled || complete) return;
     if (serverComplete) { setPlaybackPaused(value => !value); return; }
@@ -119,6 +131,9 @@ export default function App() {
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
     {sim.phase && !presentation.playing && <div className="management-phase" role="status">{sim.phase}…</div>}
     {sim.storageError && <div className="storage-error" role="alert">{sim.storageError}</div>}
+    {showSyncDebug && <aside className="sync-debug" aria-label="Time synchronization debug">
+      <strong>SYNC DEBUG</strong><span>presented: {presentation.tick} · {timeLabel(presentation.tick)}</span><span>latest: {sim.state?.tick ?? 0}</span><span>line: {dialogue.line?.tick ?? '—'}</span><span>waiting: {sim.history.filter(frame => frame.tick > presentation.tick).length}</span><span>lag: {Math.max(0, (sim.state?.tick ?? 0) - presentation.tick)}</span>
+    </aside>}
     {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
       <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business events</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>

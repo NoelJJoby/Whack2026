@@ -77,6 +77,13 @@ export interface Simulation {
 
 const errorText = (e: unknown) => playerText(e instanceof Error ? e.message : 'Request failed. Try again.');
 
+/** Reconnect/history replay may repeat frames; keep one ordered frame per tick. */
+export function orderedFrames(frames: TickFrame[]): TickFrame[] {
+  const byTick = new Map<number, TickFrame>();
+  for (const frame of frames) byTick.set(frame.tick, frame);
+  return [...byTick.values()].sort((a, b) => a.tick - b.tick);
+}
+
 export function useSimulation(): Simulation {
   const [cast, setCast] = useState<CastResponse | null>(USE_MOCKS ? mockCast : null);
   const [snapshot, setSnapshot] = useState<SimResponse | null>(USE_MOCKS ? mockResponse : null);
@@ -100,9 +107,10 @@ export function useSimulation(): Simulation {
 
   const replaceHistory = useCallback(
     (next: HistoryResponse) => {
+      const history = orderedFrames(next.history);
       setHistoryEpoch(epoch => epoch + 1);
-      lastTick.current = next.history.at(-1)?.tick ?? next.state.tick;
-      setHistory(next.history);
+      lastTick.current = history.at(-1)?.tick ?? next.state.tick;
+      setHistory(history);
       applySnapshot(next, true);
     },
     [applySnapshot],
@@ -132,7 +140,7 @@ export function useSimulation(): Simulation {
         const { frame } = message;
         if (frame.tick === lastTick.current + 1) {
           lastTick.current = frame.tick;
-          setHistory((h) => [...h, frame]);
+          setHistory((h) => orderedFrames([...h, frame]));
           applySnapshot(message);
         } else if (frame.tick > lastTick.current) {
           void resync();
