@@ -148,6 +148,8 @@ export interface ScenarioEvent {
   hearers?: string[];
   /** Rumours: who they hear it from. Defaults to 'grapevine'. */
   source?: string;
+  /** Official CEO announcement: only `hearers` (the open floor) hear it first-hand (server/announcements.ts). */
+  firstHand?: boolean;
   /** Player-written headline, already validated; replaces the type's wording. */
   text?: string;
   /** Written by the player rather than the scheduler or a preset. */

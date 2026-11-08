@@ -20,10 +20,12 @@ const BASE: Record<string, P> = {
   // Pavement to the two parked cars' driver doors (right-hand drive, so the door faces the walkway).
   pave0: [9.35, 10.75], car0: [9.35, 8.6], pave1: [11.95, 10.75], car1: [11.95, 8.6],
   // CEO office: through the glass door, round the desk.
+  // Town-hall spot on the open floor where the CEO makes announcements.
+  hall: [0.5, -1.9],
   ceoDoor: [7.5, -1.6], ceoA: [6.2, -2.6], ceoB: [6.2, -5.4], ceoBack: [8, -5.4],
 };
 const EDGES = `aL-lc lc-mL mL-fCol lc-meetIn meetIn-meet meet-meetBack meetBack-meetCorner meetCorner-winMeet
-  aC-mC mD-fDoor mR-fR ceoOut-ceoDoor ceoDoor-ceoA ceoA-ceoB ceoB-ceoBack
+  aC-mC mD-fDoor mR-fR ceoOut-ceoDoor ceoDoor-ceoA ceoA-ceoB ceoB-ceoBack hall-mC hall-mD
   fLounge-sofaPathR sofaPathR-sofaA fL-sofaPathL sofaPathL-sofaB fL-winLounge
   fDoor-doorIn doorIn-doorOut doorOut-path path-interview path-pave pave-exit pave-pave0 pave0-car0 pave0-pave1 pave1-car1`;
 

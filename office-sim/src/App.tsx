@@ -133,7 +133,8 @@ export default function App() {
     <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
-      showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}/>
+      showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}
+      announcement={presentation.frame?.events.find(e => e.official) ?? null}/>
     <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
@@ -143,7 +144,7 @@ export default function App() {
     {showSyncDebug && <aside className="sync-debug" aria-label="Time synchronization debug">
       <strong>SYNC DEBUG</strong><span>presented: {presentation.tick} · {timeLabel(presentation.tick)}</span><span>latest: {sim.state?.tick ?? 0}</span><span>line: {dialogue.line?.tick ?? '—'}</span><span>waiting: {sim.history.filter(frame => frame.tick > presentation.tick).length}</span><span>lag: {Math.max(0, (sim.state?.tick ?? 0) - presentation.tick)}</span>
     </aside>}
-    {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
+    {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>{announcement.announcement.official ? '📢 CEO' : 'Announcement'}</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
     {announcement?.business && announcement.key !== dismissedAnnouncement && <section className={`announcement business tone-${announcement.business.tone}`} aria-label="Business event">
       <div role="status"><span>{announcement.business.label}</span><p>{announcement.business.text}</p>
         <button className="view-case" onClick={() => openMenu('events', announcement.business!.caseId)}>View case</button></div>

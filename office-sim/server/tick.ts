@@ -10,6 +10,7 @@ import { managementPhase } from './management';
 import { computeTriggers, recordPeers, type Trigger } from './triggers';
 import { settleEmotion, type SettledEmotion } from './emotion';
 import { advanceConversations, incomingFor, type Incoming } from './conversations';
+import { prepareAnnouncements, rememberActions } from './announcements';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
@@ -290,8 +291,10 @@ export async function runTick(
     ...w.queue,
   ];
   w.queue = [];
+  // Official news is announced by the CEO to whoever is on the floor (business mode).
+  const announced = config.business ? prepareAnnouncements(w, pending, params) : pending;
   const events = config.billboard
-    ? pending.filter(ev => !ev.templateId).map((ev, i) => applyEvent(w, ev, params, stream(w.seed, t, `event-${i}`, 'event')))
+    ? announced.filter(ev => !ev.templateId).map((ev, i) => applyEvent(w, ev, params, stream(w.seed, t, `event-${i}`, 'event')))
     : [];
 
   let attention: Record<string, number> | undefined;
@@ -402,6 +405,7 @@ export async function runTick(
   const conversations = advanceConversations(w, order, decisions, emotions, incoming,
     Object.fromEntries(order.map(id => [id, llm[id]?.output?.reply_to])), LLM_MODES.includes(config.mode) && Boolean(provider));
   recordPeers(w, decisions);
+  rememberActions(w, decisions);
 
   const seats = w.ids.map(id => ({ id, action: decisions[id]?.action ?? null, burnout: w.agents[id].state.burnout }));
 

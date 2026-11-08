@@ -74,6 +74,9 @@ export interface TickEvent {
   text: string;
   /** Written by the player. */
   custom?: boolean;
+  /** Part B: announced by the CEO (always true); `first_hand` were on the floor to hear it. */
+  official?: boolean;
+  first_hand?: string[];
 }
 
 export interface TickFrame {

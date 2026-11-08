@@ -98,7 +98,8 @@ export function applyEvent(
   const named = ev.source && (ev.source === 'grapevine' || ids.includes(ev.source)) ? ev.source : 'grapevine';
   const source = e.official ? 'mgmt' : named;
   let hearers = ids;
-  if (!e.official) {
+  if (e.official && ev.firstHand) hearers = (ev.hearers ?? []).filter((id) => ids.includes(id));
+  else if (!e.official) {
     const given = (ev.hearers ?? []).filter((id) => ids.includes(id));
     const pool = ids.filter((id) => id !== source);
     hearers = given.length > 0 ? given : pool.length > 0 ? [pool[rng.int(pool.length)]] : [];

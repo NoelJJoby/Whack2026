@@ -80,3 +80,6 @@
 @keyframes o3-emote-pop { from { opacity: 0; margin-top: 8px; } }
 @keyframes o3-jitter { 50% { margin-left: 2px; } }
 .o3-overhead .o3-emote { position: absolute; left: calc(100% + 6px); top: 50%; translate: 0 -50%; pointer-events: none; }
+/* Part B: the CEO's announcement bubble is pinned and larger. */
+.o3-bubble.speech.announce { max-width: 260px; font-size: 13px; border-color: #d7b66c; box-shadow: 4px 4px 0 #d7b66c; }
+.o3-bubble.speech.announce small { color: #a2802f; opacity: 1; }

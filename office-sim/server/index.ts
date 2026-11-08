@@ -1,4 +1,5 @@
 import { activeCompanyTask, newCompanyTask, submissionSchema, taskSummary } from './company-tasks/state';
+import { announcementsAt } from './announcements';
 import type { CompanyTaskDetail, CompanyTaskList } from '../shared/companyTasks';
 import type { EngineTickLog } from './engine-types';
 import { readFile } from 'node:fs/promises';
@@ -121,12 +122,19 @@ function enrichRecords(r: TickResult): TickRecord[] {
   });
 }
 
+/** Tag a CEO announcement with who heard it first-hand. */
+function officialTag(result: TickResult, type: EventType): { official?: true; first_hand?: string[] } {
+  const a = announcementsAt(result.world, result.world.tick).find(x => x.type === type);
+  return a ? { official: true, first_hand: a.firstHand } : {};
+}
+
 function tickEvents(result: TickResult): TickFrame['events'] {
   const events = result.log.events.map((e) => ({
     type: e.type,
     is_true: e.is_true,
     text: result.world.claims[e.claim]?.text ?? eventParams[e.type].text,
     ...(result.world.claims[e.claim]?.custom ? { custom: true } : {}),
+    ...officialTag(result, e.type),
   }));
   // The office banner follows disclosure, not the spectator's private case list.
   const shared = result.world.eventState.decisions.filter(d => d.tick === result.world.tick)

@@ -24,7 +24,7 @@ const GOODBYE = 1.8; // seconds spent waving goodbye before heading out
 /** Shared live positions so walkers can avoid each other. */
 export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
 
-export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave';
+export type Kind = 'desk' | 'overwork' | 'sofa' | 'idle' | 'complain' | 'gossip' | 'verify' | 'leak' | 'interview' | 'quit' | 'panic' | 'off-shift' | 'leave' | 'announce';
 /** Where an agent should be and what they do there, derived from their latest TickRecord. */
 export interface Behaviour {
   goal: string;
@@ -62,16 +62,16 @@ export interface Emote { emotion: Emotion; intensity: 1 | 2 | 3; key: string; co
 const EMOTE_SECONDS = 2.5;
 
 /** A conversation line in a speech bubble, optionally a beat after the other speaker. */
-function ConvBubble({ name, text, delay }: { name: string; text: string; delay: number }) {
+function ConvBubble({ name, text, delay, pinned = false }: { name: string; text: string; delay: number; pinned?: boolean }) {
   const [shown, setShown] = useState(delay <= 0);
   useEffect(() => { if (delay <= 0) return; setShown(false); const id = setTimeout(() => setShown(true), delay * 1000); return () => clearTimeout(id); }, [text, delay]);
   if (!shown) return null;
-  return <div className="o3-stack"><div className="o3-bubble speech"><small>{name} says</small><span>{clip(text)}</span></div></div>;
+  return <div className="o3-stack"><div className={`o3-bubble speech${pinned ? ' announce' : ''}`}><small>{name} {pinned ? 'announces' : 'says'}</small><span>{pinned ? playerText(text) : clip(text)}</span></div></div>;
 }
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
-export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, departing = false, onExit, emote, convLine = null, convDelay = 0, faceTowards = null, selected, highlighted, line, showThoughts, onSelect }: {
+export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, paused = false, cinematic = false, departing = false, onExit, emote, convLine = null, convDelay = 0, faceTowards = null, attend = false, selected, highlighted, line, showThoughts, onSelect }: {
   person: Person; nav: Nav; crowd: Crowd; behaviour: Behaviour; phase: number; speed: number;
   paused?: boolean;
   /** Starring in the CEO-resigns cutscene: real-time pace and a raised-fist beat before walking out. */
@@ -84,6 +84,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   convLine?: string | null;
   convDelay?: number;
   faceTowards?: string | null;
+  /** Listening to the CEO: turn towards him even when seated. */
+  attend?: boolean;
   selected: boolean; highlighted: boolean; line: DialogueLine | null; showThoughts: boolean; onSelect: (id: string) => void;
 }) {
   const root = useRef<Group>(null);
@@ -115,7 +117,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
   useEffect(() => {
-    if (latest.kind === 'quit' || latest.kind === 'panic' || behaviour.kind === 'panic') setBehaviour(latest);
+    if (latest.kind === 'quit' || latest.kind === 'panic' || latest.kind === 'announce' || behaviour.kind === 'panic' || behaviour.kind === 'announce') setBehaviour(latest);
   }, [latest.kind]);
   useEffect(() => () => { crowd.delete(person.id); }, [crowd, person.id]);
 
@@ -200,7 +202,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
     g.position.set(m.x + hz * m.side, FLOOR, m.z - hx * m.side);
     // The resigning CEO turns to face the camera for their moment.
     // Talking or listening: turn to face the other person.
-    const partner = faceTowards && arrived && !sitting ? crowd.get(faceTowards) : undefined;
+    const partner = faceTowards && arrived && (!sitting || attend) ? crowd.get(faceTowards) : undefined;
     const facing = holding ? 0.35 : waving ? (behaviour.via ? behaviour.viaFace ?? m.heading : 0.35)
       : packing ? 0 : partner ? Math.atan2(partner.x - m.x, partner.z - m.z) : arrived && behaviour.face !== null ? behaviour.face : m.heading;
     g.rotation.y = lerpAngle(g.rotation.y, facing, Math.min(1, dt * 10));
@@ -230,6 +232,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
       // Complaining: with emotes on, the emotion decides the gesture (no unconditional flail).
       else if (k === 'complain') { if (EMOTES) a = -0.55; else { a = -2.8 + Math.sin(t * 12 + i * Math.PI) * 0.25; out = 0.35; } }
       else if (k === 'verify') a = i ? -1.5 : 0;
+      else if (k === 'announce') { a = i ? -1.9 + Math.sin(t * 3) * 0.25 : -0.3; out = i ? 0.35 : 0; } // addressing the floor
       ref.current.rotation.x = a;
       ref.current.rotation.z = i ? out : -out;
     });
@@ -296,7 +299,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, p
   // space, so it never covers the name at any zoom or font size.
   const tag = k === 'leave' ? (leaveStage === 'bye' ? 'bye!' : leaveStage === 'pack' ? 'packing up' : behaviour.tag) : behaviour.tag;
   const overhead = gone ? null : line ? <Bubble name={person.name} line={line} showThoughts={showThoughts} />
-    : convLine ? <ConvBubble name={person.name} text={convLine} delay={convDelay} />
+    : convLine ? <ConvBubble name={person.name} text={convLine} delay={convDelay} pinned={k === 'announce'} />
     : tag ? <div className={`o3-tag ${k}`}>{tag}</div> : null;
   const label = <Html position={[0, gone ? 0.65 : 1.85, 0]} center zIndexRange={[4, 0]} className="o3-person-anchor">
     <div className="o3-overhead">
