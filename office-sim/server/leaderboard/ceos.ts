@@ -113,6 +113,6 @@ export function modelCeo(spec: ModelSpec, cache: CeoCache, usage: Usage, create?
 export function leaderboardProvider(ceo: CeoPolicy, seed: number): TurnProvider {
   const staff = createStubProvider(seed);
   return async (agent, ctx) => ctx.management
-    ? (ctx.management.kind === 'ceo' ? ceo(ctx.management, seed) : fallbackOps(ctx.management))
+    ? (ctx.management.kind === 'ceo' ? ceo(ctx.management, seed) : fallbackOps(ctx.management, ctx.companySchedule))
     : staff(agent, ctx);
 }

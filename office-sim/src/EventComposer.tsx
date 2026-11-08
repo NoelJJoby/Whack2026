@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent } from 'react';
 
 import { timeLabel } from './hudModel';
 import { CUSTOM_EVENT_LIMITS, checkHeadline, normaliseHeadline } from '../shared/customEvent';
@@ -15,13 +15,7 @@ export const presets: Array<{ type: EventType; title: string; isTrue: boolean; i
   { type: 'competitor_poaching', title: 'Competitor poaching staff', isTrue: true, icon: '$' },
 ];
 
-const panels = [
-  { id: 'preset', label: 'Preset events' },
-  { id: 'custom', label: 'Custom event' },
-  { id: 'task', label: 'Company task' },
-] as const;
-
-export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, label, error, disabled = false, nextTick, companyTask }: {
+export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, label, error, disabled = false, nextTick }: {
   onInjectBusiness?: (id: string, isTrue: boolean) => Promise<boolean>;
   onInject: (type: EventType, isTrue: boolean) => Promise<boolean>;
   onInjectCustom: (text: string, isTrue: boolean) => Promise<boolean>;
@@ -29,13 +23,12 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
   error: string | null;
   disabled?: boolean;
   nextTick: number;
-  companyTask: ReactNode;
 }) {
   const [businessTemplate,setBusinessTemplate] = useState('client_win');
   const [businessSending, setBusinessSending] = useState(false);
   const [businessMessage, setBusinessMessage] = useState('');
   const [businessFailed, setBusinessFailed] = useState(false);
-  const [activePanel, setActivePanel] = useState<typeof panels[number]['id']>('preset');
+  const [activePanel, setActivePanel] = useState<'preset' | 'custom'>('preset');
   const [preset, setPreset] = useState(0);
   const [presetTruth, setPresetTruth] = useState(presets[0].isTrue);
   const [presetMessage, setPresetMessage] = useState('');
@@ -75,29 +68,18 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
 
   return <section className="panel event-composer" aria-labelledby="event-composer-title">
     <div className="event-composer-heading">
-      <h3 id="event-composer-title">{activePanel === 'task' ? 'Company task' : 'Announcement board'}</h3>
+      <h3 id="event-composer-title">Announcement board</h3>
       <span className="event-preview-label">{label}</span>
     </div>
-    <div className="event-panel-tabs" role="tablist" aria-label="Office input" onKeyDown={event => {
-      const index = panels.findIndex(panel => panel.id === activePanel);
-      const next = event.key === 'ArrowRight' ? (index + 1) % panels.length
-        : event.key === 'ArrowLeft' ? (index + panels.length - 1) % panels.length
-          : event.key === 'Home' ? 0 : event.key === 'End' ? panels.length - 1 : null;
-      if (next === null) return;
-      event.preventDefault();
-      const { id } = panels[next];
-      setActivePanel(id);
-      event.currentTarget.querySelector<HTMLButtonElement>(`#office-tab-${id}`)?.focus();
-    }}>
-      {panels.map(({ id, label }) => <button key={id} type="button" role="tab" id={`office-tab-${id}`}
-        aria-controls={`office-panel-${id}`} aria-selected={activePanel === id} tabIndex={activePanel === id ? 0 : -1}
-        className={activePanel === id ? 'event-panel-tab active' : 'event-panel-tab'} onClick={() => setActivePanel(id)}>{label}</button>)}
+    {onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || businessSending} onClick={async () => { setBusinessSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setBusinessFailed(!ok); setBusinessMessage(ok ? `Business situation queued for ${timeLabel(nextTick)}.` : ''); } finally { setBusinessSending(false); } }}>Queue business situation</button><p role="status">{businessFailed ? error : businessMessage}</p></section>}
+
+    <div className="event-panel-tabs" role="tablist" aria-label="Event type selector">
+      <button type="button" role="tab" aria-selected={activePanel === 'preset'} className={activePanel === 'preset' ? 'event-panel-tab active' : 'event-panel-tab'} onClick={() => setActivePanel('preset')}>Preset events</button>
+      <button type="button" role="tab" aria-selected={activePanel === 'custom'} className={activePanel === 'custom' ? 'event-panel-tab active' : 'event-panel-tab'} onClick={() => setActivePanel('custom')}>Custom event</button>
     </div>
 
-    {activePanel !== 'task' && onInjectBusiness && <section className="structured-injection"><h3>Introduce a business situation</h3><p>The CEO chooses the response autonomously. This is labelled as a scenario override.</p><label>Situation <select value={businessTemplate} onChange={e => setBusinessTemplate(e.target.value)}><option value="client_win">Qualified client contract</option><option value="supplier_interruption">Supplier interruption</option><option value="material_breach">Supplier data exposure</option><option value="cost_review">Cost reduction review</option></select></label><button disabled={disabled || businessSending} onClick={async () => { setBusinessSending(true); try { const ok = await onInjectBusiness(businessTemplate,true); setBusinessFailed(!ok); setBusinessMessage(ok ? `Business situation queued for ${timeLabel(nextTick)}.` : ''); } finally { setBusinessSending(false); } }}>Queue business situation</button><p role="status">{businessFailed ? error : businessMessage}</p></section>}
-
     <div className="event-panels">
-      <div id="office-panel-preset" role="tabpanel" aria-labelledby="office-tab-preset" hidden={activePanel !== 'preset'}><div className="event-panel">
+      {activePanel === 'preset' && <div className="event-panel" role="tabpanel" aria-label="Preset events">
         <div className="event-panel-header">
           <h4>Preset events</h4>
         </div>
@@ -115,9 +97,9 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
           </div>
           <div className="event-form-note"><span>Quick board pushes for common office shocks.</span><p className="event-feedback" role="status">{presetFailed && error ? <span className="coral">{error}</span> : presetMessage || `Next announcement: ${timeLabel(nextTick)}.`}</p></div>
         </form>
-      </div></div>
+      </div>}
 
-      <div id="office-panel-custom" role="tabpanel" aria-labelledby="office-tab-custom" hidden={activePanel !== 'custom'}><div className="event-panel">
+      {activePanel === 'custom' && <div className="event-panel" role="tabpanel" aria-label="Custom event">
         <div className="event-panel-header">
           <h4>Custom event</h4>
         </div>
@@ -137,8 +119,7 @@ export function EventComposer({ onInject, onInjectCustom, onInjectBusiness, labe
           </div>
           <div className="event-form-note"><span>Truth stays hidden from employees. The sim infers the event family and impact automatically.</span><p className="event-feedback" role="status">{customFailed && error ? <span className="coral">{error}</span> : customMessage || `Next announcement: ${timeLabel(nextTick)}.`}</p></div>
         </form>
-      </div></div>
-      <div id="office-panel-task" role="tabpanel" aria-labelledby="office-tab-task" hidden={activePanel !== 'task'}>{companyTask}</div>
+      </div>}
     </div>
   </section>;
 }

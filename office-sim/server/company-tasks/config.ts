@@ -1,4 +1,5 @@
 export const companyLimits = {
+  objectiveLength: 1200,
   minDeadline: 4,
   defaultDeadline: 32,
   maxDeadline: 96,

@@ -3,6 +3,7 @@ import type { Action } from '../shared/types';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { ruleParams, quitParams } from '../server/params';
 import { workdayTime } from './Workday';
+import { ACTIVITY_LABEL, isSpoken, shortenQuoted } from './companyModel';
 
 export const ACTION_LABEL: Record<Action, string> = {
   review_work: 'Reviewing work', report_issue: 'Reporting an issue', support_colleague: 'Supporting a colleague',
@@ -74,5 +75,10 @@ export function feedEntries(history: TickFrame[]): FeedEntry[] {
       label: event.custom ? 'Your announcement' : event.type === 'layoffs_rumour' ? 'Rumour' : 'Announcement', text: playerText(event.text), ids: [], truth: event.is_true,
     })),
     ...businessNotices(frame, prev).reverse().map(n => ({ key: n.key, time: timeLabel(frame.tick), label: n.label, text: n.text, ids: [], tone: n.tone })),
+    ...[...(frame.company_activity ?? [])].filter(a => isSpoken(a) || a.kind === 'review').sort((a, b) => b.round - a.round || b.order - a.order).map(a => ({
+      key: `${frame.tick}-company-${a.id}`, time: timeLabel(frame.tick), label: ACTIVITY_LABEL[a.kind],
+      text: playerText(shortenQuoted(a.dialogue)), ids: [...new Set([a.actor, ...a.recipients].filter((id): id is string => Boolean(id)))],
+      tone: a.kind === 'outcome' ? (a.result?.startsWith('accepted') ? 'mint' as const : 'coral' as const) : 'gold' as const,
+    })),
   ]);
 }

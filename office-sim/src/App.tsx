@@ -1,12 +1,11 @@
-import { Events } from './Events';
-import { BusinessReport } from './BusinessReport';
+import { BusinessPage } from './BusinessPage';
+import { OBJECTIVE_STATUS, dueIn, isActiveObjective, objectiveWorkPrefix } from './companyModel';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lookFor, type Person } from './people';
 import { OfficeView } from './three/OfficeView';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
 import { EventComposer } from './EventComposer';
-import { CompanyTaskComposer } from './CompanyTaskComposer';
 import { Company } from './Company';
 import { Scorecard } from './Scorecard';
 import { Leaderboard } from './leaderboard/Leaderboard';
@@ -24,7 +23,7 @@ import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company' | 'scorecard' | 'leaderboard';
 type Menu = Tool | 'stock' | 'events';
-const MENU_LABEL: Record<Menu, string> = { events: 'Business events', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss' };
+const MENU_LABEL: Record<Menu, string> = { events: 'Business', shake: 'Shake office', company: 'Wellbeing', rumours: 'Rumour reach', simulation: 'Simulation', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss' };
 
 function ToolIcon({ tool }: { tool: Tool }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -95,6 +94,8 @@ export default function App() {
     };
   }), [cast, latest, state, presentation.frame, presentation.previous, presenceFinished, hour]);
   const entries = useMemo(() => feedEntries(history), [history]);
+  const objective = sim.companyTasks.find(t => isActiveObjective(t.status));
+  const objectiveWork = objective ? (state?.business?.tasks ?? []).filter(t => t.id.startsWith(objectiveWorkPrefix(objective.id))) : [];
   const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
     key: `queued-${index}`, label: 'Queued', time: timeLabel((state?.tick ?? 0) + 1),
     text: state?.queue_text?.[index] ?? type, ids: [],
@@ -146,8 +147,12 @@ export default function App() {
         <button className="view-case" onClick={() => openMenu('events', announcement.business!.caseId)}>View case</button></div>
       <button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss business event">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
-      <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business events</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
+      <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
       {complete && <button className="report-entry" onClick={() => openMenu('events')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
+      {objective && <button className="objective-strip" onClick={() => openMenu('events')} aria-label={`Objective: ${objective.objective}. Open Business`}>
+        <b>Objective</b><span>{objective.objective}</span>
+        <small>{objectiveWork.length ? `${objectiveWork.filter(t => t.status === 'done').length}/${objectiveWork.length} · ` : ''}{objective.deadlineTick !== undefined ? dueIn(objective.deadlineTick, hour) : OBJECTIVE_STATUS[objective.status].text}</small>
+      </button>}
       <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
         {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
           const content = <><div className="feed-meta"><span className={entry.tone ?? (entry.label === 'Resignation' ? 'coral' : '')}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
@@ -161,15 +166,9 @@ export default function App() {
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company', 'scorecard', 'leaderboard'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
-    <MenuPanel title={MENU_LABEL.shake} open={menu === 'shake'} onClose={() => setMenu(null)}>
-      <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness}
-        label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete}
-        nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}
-        companyTask={<CompanyTaskComposer key={sim.runId} runId={sim.runId} tasks={sim.companyTasks}
-          connected={live} complete={serverComplete} running={running}/>}/>
-    </MenuPanel>
-    {menu && menu !== 'shake' && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select} initialId={caseId}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : menu === 'leaderboard' ? <Leaderboard/> : menu === 'stock' ? <StockChart history={history} current={price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+    {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
+      {menu === 'events' ? <BusinessPage state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId}
+        companyTasks={sim.companyTasks} onSubmitObjective={sim.submitObjective} objectiveDisabled={!live || serverComplete} runId={sim.runId} reportStatus={sim.reportStatus}/> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : menu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : menu === 'leaderboard' ? <Leaderboard/> : menu === 'stock' ? <StockChart history={history} current={price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={running} complete={serverComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => { setPlaybackPaused(false); void sim.step(); }} onReset={() => { setPlaybackPaused(false); void sim.reset(); }} onNewSeed={() => { setPlaybackPaused(false); void sim.newSeed(); }}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>

@@ -4,13 +4,13 @@ Implemented against `ui-overhaul-prompt.md`, with the subsequent reference-image
 
 ## Design
 
-The pixel-art office fills the game window. The forest, timber floors, sprites and existing palette are preserved. Pixelify Sans stays in the artwork and clock; Space Grotesk is used for controls, dialogue and metrics. The initial view has a single clock, two Office wire entries, four square icon buttons centred on the left edge, and a CHAOS stock-price button at the top right. The icons open Simulation, Shake office, Rumour reach and Wellbeing; hover tooltips and accessible names identify each action. Expanded tools use quiet forest-coloured panels.
+The 3D office (`three/Office3D.tsx`) fills the game window. The UI uses the self-hosted VT323 pixel font throughout. The initial view has a single clock, two Office wire entries, four square icon buttons centred on the left edge, and a CHAOS stock-price button at the top right. The icons open Simulation, Shake office, Rumour reach and Wellbeing; hover tooltips and accessible names identify each action. Expanded tools use quiet forest-coloured panels.
 
 ## Changes and ownership
 
 - `App.tsx` composes the viewport, feed, contextual employee details and mutually exclusive tools. Dashboard sections, roster, resignation leaderboard, billboard and decorative footer are removed.
-- `index.css` preserves the original room artwork and fits the three floors to the available desktop viewport. It styles the compact overlays, focus states and internally scrolling panels.
-- `design/Office.tsx` retains all eight selectable sprites and connects the pressure marker to the existing stress threshold. Statements stay available in full in employee details.
+- `index.css` styles the HUD: compact overlays, focus states and internally scrolling panels. The 3D scene's labels, bubbles and tags are styled in `three/office3d.css`.
+- `people.tsx` holds each archetype's look and the pixel portrait used by the dialogue bar and employee panel. Statements stay available in full in employee details.
 - `GamePanel.tsx` implements a 348px contextual employee panel, viewport clamping, labelled metric bars, native modal menus, explicit keyboard focus wrapping, dismissal and focus restoration.
 - `Workday.tsx` retains the existing day/hour mapping and provides the single compact clock, playback button and speed controls. `Controls.tsx` moves duration, advance, reset and new run to Simulation.
 - `Company.tsx` supplies the separate Wellbeing and Rumour reach views, plus Reveal truth. Stock is removed from those views. `StockPrice.tsx` displays the live CHAOS price and opening percentage on the game window; clicking it opens `StockChart` in an exclusive graph dialog with the same dismissal and focus handling as the tools.
@@ -24,7 +24,6 @@ The pixel-art office fills the game window. The forest, timber floors, sprites a
 | Requirement | Evidence |
 | --- | --- |
 | 1440×900, 1366×768, 1280×720 | Chromium screenshots reviewed; document scroll dimensions equal viewport dimensions at every size. |
-| All three floors and eight employees visible and selectable | Each sprite is inside the viewport, passes a pointer hit test, and opens its own employee panel at every desktop size. |
 | Menus remain over the office; only one open | Browser checks for all four tools; office remains rendered behind each dialog. |
 | Reference icon dock | Four icon-only square buttons match the reference order and are vertically centred at the left at every desktop size. |
 | Visible stock price | CHAOS button remains at the top right; a streamed price of $63.45 is displayed with −36.55% and opens the graph at the same price. Stock is absent from Wellbeing and Rumour reach. |

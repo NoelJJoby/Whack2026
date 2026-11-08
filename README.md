@@ -74,6 +74,6 @@ Run `pnpm dev` from `office-sim` and open http://localhost:5173. The API runs on
 
 ## Company objectives
 
-Open **Shake office** and select the **Company task** tab. Enter a hypothetical objective and choose **Queue task**, then close the panel and use **Play** or **Step** to begin. You can also submit through `POST /api/sim/company-tasks` using the current run ID and an idempotency key. The company-task API and committed SSE frames show the brief, work, findings, and outcome.
+Submit a hypothetical objective to `POST /api/sim/company-tasks` using the current run ID and an idempotency key. Inspect its brief, work, findings, and outcome through the company-task API and committed SSE frames.
 
 From `office-sim`, run `node --import tsx server/scripts/company-task-demo.ts` for a rules-mode launch scenario. See the [implementation plan and release notes](docs/task-driven-company-implementation-plan.md#release-implementation-and-verification) for the request body, route details, and verification results.
