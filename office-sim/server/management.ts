@@ -8,6 +8,10 @@ import { post } from './business';
 import { days } from '../shared/workday';
 import { withRequestMetrics } from './llm/telemetry';
 import type { CallMetrics } from './llm/client';
+import { collecting } from './diagnostics/collector';
+import { noteOpsOutcome, noteOwnerLost, noteRejection } from './diagnostics/details';
+import type { ReasonCode } from '../shared/inbox';
+import type { Task } from '../shared/business';
 
 export function optionsFor(w: World, eventId: string): BusinessOption[] {
   const e = w.eventState.cases.find(e => e.id === eventId)!;
@@ -85,6 +89,16 @@ function validateCeo(w: World, ctx: ManagementContext, raw: unknown) {
   if (spend > Math.max(0, ctx.finances.cash-ctx.finances.committed)) throw new Error('Unaffordable decision');
   return v;
 }
+/** validateOps's assignment check, split into the reason it fails. Null exactly when the assignment is valid. */
+export function assignmentRejection(w: World, t: Task, p: ManagementContext['employees'][number] | undefined, a: ManagementDecision['assignments'][number]): Extract<ReasonCode, `REJECTED_${string}`> | null {
+  if (!p) return 'REJECTED_INVALID';
+  if (!p.capabilities.includes(t.department)) return 'REJECTED_NO_CAPABILITY';
+  if (a.allocation <= 0) return 'REJECTED_INVALID';
+  if (t.status === 'review' && t.owner === p.id) return 'REJECTED_SELF_REVIEW';
+  if (t.dependencies.some(id => w.business.tasks.find(t => t.id === id)?.status !== 'done')) return 'REJECTED_DEPS_NOT_DONE';
+  return null;
+}
+
 function validateOps(w: World, ctx: ManagementContext, raw: unknown, schedule?: CompanySchedule) {
   const v = opsSchema.parse(raw); if (v.revision !== w.tick) throw new Error('Stale operations revision');
   const used = new Map<string,number>(); const seen = new Set<string>();
@@ -95,9 +109,10 @@ function validateOps(w: World, ctx: ManagementContext, raw: unknown, schedule?: 
     if (a.state === 'paused') { if (seen.has(a.taskId) && a.allocation !== 0) throw new Error('Paused work consumes no allocation'); continue; }
     const t = w.business.tasks.find(t => t.id === a.taskId)!;
     const p = ctx.employees.find(e => e.id === a.employeeId);
-    if (!p || !p.capabilities.includes(t.department) || a.allocation <= 0 || (t.status === 'review' && t.owner === p.id) || t.dependencies.some(id => w.business.tasks.find(t => t.id === id)?.status !== 'done')) throw new Error('Invalid assignment, dependency or reviewer');
-    used.set(p.id,(used.get(p.id) ?? 0)+a.allocation);
-    if (used.get(p.id)! > p.capacity) throw new Error('Overbooked employee');
+    const rejection = assignmentRejection(w, t, p, a);
+    if (rejection) { if (collecting(w)) noteRejection(w, t, a, rejection); throw new Error('Invalid assignment, dependency or reviewer'); }
+    used.set(p!.id,(used.get(p!.id) ?? 0)+a.allocation);
+    if (used.get(p!.id)! > p!.capacity) { if (collecting(w)) noteRejection(w, t, a, 'REJECTED_OVER_CAPACITY', { booked: used.get(p!.id)!, capacity: p!.capacity, adding: a.allocation }); throw new Error('Overbooked employee'); }
   }
   if (schedule) validateCompanyAssignments(ctx, schedule, merged);
   return v;
@@ -170,7 +185,7 @@ export async function managementPhase(w: World, provider: TurnProvider | null, m
       if (option.kind === 'layoff' && option.employeeId) {
         const a = w.agents[option.employeeId]; if (a.status !== 'active' || owners.acting) throw new Error('Invalid layoff authority');
         a.status = 'laid_off'; a.quitTick = w.tick;
-        for (const t of w.business.tasks.filter(t => t.owner === a.id && !['done','cancelled'].includes(t.status))) { t.owner = null; t.status = 'blocked'; t.version++; }
+        for (const t of w.business.tasks.filter(t => t.owner === a.id && !['done','cancelled'].includes(t.status))) { if (collecting(w)) noteOwnerLost(w, t, a.id); t.owner = null; t.status = 'blocked'; t.version++; }
         e.status = 'resolved'; e.outcome = `${a.profile.name} laid off by CEO decision; payroll and delivery capacity reduced prospectively.`; directive.active = false;
         addEvidence(w,e,e.outcome,actor,w.ids.filter(id => w.agents[id].status === 'active'));
       } else ensureResponseTasks(w,e,option.kind);
@@ -190,6 +205,7 @@ export async function managementPhase(w: World, provider: TurnProvider | null, m
       }
     }
     if (kind === 'ops') {
+      if (collecting(w)) noteOpsOutcome(w, ctx, d, company?.schedule);
       if (company) recordCompanySchedule(w, ctx.tasks, d);
       const next = managementContext(w,'ops',actor);
       const view = company ? companySchedulingView(w, next.tasks) : undefined;

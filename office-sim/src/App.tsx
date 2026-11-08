@@ -1,4 +1,7 @@
-import { BusinessPage } from './BusinessPage';
+import { BusinessPage, type Tab as BusinessTab } from './BusinessPage';
+import { Inbox, InboxToastView } from './Inbox';
+import { inboxAt, loadRead, messageIds, newToasts, openThreadFor, saveRead, unreadCount } from './inboxModel';
+import type { InboxThread, InboxToast } from '../shared/inbox';
 import { OBJECTIVE_STATUS, dueIn, isActiveObjective, objectiveWorkPrefix } from './companyModel';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lookFor, type Person } from './people';
@@ -21,21 +24,23 @@ import { isOvertime } from '../shared/workday';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import { EMOTES, FEED_EMOJI } from './emotes';
 import './index.css';
+import './inbox.css';
 
-type RailTool = 'events' | 'rumours' | 'company' | 'scorecard' | 'leaderboard' | 'settings';
+type RailTool = 'events' | 'inbox' | 'rumours' | 'company' | 'scorecard' | 'leaderboard' | 'settings';
 type Menu = RailTool | 'stock' | 'business';
-const MENU_LABEL: Record<Menu, string> = { events: 'Events', company: 'Wellbeing', rumours: 'Rumour meter', settings: 'Simulation settings', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss', business: 'Business' };
+const MENU_LABEL: Record<Menu, string> = { events: 'Events', inbox: 'Inbox', company: 'Wellbeing', rumours: 'Rumour meter', settings: 'Simulation settings', stock: 'CHAOS stock', scorecard: 'Scorecard', leaderboard: 'Best Boss', business: 'Business' };
 const RAIL_GROUPS: Array<{ label: string; tools: RailTool[] }> = [
   { label: 'Act', tools: ['events'] },
-  { label: 'Monitor', tools: ['rumours', 'company'] },
+  { label: 'Monitor', tools: ['inbox', 'rumours', 'company'] },
   { label: 'Results', tools: ['scorecard', 'leaderboard'] },
 ];
-const RAIL_SHORTCUT: Record<RailTool, string> = { events: 'E', rumours: 'R', company: 'W', scorecard: 'C', leaderboard: 'L', settings: 'Shift+S' };
+const RAIL_SHORTCUT: Record<RailTool, string> = { events: 'E', inbox: 'I', rumours: 'R', company: 'W', scorecard: 'C', leaderboard: 'L', settings: 'Shift+S' };
 
 function ToolIcon({ tool }: { tool: RailTool }) {
   return <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
     {tool === 'settings' ? <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="11" cy="18" r="2" fill="currentColor"/></g>
       : tool === 'events' ? <path fill="currentColor" d="m13 2-8 12h6l-1 8 9-13h-6z"/>
+      : tool === 'inbox' ? <path fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" d="M4 13h4l1 3h6l1-3h4M4 13l2-8h12l2 8v6H4z"/>
       : tool === 'rumours' ? <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"><path d="M4 5h12v9H9l-4 4v-4H4z"/><path d="M9 9h8v7h-3l-3 3v-3H9z"/></g>
       : tool === 'company' ? <path fill="currentColor" d="M12 21S4 16 4 10a4 4 0 0 1 7-2.6A4 4 0 0 1 18 10c0 6-6 11-6 11z"/>
       : tool === 'scorecard' ? <path fill="currentColor" d="M4 19h4v-7H4zm6 0h4V5h-4zm6 0h4v-10h-4z"/>
@@ -50,6 +55,11 @@ export default function App() {
   const [highlight, setHighlight] = useState<string[]>([]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
+  const [businessTab, setBusinessTab] = useState<BusinessTab | undefined>(undefined);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [read, setRead] = useState<Set<string>>(() => new Set());
+  const [toast, setToast] = useState<{ items: InboxToast[]; at: number } | null>(null);
+  const toastSeen = useRef({ epoch: -1, tick: 0 });
   const [expanded, setExpanded] = useState(false);
   const [truth, setTruth] = useState(false);
   const [showSyncDebug, setShowSyncDebug] = useState(false);
@@ -79,16 +89,16 @@ export default function App() {
     window.addEventListener('keydown', down);
     return () => window.removeEventListener('keydown', down);
   }, []);
-  const openMenu = useCallback((next: Menu, businessCase: string | null = null) => {
-    setSelected(null); setHighlight([]); setCaseId(businessCase); setMenu(next);
+  const openMenu = useCallback((next: Menu, businessCase: string | null = null, tab?: BusinessTab) => {
+    setSelected(null); setHighlight([]); setCaseId(businessCase); setBusinessTab(tab); setMenu(next);
   }, []);
   const toggleRailMenu = useCallback((next: RailTool) => {
-    setSelected(null); setHighlight([]); setCaseId(null);
+    setSelected(null); setHighlight([]); setCaseId(null); setThreadId(null);
     setMenu(current => current === next ? null : next);
   }, []);
   useEffect(() => {
     const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
-    const shortcuts: Partial<Record<string, RailTool>> = { KeyE: 'events', KeyR: 'rumours', KeyW: 'company', KeyC: 'scorecard', KeyL: 'leaderboard' };
+    const shortcuts: Partial<Record<string, RailTool>> = { KeyE: 'events', KeyI: 'inbox', KeyR: 'rumours', KeyW: 'company', KeyC: 'scorecard', KeyL: 'leaderboard' };
     const down = (event: KeyboardEvent) => {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
       const tool = event.shiftKey && event.code === 'KeyS' ? 'settings' : !event.shiftKey ? shortcuts[event.code] : undefined;
@@ -134,6 +144,35 @@ export default function App() {
   })).reverse();
   const wireEntries = [...queued, ...entries];
   const person = people.find(p => p.id === selected);
+  // Task inbox, as of the presented hour.
+  const threads = useMemo(() => inboxAt(sim.inboxBase, history), [sim.inboxBase, history]);
+  const unread = unreadCount(threads, read);
+  useEffect(() => { setRead(loadRead(sim.runId)); }, [sim.runId]);
+  const markRead = useCallback((items: InboxThread[]) => setRead(current => {
+    const next = new Set([...current, ...items.flatMap(messageIds)]);
+    saveRead(sim.runId, next);
+    return next;
+  }), [sim.runId]);
+  const openThread = useCallback((taskId: string | null) => {
+    setSelected(null); setHighlight([]); setCaseId(null); setThreadId(taskId); setMenu('inbox');
+  }, []);
+  const whyFor = useCallback((taskId: string) => Boolean(openThreadFor(threads, taskId)), [threads]);
+  const jumpToTask = (thread: InboxThread) => thread.caseId && !thread.objectiveId ? openMenu('business', thread.caseId)
+    : openMenu('business', null, thread.objectiveId ? 'objective' : 'staff');
+  // Critical alerts: one toast at a time; alerts arriving while it is fresh merge into it.
+  useEffect(() => {
+    const seen = toastSeen.current;
+    if (seen.epoch !== presentation.epoch) { toastSeen.current = { epoch: presentation.epoch, tick: hour }; return; }
+    if (hour <= seen.tick) return;
+    const fresh = newToasts(history, seen.tick);
+    seen.tick = hour;
+    if (fresh.length) setToast(current => current && Date.now() - current.at < 4000 ? { items: [...current.items, ...fresh], at: current.at } : { items: fresh, at: Date.now() });
+  }, [hour, history, presentation.epoch]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 9000);
+    return () => clearTimeout(timer);
+  }, [toast]);
   const speaking = dialogue.line?.kind === 'agent' ? dialogue.line.agent : null;
   const speaker: Speaker | null = useMemo(() => {
     if (dialogue.line?.kind === 'narrator') return { name: 'Office narrator', team: '', look: lookFor('', 0) };
@@ -197,8 +236,9 @@ export default function App() {
     <nav className="game-tools" aria-label="Office tools">
       {RAIL_GROUPS.map(group => <div className="rail-group" key={group.label} aria-label={group.label}>{group.tools.map(id => {
         const alert = id === 'rumours' ? rumourAlert : id === 'company' ? wellbeingAlert : false;
-        return <button key={id} onClick={() => toggleRailMenu(id)} aria-label={`${MENU_LABEL[id]} · ${RAIL_SHORTCUT[id]}${alert ? ' · Needs attention' : ''}`} data-tooltip={`${MENU_LABEL[id]} · ${RAIL_SHORTCUT[id]}`} aria-controls="rail-panel" aria-expanded={menu === id}>
-          <ToolIcon tool={id}/>{alert && <span className="rail-alert" aria-label="Needs attention"/>}
+        const count = id === 'inbox' ? unread : 0;
+        return <button key={id} onClick={() => toggleRailMenu(id)} aria-label={`${MENU_LABEL[id]} · ${RAIL_SHORTCUT[id]}${alert ? ' · Needs attention' : ''}${count ? ` · ${count} unread alerts` : ''}`} data-tooltip={`${MENU_LABEL[id]} · ${RAIL_SHORTCUT[id]}`} aria-controls="rail-panel" aria-expanded={menu === id}>
+          <ToolIcon tool={id}/>{alert && <span className="rail-alert" aria-label="Needs attention"/>}{count > 0 && <span className="rail-count" aria-hidden="true">{count > 99 ? '99+' : count}</span>}
         </button>;
       })}</div>)}
       <div className="rail-system" aria-label="System"><button onClick={() => toggleRailMenu('settings')} aria-label={`${MENU_LABEL.settings} · ${RAIL_SHORTCUT.settings}`} data-tooltip={`${MENU_LABEL.settings} · ${RAIL_SHORTCUT.settings}`} aria-controls="rail-panel" aria-expanded={menu === 'settings'}><ToolIcon tool="settings"/></button></div>
@@ -206,10 +246,11 @@ export default function App() {
     </div>
     <DialogueBar state={dialogue.state} line={dialogue.line} speaker={speaker} auto={dialogue.auto} voices={dialogue.voices} showThoughts={dialogue.showThoughts} hidden={menu !== null}
       onNext={dialogue.next} onSkip={dialogue.skip} onAuto={() => dialogue.setAuto(!dialogue.auto)} onVoices={() => dialogue.setVoices(!dialogue.voices)} onHistory={() => { setSelected(null); setExpanded(true); }}/>
-    {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
+    {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee} whyFor={whyFor} onWhy={openThread}/>}
+    {toast && <InboxToastView toasts={toast.items} onOpen={() => { openThread(toast.items.length === 1 ? toast.items[0].threadId : null); setToast(null); }} onDismiss={() => setToast(null)}/>}
     {sim.error && !menu && <button className="error-notice" onClick={() => toggleRailMenu('settings')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation settings</span></button>}
     {railMenu && <RailPanel id="rail-panel" title={MENU_LABEL[railMenu]} onClose={() => setMenu(null)}>
-      {railMenu === 'events' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : railMenu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : railMenu === 'leaderboard' ? <Leaderboard/> : railMenu === 'company' || railMenu === 'rumours' ? <Company history={history} view={railMenu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+      {railMenu === 'inbox' ? <Inbox threads={threads} people={people} read={read} focusId={threadId} onRead={markRead} onJump={jumpToTask} onFocus={select}/> : railMenu === 'events' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : railMenu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : railMenu === 'leaderboard' ? <Leaderboard/> : railMenu === 'company' || railMenu === 'rumours' ? <Company history={history} view={railMenu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={running} complete={serverComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => { setPlaybackPaused(false); void sim.step(); }} onReset={() => { setPlaybackPaused(false); void sim.reset(); }} onNewSeed={() => { setPlaybackPaused(false); void sim.newSeed(); }}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
@@ -221,7 +262,7 @@ export default function App() {
     </RailPanel>}
     {(menu === 'business' || menu === 'stock') && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
       {menu === 'business'
-        ? <BusinessPage state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId}
+        ? <BusinessPage state={state} history={history} tick={hour} cast={cast} onPerson={select} initialCase={caseId} initialTab={businessTab} whyFor={whyFor} onWhy={openThread}
           companyTasks={sim.companyTasks} onSubmitObjective={sim.submitObjective} objectiveDisabled={!live || serverComplete} runId={sim.runId} reportStatus={sim.reportStatus}/>
         : <StockChart history={history} current={price} initialPrice={sim.initialPrice}/>
       }

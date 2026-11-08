@@ -3,6 +3,7 @@ import type { BusinessEvent, EventState } from '../shared/events';
 import type { AgentProfile } from '../shared/types';
 import { SITUATION_STATUS, dueIn, planLabel, shortTitle } from './companyModel';
 import { timeLabel } from './hudModel';
+import { WhyButton, type WhyProps } from './Inbox';
 
 export const money = (amount: number, currency = 'GBP') => new Intl.NumberFormat('en-GB',{ style: 'currency', currency, maximumFractionDigits: 0 }).format(amount/100);
 
@@ -15,7 +16,7 @@ const SOURCE: Record<BusinessEvent['origin'], string> = {
 };
 
 /** One business situation, told in order: what happened, what the CEO decided, who is on it, how it ended. */
-export function EventDetail({ event, events, business, cast, onPerson, tick }: { event: BusinessEvent; events: EventState; business: Business; cast: AgentProfile[]; onPerson?: (id: string) => void; tick?: number }) {
+export function EventDetail({ event, events, business, cast, onPerson, tick, whyFor, onWhy }: WhyProps & { event: BusinessEvent; events: EventState; business: Business; cast: AgentProfile[]; onPerson?: (id: string) => void; tick?: number }) {
   const tasks = business.tasks.filter(t => event.tasks.includes(t.id));
   const contract = business.contracts.find(c => c.id === `contract-${event.id}`);
   const name = (id: string | null) => cast.find(a => a.id === id)?.name ?? id ?? 'no one yet';
@@ -42,7 +43,7 @@ export function EventDetail({ event, events, business, cast, onPerson, tick }: {
     {tasks.length > 0 && <section><h4>Who's working on it</h4>{tasks.map(t => <div className="story-task" key={t.id}>
       <p><strong>{shortTitle(t.title).split(':')[0]}</strong> · {person(t.owner)}</p>
       <div className="objective-bar" aria-hidden="true"><i style={{ width: `${Math.max(0, Math.min(1, 1 - t.remaining / t.effort)) * 100}%` }}/></div>
-      <small>{t.status === 'done' ? 'Done' : t.status === 'review' ? 'In review' : t.status === 'active' ? 'In progress' : t.status === 'blocked' ? 'Blocked' : t.status === 'paused' ? 'On hold' : 'Not started'} · due {timeLabel(t.deadline)}{t.reviewRequired ? ` · ${t.reviewed ? 'reviewed' : 'needs review'}` : ''}</small>
+      <small>{t.status === 'done' ? 'Done' : t.status === 'review' ? 'In review' : t.status === 'active' ? 'In progress' : t.status === 'blocked' ? 'Blocked' : t.status === 'paused' ? 'On hold' : 'Not started'} · due {timeLabel(t.deadline)}{t.reviewRequired ? ` · ${t.reviewed ? 'reviewed' : 'needs review'}` : ''}<WhyButton taskId={t.id} whyFor={whyFor} onWhy={onWhy}/></small>
     </div>)}</section>}
     {contract && <section><h4>The contract</h4><p>Worth {money(contract.value, business.currency)} · earned {money(contract.recognised, business.currency)} · collected {money(contract.collected, business.currency)}</p></section>}
     <section><h4>Result</h4>

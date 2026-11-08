@@ -43,6 +43,12 @@ import { DEFAULT_PARAMS, eventParams } from './params';
 import { toPriceDTO, workforceReport } from './price';
 import { buildScenario, fixtureCast } from './scripts/fixture';
 import { createWorld, queueEvent, runTick, toSimulationState, type TickConfig, type TickResult } from './tick';
+import { emptyInbox, foldInbox, inboxThreads, type InboxState } from './diagnostics/inbox';
+import { applyInboxDelta, type InboxDelta, type InboxThread, type TaskEvent } from '../shared/inbox';
+
+/** Task inbox diagnostics are on unless SIM_INBOX=off. They never change the simulation. */
+const INBOX_ENABLED = process.env.SIM_INBOX !== 'off';
+const hasInboxChanges = (d: InboxDelta) => d.threads.length > 0 || d.toasts.length > 0;
 
 // Load the key from office-sim/.env (then the repo-root .env) wherever the server is started from.
 // A variable already set in the environment wins, so `ANTHROPIC_API_KEY= ...` forces rules mode.
@@ -165,6 +171,9 @@ export class OfficeSimManager {
   private world!: World;
   private frames: TickFrame[] = [];
   private feed: string[] = [];
+  private inbox: InboxState = emptyInbox();
+  /** Threads as of the hour before frames[0], for clients that replay frames from the start. */
+  private inboxBase: InboxThread[] = [];
   private provider: TurnProvider | null = null;
   private reviewer: HeadlineReviewer | null = null;
   private customEventGenerator: ((headline: string, kind: CustomEventKind, isTrue: boolean) => Promise<GeneratedCustomEvent>) | null = null;
@@ -237,10 +246,27 @@ export class OfficeSimManager {
     this.phase = null; this.storageError = null;
     this.frames = [];
     this.feed = [recoverId ? 'Recovered committed run. Playback is paused.' : 'Simulation ready.'];
+    this.inbox = emptyInbox(); this.inboxBase = [];
+    const inboxDeltas = recoverId ? this.recoverInbox(recoverId) : new Map<number, InboxDelta>();
     if (recoverId && this.world.companyTasks?.length) this.recoverCompanyFrames(recoverId);
+    for (const frame of this.frames) { const delta = inboxDeltas.get(frame.tick); if (delta) frame.inbox = delta; }
+    if (!this.frames.length) this.inboxBase = inboxThreads(this.inbox);
     this.customHeadlines = new Set([...Object.values(this.world.claims).filter(c => c.custom).map(c => headlineKey(c.text)),...this.world.queue.filter(e => e.custom && e.text).map(e => headlineKey(e.text!))]);
     this.started = this.world.tick > 0;
     this.running = false;
+  }
+
+  /** Rebuild the inbox from the task events committed with each tick. */
+  private recoverInbox(runId: string) {
+    const deltas = new Map<number, InboxDelta>();
+    for (const tx of this.store.read(runId)) {
+      const events = (tx.audit as { taskEvents?: TaskEvent[] } | null)?.taskEvents;
+      if (tx.kind !== 'tick' || !events) continue;
+      const folded = foldInbox(this.inbox, events, tx.world, DEFAULT_PARAMS);
+      this.inbox = folded.state;
+      if (hasInboxChanges(folded.delta)) deltas.set(tx.tick, folded.delta);
+    }
+    return deltas;
   }
 
   private recoverCompanyFrames(runId: string) {
@@ -289,7 +315,7 @@ export class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
+    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true, diagnostics: INBOX_ENABLED };
   }
 
   state(): SimulationState {
@@ -319,7 +345,7 @@ export class OfficeSimManager {
   }
 
   history(): HistoryResponse {
-    return { ...this.response(), history: this.frames };
+    return { ...this.response(), history: this.frames, inbox_base: this.inboxBase };
   }
 
   castResponse(): CastResponse {
@@ -387,12 +413,14 @@ export class OfficeSimManager {
     result.world.queue.push(...this.world.queue.slice(queueLength));
     const additions = this.world.companyTasks?.slice(companyCount);
     if (additions?.length) (result.world.companyTasks ??= []).push(...additions);
-    try { this.store.commit(this.runId,result.world,'tick',{ log: result.log, settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } }); }
+    try { this.store.commit(this.runId,result.world,'tick',{ log: result.log, ...(result.taskEvents ? { taskEvents: result.taskEvents } : {}), settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } }); }
     catch (error) {
       this.storageError = 'History storage failed. The previous tick is retained; retry after restoring storage.';
       this.running = false; this.phase = null; this.clearTimer(); this.emitState(); throw error;
     }
     this.world = result.world; this.phase = null; this.storageError = null;
+    const inbox = foldInbox(this.inbox, result.taskEvents ?? [], result.world, DEFAULT_PARAMS);
+    this.inbox = inbox.state;
     const records = enrichRecords(result);
     const events = tickEvents(result);
     this.feed.push(...events.map((e) => `Event: ${e.text}`), ...records.map((r) => r.summary));
@@ -418,10 +446,11 @@ export class OfficeSimManager {
     const frame: TickFrame = {
       price: toPriceDTO(result.log.price), tick: this.world.tick, records, events, state: this.state(),
       ...(result.log.companyActivity ? { company_activity: result.log.companyActivity } : {}),
+      ...(hasInboxChanges(inbox.delta) ? { inbox: inbox.delta } : {}),
     };
     frame.day_report = dayReport(this.world, [...this.frames, frame]);
     this.frames.push(frame);
-    if (this.frames.length > MAX_HISTORY) this.frames.shift();
+    if (this.frames.length > MAX_HISTORY) this.inboxBase = applyInboxDelta(this.inboxBase, this.frames.shift()?.inbox);
     this.emit({ type: 'tick', frame, ...this.response() });
     if (this.world.tick >= this.maxTicks) this.complete();
   }

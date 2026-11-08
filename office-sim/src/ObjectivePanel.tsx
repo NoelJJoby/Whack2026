@@ -1,3 +1,4 @@
+import { WhyButton, type WhyProps } from './Inbox';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TickFrame } from '../shared/api';
 import type { CompanyActivity, CompanyTaskDetail, CompanyTaskSummary } from '../shared/companyTasks';
@@ -61,7 +62,7 @@ function Discussion({ activity, name }: { activity: CompanyActivity[]; name: (id
   </li>)}</ol>;
 }
 
-function ObjectiveView({ summary, state, history, tick, cast, onPerson }: {
+function ObjectiveView({ summary, state, history, tick, cast, onPerson, whyFor, onWhy }: WhyProps & {
   summary: CompanyTaskSummary; state: SimulationState | null; history: TickFrame[]; tick: number; cast: AgentProfile[]; onPerson: (id: string) => void;
 }) {
   const detail = useDetail(summary.id, `${summary.status}-${tick}`);
@@ -96,7 +97,7 @@ function ObjectiveView({ summary, state, history, tick, cast, onPerson }: {
     {rows.length > 0 && <section><h4>The work</h4><ol className="objective-work">{rows.map(r => <li key={r.id} className={r.state}>
       <div><span className="chip">{CATEGORY_LABEL[r.category]}</span><strong>{r.title}</strong></div>
       <div className="objective-bar" aria-hidden="true"><i style={{ width: `${r.progress * 100}%` }}/></div>
-      <p>{WORK_STATE_LABEL[r.state]}{r.state === 'waiting' && `: ${r.needs.join(', ')}`} · {r.state === 'review' ? <>reviewer {person(r.reviewer)}</> : person(r.owner)}{r.rework > 0 && ` · sent back ${r.rework}×`}</p>
+      <p>{WORK_STATE_LABEL[r.state]}{r.state === 'waiting' && `: ${r.needs.join(', ')}`} · {r.state === 'review' ? <>reviewer {person(r.reviewer)}</> : person(r.owner)}{r.rework > 0 && ` · sent back ${r.rework}×`}<WhyButton taskId={r.id} whyFor={whyFor} onWhy={onWhy}/></p>
       <small>Done when: {r.acceptance}</small>
     </li>)}</ol></section>}
     {findings.length > 0 && <section><h4>What they found</h4>{findings.map(f => <div className="objective-finding" key={f.id}>
@@ -107,18 +108,18 @@ function ObjectiveView({ summary, state, history, tick, cast, onPerson }: {
   </article>;
 }
 
-export function ObjectivePanel({ summaries, state, history, tick, cast, disabled, onPerson, onSubmit }: {
+export function ObjectivePanel({ summaries, state, history, tick, cast, disabled, onPerson, onSubmit, whyFor, onWhy }: WhyProps & {
   summaries: CompanyTaskSummary[]; state: SimulationState | null; history: TickFrame[]; tick: number; cast: AgentProfile[];
   disabled: boolean; onPerson: (id: string) => void; onSubmit: (objective: string, deadline: number) => Promise<string | null>;
 }) {
   const active = summaries.find(s => isActiveObjective(s.status));
   const past = summaries.filter(s => s !== active).reverse();
   const [shown, setShown] = useState<string | null>(null);
-  if (active) return <ObjectiveView summary={active} state={state} history={history} tick={tick} cast={cast} onPerson={onPerson}/>;
+  if (active) return <ObjectiveView summary={active} state={state} history={history} tick={tick} cast={cast} onPerson={onPerson} whyFor={whyFor} onWhy={onWhy}/>;
   const pick = past.find(s => s.id === shown) ?? past[0];
   return <div className="objective-tab">
     <ObjectiveForm disabled={disabled} onSubmit={onSubmit}/>
     {past.length > 1 && <div className="company-tabs" role="group" aria-label="Earlier objectives">{past.map((s, i) => <button key={s.id} aria-pressed={s === pick} onClick={() => setShown(s.id)}>Objective {past.length - i}</button>)}</div>}
-    {pick && <ObjectiveView summary={pick} state={state} history={history} tick={tick} cast={cast} onPerson={onPerson}/>}
+    {pick && <ObjectiveView summary={pick} state={state} history={history} tick={tick} cast={cast} onPerson={onPerson} whyFor={whyFor} onWhy={onWhy}/>}
   </div>;
 }

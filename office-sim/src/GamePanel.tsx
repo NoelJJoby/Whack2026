@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 're
 import { Sprite, type Person } from './people';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { metricState, playerText, type Metric } from './hudModel';
+import { WhyButton, type WhyProps } from './Inbox';
 
 export function MenuPanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -52,7 +53,7 @@ export function MetricBar({ label, value, threshold }: { label: Metric; value: n
   return <div className="metric"><div className="metric-heading"><span>{label}</span><strong>{displayValue}<small>/100</small></strong></div><div className="metric-track" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} aria-valuetext={`${value} out of 100, ${status.text}`}><i className={`fill-${status.tone}`} style={{ width: `${value}%` }}/></div><span className={`metric-status ${status.tone}`}>{status.text}</span></div>;
 }
 
-export function EmployeePanel({ person, threshold, anchor, onClose, business, employeeId, cast = [] }: { business?: Business; employeeId?: string; cast?: AgentProfile[]; person: Person; threshold: number; anchor: HTMLElement | null; onClose: () => void }) {
+export function EmployeePanel({ person, threshold, anchor, onClose, business, employeeId, cast = [], whyFor, onWhy }: WhyProps & { business?: Business; employeeId?: string; cast?: AgentProfile[]; person: Person; threshold: number; anchor: HTMLElement | null; onClose: () => void }) {
   const panel = useRef<HTMLElement>(null);
   const [position, setPosition] = useState({ left: 12, top: 12 });
   useLayoutEffect(() => {
@@ -86,7 +87,7 @@ export function EmployeePanel({ person, threshold, anchor, onClose, business, em
   return <section ref={panel} style={position} className="employee-panel" role="dialog" aria-labelledby="employee-name">
     <div className="employee-heading"><div className="portrait" style={{ borderColor: person.color }}><Sprite person={person} quit={person.quit}/></div><div><h2 id="employee-name">{person.name}</h2><p>{person.role}</p></div><button className="close" onClick={onClose} aria-label="Close employee details">×</button></div>
     <div className="employee-content" tabIndex={0} aria-label="Employee statements and metrics"><p className={`current-action ${person.quit ? 'coral' : 'mint'}`}><span className="status-dot"/>{person.action}</p>
-      {business && employeeId && <section className="employee-assignment"><h3>Current work</h3><p>Supervisor: {cast.find(p => p.id === business.positions[employeeId]?.supervisor)?.name ?? business.positions[employeeId]?.supervisor ?? 'Executive owner'}</p>{business.tasks.filter(t => t.owner === employeeId && !['done','cancelled'].includes(t.status)).map(t => <p key={t.id}>{t.title} · {t.status} · Due {timeLabel(t.deadline)} · Priority {t.priority}</p>)}</section>}
+      {business && employeeId && <section className="employee-assignment"><h3>Current work</h3><p>Supervisor: {cast.find(p => p.id === business.positions[employeeId]?.supervisor)?.name ?? business.positions[employeeId]?.supervisor ?? 'Executive owner'}</p>{business.tasks.filter(t => t.owner === employeeId && !['done','cancelled'].includes(t.status)).map(t => <p key={t.id}>{t.title} · {t.status} · Due {timeLabel(t.deadline)} · Priority {t.priority}<WhyButton taskId={t.id} whyFor={whyFor} onWhy={onWhy}/></p>)}</section>}
       <div className="employee-dialogue"><h3>Public statement</h3><blockquote>{person.says ? `“${playerText(person.says)}”` : 'No statement yet'}</blockquote><h3>Private thought</h3><blockquote className="private-thought">{person.thinks ? `“${playerText(person.thinks)}”` : 'No thought recorded'}</blockquote></div>
       <div className="employee-metrics"><MetricBar label="Stress" value={person.stress} threshold={threshold}/><MetricBar label="Burnout" value={person.burnout} threshold={threshold}/><MetricBar label="Trust in management" value={person.trust} threshold={threshold}/><MetricBar label="Workload" value={person.workload} threshold={threshold}/></div>
       <p className="metric-note">Higher stress, burnout and workload mean more pressure. Higher trust is favourable. Burnout rises above {BURNOUT_STRESS_THRESHOLD} stress and recovers below {BURNOUT_RECOVERY_THRESHOLD}. The base burnout exit threshold is {threshold}; recent interviews can lower it.</p>

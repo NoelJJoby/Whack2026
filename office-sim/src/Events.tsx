@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import type { SimulationState, AgentProfile } from '../shared/types';
 import { EventDetail } from './EventDetail';
+import type { WhyProps } from './Inbox';
 import { SITUATION_STATUS, dueIn, isOpenSituation } from './companyModel';
 import { timeLabel } from './hudModel';
 
 type Filter = 'open' | 'closed' | 'all';
 
 /** Business situations (cases) in plain language: what happened, what the CEO did, who is on it. */
-export function Events({ state, cast, onPerson, initialId = null, tick }: { state: SimulationState | null; cast: AgentProfile[]; onPerson?: (id: string) => void; initialId?: string | null; tick: number }) {
+export function Events({ state, cast, onPerson, initialId = null, tick, whyFor, onWhy }: WhyProps & { state: SimulationState | null; cast: AgentProfile[]; onPerson?: (id: string) => void; initialId?: string | null; tick: number }) {
   const cases = state?.eventState?.cases ?? [];
   const initial = cases.find(e => e.id === initialId);
   const [selected, setSelected] = useState<string | null>(initialId);
@@ -33,7 +34,7 @@ export function Events({ state, cast, onPerson, initialId = null, tick }: { stat
           <strong>{e.headline}</strong>
           {handlers.length > 0 && <small>Handled by {handlers.join(', ')}</small>}
         </button>
-        {selected === e.id && <EventDetail event={e} events={events} business={b} cast={cast} onPerson={onPerson} tick={tick}/>}
+        {selected === e.id && <EventDetail event={e} events={events} business={b} cast={cast} onPerson={onPerson} tick={tick} whyFor={whyFor} onWhy={onWhy}/>}
       </div>;
     })}</div>
     {!shown.length && <p className="empty-state">{filter === 'open' ? 'Nothing needs attention right now.' : 'No situations yet.'}</p>}
