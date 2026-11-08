@@ -125,9 +125,11 @@ function streetLamp(x: number, z: number) {
   G(x, 1.1, z, 0.26, 0.3, 0.26, '#ffe3a0');
   S(x, 1.4, z, 0.34, 0.08, 0.34, TRIM);
 }
-function car(x: number, z: number, colour: string, alongX: boolean) {
+/** A car's boxes around the origin, facing +x (the parked cars are animated, so they are not baked in). */
+export function carBoxes(colour: string): { solid: Box[]; glow: Box[] } {
+  const out = { solid: [] as Box[], glow: [] as Box[] };
   const B = (dx: number, y: number, dz: number, w: number, h: number, d: number, c: string, glowing = false) =>
-    (glowing ? G : S)(x + (alongX ? dx : dz), y, z + (alongX ? dz : dx), alongX ? w : d, h, alongX ? d : w, c);
+    (glowing ? out.glow : out.solid).push([dx, y, dz, w, h, d, c]);
   for (const dx of [-0.65, 0.65]) for (const dz of [-0.5, 0.5]) B(dx, 0.05, dz, 0.42, 0.42, 0.18, '#1c1d22');
   B(0, 0.25, 0, 2.3, 0.5, 1.1, colour);
   B(-0.1, 0.75, 0, 1.3, 0.45, 1.0, colour);
@@ -136,6 +138,7 @@ function car(x: number, z: number, colour: string, alongX: boolean) {
   B(1.16, 0.4, 0.35, 0.04, 0.14, 0.22, '#fff1c2', true);
   B(-1.16, 0.4, -0.35, 0.04, 0.14, 0.22, '#e04a3a', true);
   B(-1.16, 0.4, 0.35, 0.04, 0.14, 0.22, '#e04a3a', true);
+  return out;
 }
 
 // Open plan: desks, chairs, rugs, back-wall amenities.
@@ -196,7 +199,3 @@ for (const [x, z, s] of [[-15, -9, 1], [-15, -2, 0.9], [-14.8, 6, 1], [15, -9, 0
 for (const [x, z] of [[-8, 6.3], [-4, 6.3], [3.5, 6.3], [7.5, 6.3]]) bush(x, z);
 for (const [x, z] of [[-13, 3], [-11, 8.5], [-2.8, 8.8], [12.5, 0.5], [-13, -6]]) flowers(x, z);
 for (const [x, z] of [[-1.6, 8.5], [1.6, 8.5], [-1.6, 6.6], [1.6, 6.6]]) streetLamp(x, z);
-car(-6, 12.3, '#e8b730', true);
-car(7, 13.7, '#3d6fb8', true);
-car(10.2, 8.2, '#e6e6e6', false);
-car(12.8, 8.2, '#cf4436', false);
