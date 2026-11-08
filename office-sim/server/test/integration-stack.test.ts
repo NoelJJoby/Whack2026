@@ -73,15 +73,17 @@ describe('event lifecycle: scheduling, CEO decision, ops work and resolution', (
     const after = w.eventState.cases.find(c => c.id === e.id)!;
     assert.ok(['responding', 'resolved', 'failed', 'monitoring'].includes(after.status), `unexpected status ${after.status}`);
     if (after.status === 'resolved') assert.ok(after.outcome, 'a resolved case records its outcome');
+    assert.notEqual(after.status, 'open', 'the response case moved past open within the run');
   });
 
-  it('an untrue rumour never changes business state and archives after a day', async () => {
+  it('an untrue rumour travels as a false claim only: no business case, no cash or employment change', async () => {
     let w = queueEvent(world(5), { type: 'layoffs_rumour', isTrue: false, hearers: ['gossip'] });
     const cashBefore = w.business.cash;
     w = await run(w, 8, ceoPicksFirst(5));
+    assert.ok(Object.values(w.claims).some(c => c.is_true === false), 'the rumour exists as a false claim');
+    assert.ok(!w.eventState.cases.some(c => c.templateId === 'layoffs_rumour'), 'a rumour never opens a business case');
+    assert.ok(w.eventState.cases.every(c => c.truth), 'every business case is factual');
     assert.ok(w.ids.every(id => w.agents[id].status === 'active'), 'a false layoff rumour lays nobody off');
-    const rumour = w.eventState.cases.find(c => !c.truth);
-    if (rumour) assert.ok(['resolved', 'open'].includes(rumour.status));
     assert.ok(w.business.cash >= cashBefore - 1, 'a false rumour does not move cash by itself');
   });
 });
@@ -128,21 +130,23 @@ describe('CEO: decisions, budgets, layoffs and authority', () => {
     openEvent(w, 'cost_review');
     w.business.tasks[0].owner = 'loyalist';
     w.business.tasks[0].status = 'active';
+    let offered = false;
     const provider: TurnProvider = async (profile, ctx) => {
       if (ctx.management?.kind === 'ceo') {
         const v = fallbackCeo(ctx.management);
         const layoff = ctx.management.options.find(o => o.kind === 'layoff' && o.employeeId === 'loyalist');
-        if (layoff) { v.choices[0].optionId = layoff.id; v.choices[0].budget = layoff.cost; }
+        assert.ok(layoff, 'the layoff option for an active employee must be offered');
+        offered = true;
+        v.choices[0].optionId = layoff.id; v.choices[0].budget = layoff.cost;
         return v;
       }
       return createStubProvider(42)(profile, ctx);
     };
     w = await run(w, 1, provider);
-    const laid = w.agents.loyalist.status;
-    assert.ok(laid === 'laid_off' || w.eventState.decisions.some(d => d.fallback), 'the layoff either applied or was rejected with a recorded fallback');
-    if (laid === 'laid_off') {
-      assert.ok(w.business.tasks.filter(t => !['done', 'cancelled'].includes(t.status)).every(t => t.owner !== 'loyalist'));
-    }
+    assert.ok(offered, 'the CEO was asked to choose');
+    assert.equal(w.agents.loyalist.status, 'laid_off', 'the valid layoff was applied');
+    assert.ok(w.business.tasks.filter(t => !['done', 'cancelled'].includes(t.status)).every(t => t.owner !== 'loyalist'), 'the laid-off employee holds no open work');
+    assert.equal(w.eventState.decisions.find(d => d.kind === 'ceo')!.fallback, null, 'the CEO decision was valid, not a fallback');
   });
 
   it('with the CEO quit, ops acts with authority "acting" and discretionary layoffs are never offered', async () => {
