@@ -159,3 +159,23 @@ test('display adapters remove engine hour terminology from errors and accessible
   assert.ok(markup.includes('Trust in management'));
   assert.ok(!/\bticks?\b/i.test(markup));
 });
+
+test('the engine badge names the decision-maker for each mode and reason', async () => {
+  const { engineLabel } = await import('./hudModel');
+  assert.equal(engineLabel('llm_bias', 'configured'), 'LLM + bias engine');
+  assert.equal(engineLabel('rules', 'no_api_key'), 'Rules mode · No API key');
+  assert.equal(engineLabel('rules', 'llm_failed'), 'Rules mode · LLM unavailable');
+  assert.equal(engineLabel('rules', 'configured'), 'Rules mode');
+});
+
+test('a failed case shows its reason in the event detail, not just the status word', async () => {
+  const { EventDetail } = await import('./EventDetail');
+  const reason = 'No active CEO or operations manager to respond; the case lapsed without a decision.';
+  const event = { id: 'e1', rootId: 'e1', parentId: null, templateId: 'delivery_concern', headline: 'Client concern', rarity: 'common', valence: 'negative', domain: 'delivery', severity: 'medium', origin: 'external', entityId: 'x', openedTick: 1, deadline: 5, owner: null, status: 'failed', truth: true, detected: true, evidence: [], decisions: [], tasks: [], ledger: [], milestones: [], outcome: reason, quarter: 1, target: 0, value: 0, exposure: false, contained: false } as never;
+  const events = { cases: [event], evidence: [], decisions: [], directives: [], scheduler: { common: { index: 0, nominal: 0, due: 0 }, rare: { index: 0, nominal: 0, due: 0 } }, scheduling: [], cooldowns: {}, incidents: [], diagnostics: [] } as never;
+  const business = { tasks: [], contracts: [], work: [], ledger: [], currency: 'GBP' } as never;
+  const html = renderToStaticMarkup(createElement(EventDetail, { event, events, business, cast: [], onPerson: undefined }));
+  assert.match(html, /Missed its deadline/);
+  assert.match(html, /<h4>Result<\/h4>/);
+  assert.match(html, /No active CEO or operations manager/);
+});

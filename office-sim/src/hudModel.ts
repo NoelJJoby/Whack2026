@@ -32,6 +32,19 @@ export function metricState(label: Metric, value: number, burnoutThreshold: numb
 }
 export interface FeedEntry {
   key: string; time: string; label: string; text: string; ids: string[]; truth?: boolean; tone?: BusinessNotice['tone'];
+  /** A reply in a conversation, shown indented under the line it answers. */
+  reply?: boolean;
+  thread?: string;
+}
+/** Conversation lines in the wire: "Tom → Priya 😤: '…' · because …", replies as "↳ Priya 🙂: '…'". */
+export interface FeedVoices { names: Record<string, string>; emoji: Record<string, string> }
+function conversationText(record: TickFrame['records'][number], voices: FeedVoices): string | null {
+  const c = record.conversation, line = record.public_line?.trim();
+  if (!c || !line) return null;
+  const name = (id: string) => voices.names[id] ?? id;
+  const face = record.emotion ? ` ${voices.emoji[record.emotion] ?? ''}` : '';
+  return c.role === 'reply' ? `↳ ${name(record.agent)}${face}: '${playerText(line)}'`
+    : `${name(record.agent)} → ${name(c.with)}${face}: '${playerText(line)}'${record.cause ? ` · because ${playerText(record.cause)}` : ''}`;
 }
 /** A business case changing in a way the spectator should see without opening the Business events panel. */
 export interface BusinessNotice {
@@ -63,12 +76,14 @@ export function businessNotices(frame: TickFrame, prev?: TickFrame): BusinessNot
   });
 }
 /** Each record occurs once: a resignation replaces its action entry. */
-export function feedEntries(history: TickFrame[]): FeedEntry[] {
-  return history.map((frame, i) => ({ frame, prev: history[i - 1]?.tick === frame.tick - 1 ? history[i - 1] : undefined })).reverse().flatMap(({ frame, prev }) => [
+export function feedEntries(history: TickFrame[], voices?: FeedVoices): FeedEntry[] {
+  const entries: FeedEntry[] = history.map((frame, i) => ({ frame, prev: history[i - 1]?.tick === frame.tick - 1 ? history[i - 1] : undefined })).reverse().flatMap(({ frame, prev }) => [
     ...[...frame.records].reverse().sort((a, b) => Number(Boolean(b.quit)) - Number(Boolean(a.quit))).map((record) => ({
       key: `${frame.tick}-${record.agent}`, time: timeLabel(frame.tick),
-      label: record.quit ? 'Resignation' : ACTION_LABEL[record.action], text: playerText(record.summary),
-      ids: record.target ? [record.agent, record.target] : [record.agent],
+      label: record.quit ? 'Resignation' : record.conversation?.role === 'reply' ? 'Reply' : ACTION_LABEL[record.action],
+      text: (voices && !record.quit && conversationText(record, voices)) || playerText(record.summary),
+      ids: record.conversation ? [record.agent, record.conversation.with] : record.target ? [record.agent, record.target] : [record.agent],
+      ...(voices && record.conversation ? { thread: record.conversation.id, ...(record.conversation.role === 'reply' ? { reply: true } : {}) } : {}),
     })),
     ...[...frame.events].reverse().map((event, i) => ({
       key: `${frame.tick}-event-${i}`, time: timeLabel(frame.tick),
@@ -81,4 +96,22 @@ export function feedEntries(history: TickFrame[]): FeedEntry[] {
       tone: a.kind === 'outcome' ? (a.result?.startsWith('accepted') ? 'mint' as const : 'coral' as const) : 'gold' as const,
     })),
   ]);
+  // Replies arrive an hour later; thread each one directly beneath the line it answers (newest-first list).
+  const threaded = entries.filter(e => !e.reply || !entries.some(o => o.thread === e.thread && !o.reply));
+  for (const e of [...entries].reverse()) {
+    if (!e.reply || !threaded.some(o => o.thread === e.thread && !o.reply)) continue;
+    const at = threaded.findIndex(o => o.thread === e.thread && !o.reply);
+    let end = at + 1;
+    while (end < threaded.length && threaded[end].reply && threaded[end].thread === e.thread) end++;
+    threaded.splice(end, 0, e);
+  }
+  return threaded;
+}
+
+/** The engine label shown to players: which decision-maker is driving the office. */
+export function engineLabel(mode: string | null, reason: string | null): string {
+  if (mode === 'llm_bias') return 'LLM + bias engine';
+  if (reason === 'no_api_key') return 'Rules mode · No API key';
+  if (reason === 'llm_failed') return 'Rules mode · LLM unavailable';
+  return 'Rules mode';
 }

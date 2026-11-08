@@ -55,6 +55,10 @@ export interface LlmOutput {
   inner_monologue: string;
   /** claim id -> 0..100, how true the agent thinks it is. */
   beliefs: Record<string, number>;
+  /** Optional: an emotion name, a trigger key, and the conversation being answered. Rules validate all three. */
+  emotion?: string;
+  cause?: string;
+  reply_to?: string;
 }
 
 // --- Agents -----------------------------------------------------------------
@@ -144,6 +148,8 @@ export interface ScenarioEvent {
   hearers?: string[];
   /** Rumours: who they hear it from. Defaults to 'grapevine'. */
   source?: string;
+  /** Official CEO announcement: only `hearers` (the open floor) hear it first-hand (server/announcements.ts). */
+  firstHand?: boolean;
   /** Player-written headline, already validated; replaces the type's wording. */
   text?: string;
   /** Written by the player rather than the scheduler or a preset. */
@@ -266,6 +272,10 @@ export interface TurnContext {
   events: Array<{ type: EventType; text: string }>;
   /** Voice brief, set in LLM modes by server/speech.ts. */
   speech?: SpeechContext;
+  /** Concrete reasons this agent might be upset this hour (server/triggers.ts). */
+  triggers?: import('./triggers').Trigger[];
+  /** A colleague's line waiting for this agent's reply (server/conversations.ts). */
+  incoming?: import('./conversations').Incoming;
 }
 
 /** Example small-talk lines for a voice, or null if the call failed. */

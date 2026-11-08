@@ -23,6 +23,13 @@ function believe(ctx: TurnContext, claim: TurnContext['claims'][number], noise: 
   return Math.round(Math.min(100, Math.max(0, base + distrustBoost + noise)));
 }
 
+/** Stub emotion: reacts to the worst trigger (with its key as cause) and answers anyone who spoke to it. */
+function stubFeeling(ctx: TurnContext): { emotion: string; cause?: string; reply_to?: string } {
+  const top = [...(ctx.triggers ?? [])].sort((a, b) => b.severity - a.severity)[0];
+  const emotion = top ? (top.severity >= 3 ? 'frustrated' : 'stressed') : ctx.state.stress < 35 ? 'happy' : 'neutral';
+  return { emotion, ...(top ? { cause: top.id } : {}), ...(ctx.incoming ? { reply_to: ctx.incoming.id } : {}) };
+}
+
 export function createStubProvider(runSeed: number, opts: StubOptions = {}): TurnProvider {
   return async (agent, ctx) => {
     if (opts.nullFor?.(agent.id, ctx.tick)) return null;
@@ -31,7 +38,7 @@ export function createStubProvider(runSeed: number, opts: StubOptions = {}): Tur
     if (ctx.management) return ctx.management.kind === 'ceo' ? fallbackCeo(ctx.management) : fallbackOps(ctx.management, ctx.companySchedule);
     if (ctx.work) {
       const task = ctx.work.reviewable[0] ?? ctx.work.assignments[0];
-      return { proposals: [task ? { action: ctx.work.reviewable.includes(task) ? 'review_work' : 'work', task_id: task.id, assignment_version: task.version, weight: 1 } : { action: 'slack_off', weight: 1 }], public_line: 'I will follow the current work plan.', inner_monologue: 'I should check the acceptance criteria.', beliefs: Object.fromEntries(ctx.claims.map(c => [c.id,50])) };
+      return { proposals: [task ? { action: ctx.work.reviewable.includes(task) ? 'review_work' : 'work', task_id: task.id, assignment_version: task.version, weight: 1 } : { action: 'slack_off', weight: 1 }], public_line: 'I will follow the current work plan.', inner_monologue: 'I should check the acceptance criteria.', beliefs: Object.fromEntries(ctx.claims.map(c => [c.id,50])) , ...stubFeeling(ctx) };
     }
     const rng = stream(runSeed, ctx.tick, agent.id, 'stub');
     const jitter = () => 0.8 + 0.4 * rng.next();
@@ -56,6 +63,6 @@ export function createStubProvider(runSeed: number, opts: StubOptions = {}): Tur
     const top = proposals.reduce((a, b) => (b.weight > a.weight ? b : a));
     const lines = templateLines('work', null, null, rng);
     if (opts.legacyFormat) return { action: top.action, target: top.target ?? null, claim_id: null, ...lines };
-    return { proposals, ...lines, beliefs };
+    return { proposals, ...lines, beliefs, ...stubFeeling(ctx) };
   };
 }

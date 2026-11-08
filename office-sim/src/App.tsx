@@ -11,7 +11,7 @@ import { Scorecard } from './Scorecard';
 import { Leaderboard } from './leaderboard/Leaderboard';
 import { StockPrice, StockChart } from './StockPrice';
 import { EmployeePanel, MenuPanel, RailPanel } from './GamePanel';
-import { ACTION_LABEL, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
+import { ACTION_LABEL, engineLabel, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
 import { quitParams } from '../server/params';
 import { RUN_LENGTHS, useSimulation } from './useSimulation';
 import { useDialogue } from './useDialogue';
@@ -19,6 +19,7 @@ import { usePresentation } from './usePresentation';
 import { presentedPresence } from './presentation';
 import { isOvertime } from '../shared/workday';
 import { DialogueBar, type Speaker } from './DialogueBar';
+import { EMOTES, FEED_EMOJI } from './emotes';
 import './index.css';
 
 type RailTool = 'events' | 'rumours' | 'company' | 'scorecard' | 'leaderboard' | 'settings';
@@ -124,7 +125,7 @@ export default function App() {
   const rumourAlert = (state?.metrics.false_reach ?? 0) > 0;
   const wellbeingAlert = people.some(person => !person.quit && person.burnout >= (cast.find(profile => profile.id === person.id)?.traits.quit_threshold ?? quitParams.defaultBurnoutThreshold));
   const railMenu = menu && menu !== 'stock' && menu !== 'business' ? menu : null;
-  const entries = useMemo(() => feedEntries(history), [history]);
+  const entries = useMemo(() => feedEntries(history, EMOTES ? { names: Object.fromEntries(cast.map(c => [c.id, c.name])), emoji: FEED_EMOJI } : undefined), [history, cast]);
   const objective = sim.companyTasks.find(t => isActiveObjective(t.status));
   const objectiveWork = objective ? (state?.business?.tasks ?? []).filter(t => t.id.startsWith(objectiveWorkPrefix(objective.id))) : [];
   const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
@@ -156,12 +157,14 @@ export default function App() {
     target?.focus({ preventScroll: true });
   }, []);
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
-  const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
+  const diagnostic = engineLabel(sim.mode, sim.modeReason);
   return <main className="game-window" aria-label="The Daily Grind">
     <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
-      showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null} showDebug={showSyncDebug}/>
+      showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null} showDebug={showSyncDebug}
+      announcement={presentation.frame?.events.find(e => e.official) ?? null}/>
+    <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
@@ -170,7 +173,7 @@ export default function App() {
     {showSyncDebug && <aside className="sync-debug" aria-label="Time synchronization debug">
       <strong>SYNC DEBUG</strong><span>presented: {presentation.tick} · {timeLabel(presentation.tick)}</span><span>latest: {sim.state?.tick ?? 0}</span><span>line: {dialogue.line?.tick ?? '—'}</span><span>waiting: {sim.history.filter(frame => frame.tick > presentation.tick).length}</span><span>lag: {Math.max(0, (sim.state?.tick ?? 0) - presentation.tick)}</span>
     </aside>}
-    {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
+    {announcement?.announcement && announcement.key !== dismissedAnnouncement && <section className="announcement" aria-label="New announcement"><div role="status"><span>{announcement.announcement.official ? '📢 CEO' : 'Announcement'}</span><p>{playerText(announcement.announcement.text)}</p></div><button className="close" onClick={() => setDismissedAnnouncement(announcement.key)} aria-label="Dismiss announcement">×</button></section>}
     {announcement?.business && announcement.key !== dismissedAnnouncement && <section className={`announcement business tone-${announcement.business.tone}`} aria-label="Business event">
       <div role="status"><span>{announcement.business.label}</span><p>{announcement.business.text}</p>
         <button className="view-case" onClick={() => openMenu('business', announcement.business!.caseId)}>View case</button></div>
@@ -186,7 +189,7 @@ export default function App() {
       <div className="wire-history" id="wire-history" tabIndex={expanded ? 0 : undefined} onKeyDown={event => { if (event.key === 'Escape' && expanded) { setExpanded(false); event.currentTarget.parentElement?.querySelector('button')?.focus(); } }}>
         {(expanded ? wireEntries : wireEntries.slice(0, 2)).map(entry => {
           const content = <><div className="feed-meta"><span className={entry.tone ?? (entry.label === 'Resignation' ? 'coral' : '')}>{entry.label}{truth && entry.truth !== undefined && <b className={entry.truth ? 'mint' : 'coral'}> · {entry.truth ? 'True' : 'False'}</b>}</span><time>{entry.time}</time></div><p>{entry.text}</p></>;
-          return entry.ids.length ? <button className="feed-entry" key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
+          return entry.ids.length ? <button className={`feed-entry${entry.reply ? ' reply' : ''}`} key={entry.key} onMouseEnter={() => setHighlight(entry.ids)} onMouseLeave={() => setHighlight([])} onFocus={() => setHighlight(entry.ids)} onBlur={() => setHighlight([])} onClick={() => select(entry.ids[0])}>{content}</button> : <article className="feed-entry" key={entry.key}>{content}</article>;
         })}
         {!entries.length && !state?.queue.length && <p className="empty-state">No events yet</p>}
       </div>
