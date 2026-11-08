@@ -11,7 +11,7 @@ import { createTurnProvider } from '../llm';
 import { DEFAULT_PARAMS as P } from '../params';
 import { FEELING_TABLES } from '../llm/bands';
 import { buildTurnPrompt, claimKeys } from '../llm/prompt';
-import { buildScenario, fixtureCast } from '../scripts/fixture';
+import { fixtureCast } from '../scripts/fixture';
 import { runSimulation, type RunResult } from '../tick';
 import { NO_REGEN_PARAMS } from './helpers';
 
@@ -127,7 +127,7 @@ async function runWithFake(mode: RunConfig['mode'], opts: FakeOptions = {}, seed
     captured.push({ tick: ctx.tick, agent: agent.id, ctx: structuredClone(ctx), prompt: buildTurnPrompt(agent, ctx) });
     return real(agent, ctx);
   };
-  const config: RunConfig = { seed, mode, ticks: 16, scenario: buildScenario(seed, 16), gossip: true, billboard: true, priceFeedback: false };
+  const config: RunConfig = { seed, mode, ticks: 16, scenario: [{ tick: 2, type: 'pr_scandal', isTrue: true }], gossip: true, billboard: true, priceFeedback: false };
   const originalKey = process.env.ANTHROPIC_API_KEY;
   const originalInfo = console.info;
   process.env.ANTHROPIC_API_KEY = 'test-only-not-a-real-key';

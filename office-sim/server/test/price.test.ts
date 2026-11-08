@@ -5,7 +5,7 @@ import { ACTIONS, type RunConfig, type TurnContext } from '../engine-types';
 import { DEFAULT_PARAMS as P } from '../params';
 import { applyPriceFeedback, createPriceState, normal, toPriceDTO, updatePrice, validatePriceParams, type PriceInput, type PriceState } from '../price';
 import { stream } from '../rng';
-import { buildScenario, fixtureCast } from '../scripts/fixture';
+import { fixtureCast } from '../scripts/fixture';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, runSimulation, runTick } from '../tick';
 import { makeAgent, makeClaim } from './helpers';
@@ -155,12 +155,144 @@ test('public DTO allowlist omits engine-only metadata and future corrections', (
   assert.equal(dto.markers[0].event, 'headline');
 });
 
+// Frozen pre-cadence schedules: price regression stays independent of calendar tuning.
+const LEGACY_SCENARIOS: import('../engine-types').ScenarioEvent[][] = [
+  [
+    {
+      "tick": 3,
+      "type": "competitor_poaching",
+      "isTrue": false,
+      "source": "breadwinner"
+    },
+    {
+      "tick": 25,
+      "type": "pr_scandal",
+      "isTrue": false,
+      "source": "flight"
+    }
+  ],
+  [
+    {
+      "tick": 3,
+      "type": "surprise_bonus",
+      "isTrue": true
+    },
+    {
+      "tick": 28,
+      "type": "long_hours_policy",
+      "isTrue": true
+    }
+  ],
+  [
+    {
+      "tick": 2,
+      "type": "layoffs_rumour",
+      "isTrue": false,
+      "source": "gossip"
+    },
+    {
+      "tick": 27,
+      "type": "competitor_poaching",
+      "isTrue": false,
+      "source": "gossip"
+    }
+  ],
+  [
+    {
+      "tick": 4,
+      "type": "layoffs_rumour",
+      "isTrue": false,
+      "source": "ops"
+    },
+    {
+      "tick": 30,
+      "type": "merger",
+      "isTrue": false
+    }
+  ],
+  [
+    {
+      "tick": 2,
+      "type": "new_management",
+      "isTrue": true
+    },
+    {
+      "tick": 27,
+      "type": "competitor_poaching",
+      "isTrue": true,
+      "source": "ceo"
+    }
+  ],
+  [
+    {
+      "tick": 1,
+      "type": "pr_scandal",
+      "isTrue": false,
+      "source": "ops"
+    },
+    {
+      "tick": 25,
+      "type": "long_hours_policy",
+      "isTrue": true
+    }
+  ],
+  [
+    {
+      "tick": 2,
+      "type": "surprise_bonus",
+      "isTrue": true
+    },
+    {
+      "tick": 26,
+      "type": "new_management",
+      "isTrue": false
+    }
+  ],
+  [
+    {
+      "tick": 4,
+      "type": "merger",
+      "isTrue": false
+    },
+    {
+      "tick": 29,
+      "type": "competitor_poaching",
+      "isTrue": false,
+      "source": "skeptic"
+    }
+  ],
+  [
+    {
+      "tick": 2,
+      "type": "new_management",
+      "isTrue": true
+    },
+    {
+      "tick": 26,
+      "type": "long_hours_policy",
+      "isTrue": true
+    }
+  ],
+  [
+    {
+      "tick": 1,
+      "type": "new_management",
+      "isTrue": false
+    },
+    {
+      "tick": 27,
+      "type": "long_hours_policy",
+      "isTrue": true
+    }
+  ]
+];
+
 test('feedback off preserves the versioned legacy fixture over ten seeds and thirty ticks', async () => {
   const results = [];
   const legacyParams = structuredClone(P);
   legacyParams.rules.overtime = { stress: 0, burnout: 0 };
   for (let seed = 1; seed <= 10; seed++) {
-    const scenario = buildScenario(seed, 30);
+    const scenario = LEGACY_SCENARIOS[seed - 1];
     const r = await runSimulation(fixtureCast(seed), config({ seed, scenario }), createStubProvider(seed), legacyParams);
     // Voice fields are new log metadata; stripping them shows the workforce run itself is unchanged.
     const logs = r.logs.map(({ price: _price, voices: _v, examples: _e, speech: _s, ...log }) => ({

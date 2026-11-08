@@ -137,7 +137,7 @@ describe('tick loop: LLM contract', () => {
   it('agents never see truth tags', async () => {
     const seen: TurnContext[] = [];
     const stub = createStubProvider(42);
-    await run(config({ ticks: 10 }), async (a, ctx) => {
+    await run(config({ ticks: 10, scenario: [{ tick: 2, type: 'pr_scandal', isTrue: true }] }), async (a, ctx) => {
       seen.push(ctx);
       return stub(a, ctx);
     });
@@ -197,8 +197,8 @@ describe('tick loop: events and ablations', () => {
   it('every tunable lives in params: a different param set changes the run', async () => {
     const harsher = structuredClone(P);
     harsher.rules.passive.burnoutGain = 6;
-    const a = await runSimulation(fixtureCast(42), config({ ticks: 50 }), createStubProvider(42));
-    const b = await runSimulation(fixtureCast(42), config({ ticks: 50 }), createStubProvider(42), harsher);
+    const a = await runSimulation(fixtureCast(42), config({ ticks: 50, scenario: [{ tick: 2, type: 'pr_scandal', isTrue: true }] }), createStubProvider(42));
+    const b = await runSimulation(fixtureCast(42), config({ ticks: 50, scenario: [{ tick: 2, type: 'pr_scandal', isTrue: true }] }), createStubProvider(42), harsher);
     assert.ok(b.summary.quits > a.summary.quits);
   });
 });
