@@ -211,3 +211,16 @@ a:focus-visible, select:focus-visible { outline: 2px solid #ffe2a2; outline-offs
 @media (max-width: 420px) { .score-tiles { grid-template-columns: minmax(0, 1fr); } }
 /* Narrow screens keep the rail centred; the wire there spans the width above the office. */
 @media (max-width: 700px) { .game-tools { top: 50%; transform: translateY(-50%); } }
+
+.task-composer { display: grid; gap: 12px; }
+.task-composer .event-panel { padding: 14px; min-width: 0; }
+.task-intro, .task-objective { font-size: 18px; line-height: 1.25; }
+.task-composer .event-headline-label, .task-composer .event-headline-check, .task-note { font-size: 15px; }
+.task-note { color: var(--muted); line-height: 1.25; }
+.task-note.coral { color: var(--coral); }
+.task-form .event-headline { font-size: 18px; line-height: 1.25; }
+.task-form .event-headline::placeholder { color: var(--muted); opacity: 1; }
+.task-form-footer, .task-receipt-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.task-form-footer .post-event { font-size: 16px; min-height: 40px; margin-left: auto; }
+.task-receipt-heading h3 { font-size: 16px; color: var(--muted); }
+.task-objective { white-space: pre-wrap; overflow-wrap: anywhere; }

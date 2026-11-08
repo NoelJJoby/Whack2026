@@ -6,6 +6,7 @@ import { OfficeView } from './three/OfficeView';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
 import { EventComposer } from './EventComposer';
+import { CompanyTaskComposer } from './CompanyTaskComposer';
 import { Company } from './Company';
 import { Scorecard } from './Scorecard';
 import { Leaderboard } from './leaderboard/Leaderboard';
@@ -160,8 +161,15 @@ export default function App() {
     {person && <EmployeePanel key={person.id} person={person} anchor={returnFocus.current} business={state?.business} employeeId={person.id} cast={cast} threshold={cast.find(p => p.id === person.id)?.traits.quit_threshold || quitParams.defaultBurnoutThreshold} onClose={closeEmployee}/>}
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company', 'scorecard', 'leaderboard'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
-    {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select} initialId={caseId}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}/> : menu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : menu === 'leaderboard' ? <Leaderboard/> : menu === 'stock' ? <StockChart history={history} current={price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+    <MenuPanel title={MENU_LABEL.shake} open={menu === 'shake'} onClose={() => setMenu(null)}>
+      <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness}
+        label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete}
+        nextTick={(sim.state?.tick ?? hour) + (sim.phase ? 2 : 1)}
+        companyTask={<CompanyTaskComposer key={sim.runId} runId={sim.runId} tasks={sim.companyTasks}
+          connected={live} complete={serverComplete} running={running}/>}/>
+    </MenuPanel>
+    {menu && menu !== 'shake' && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
+      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select} initialId={caseId}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'scorecard' ? <Scorecard scorecard={state?.metrics.scorecard}/> : menu === 'leaderboard' ? <Leaderboard/> : menu === 'stock' ? <StockChart history={history} current={price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
         <Controls running={running} complete={serverComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => { setPlaybackPaused(false); void sim.step(); }} onReset={() => { setPlaybackPaused(false); void sim.reset(); }} onNewSeed={() => { setPlaybackPaused(false); void sim.newSeed(); }}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
