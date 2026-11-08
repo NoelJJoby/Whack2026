@@ -22,6 +22,7 @@ import { isOvertime } from '../shared/workday';
 import { isFastForward } from '../shared/playback';
 import { DialogueBar, type Speaker } from './DialogueBar';
 import { EMOTES, FEED_EMOJI } from './emotes';
+import { useBackgroundMusic } from './useBackgroundMusic';
 import './index.css';
 
 type Tool = 'simulation' | 'shake' | 'rumours' | 'company' | 'scorecard' | 'leaderboard';
@@ -71,6 +72,7 @@ export default function App() {
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
   const running = sim.state?.running ?? false;
+  const music = useBackgroundMusic();
   const dialogue = useDialogue({
     frame: presentation.frame, previous: presentation.previous, playing: presentation.playing && presentation.epoch === sim.historyEpoch,
     epoch: sim.historyEpoch, speed: sim.speed, onDone: presentation.done, paused: menu !== null || playbackPaused, blocked: menu !== null,
@@ -192,6 +194,7 @@ export default function App() {
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
           <label><input type="checkbox" checked={dialogue.voices} onChange={e => dialogue.setVoices(e.target.checked)}/> Voices</label>
+          <label><input type="checkbox" checked={music.enabled} onChange={e => music.setEnabled(e.target.checked)}/> Background music</label>
           <label><input type="checkbox" checked={dialogue.showThoughts} onChange={e => dialogue.setShowThoughts(e.target.checked)}/> Show inner thoughts</label>
         </fieldset>
         <div className="diagnostics"><h3>Connection & engine</h3><dl><div><dt>Connection</dt><dd>{live ? 'Connected' : connectionText}</dd></div><div><dt>Engine</dt><dd>{diagnostic}</dd></div><div><dt>Seed</dt><dd>{state?.seed ?? '—'}</dd></div></dl>{sim.error && <p role="status" className="coral">{playerText(sim.error)}</p>}</div>

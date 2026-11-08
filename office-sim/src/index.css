@@ -188,7 +188,10 @@ button.feed-entry:hover, button.feed-entry:focus-visible { background: #40504488
 .contract-position { padding: 12px; border: 1px solid var(--border); }
 .story-task { border-left: 2px solid var(--border); padding-left: 12px; }
 .business-report { border-top: 2px solid var(--border); margin-top: 24px; padding-top: 20px; }
+.ceo-model-label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .business-report select, .structured-injection select { display: block; width: 100%; max-width: 100%; margin: 6px 0 12px; background: var(--panel); color: inherit; font: inherit; padding: 8px; border: 1px solid var(--border); }
+.ceo-model-select { display: block; width: 100%; max-width: 100%; margin: 6px 0 12px; background: #263d38; color: #f3d790; font: 13px 'VT323', monospace; padding: 7px 12px; border: 0; box-shadow: inset 0 -2px #152b2b; }
+.ceo-model-select:focus-visible { outline: 2px solid #ffe2a2; outline-offset: 3px; }
 .report-action, .structured-injection button { border: 1px solid var(--gold); padding: 9px 12px; justify-self: start; }
 .report-downloads { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .report-downloads a { color: var(--mint); font-size: 12px; text-decoration: underline; text-align: left; }

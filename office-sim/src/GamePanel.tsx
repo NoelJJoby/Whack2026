@@ -4,7 +4,7 @@ import { timeLabel } from './hudModel';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Sprite, type Person } from './people';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
-import { metricState, playerText, type Metric } from './hudModel';
+import { CEO_MODEL_OPTIONS, metricState, playerText, type Metric } from './hudModel';
 
 export function MenuPanel({ title, onClose, children, wide = false }: { wide?: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -33,6 +33,17 @@ export function MetricBar({ label, value, threshold }: { label: Metric; value: n
   const status = metricState(label, value, threshold);
   const displayValue = Number(value.toFixed(1));
   return <div className="metric"><div className="metric-heading"><span>{label}</span><strong>{displayValue}<small>/100</small></strong></div><div className="metric-track" role="meter" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} aria-valuetext={`${value} out of 100, ${status.text}`}><i className={`fill-${status.tone}`} style={{ width: `${value}%` }}/></div><span className={`metric-status ${status.tone}`}>{status.text}</span></div>;
+}
+
+/** Mock: the choice is local to this panel and is not sent to the server. */
+function CeoModelSelect() {
+  const [model, setModel] = useState<string>(CEO_MODEL_OPTIONS[0].id);
+  return <section className="employee-assignment ceo-model">
+    <label htmlFor="ceo-model" className="ceo-model-label">CEO model</label>
+    <select id="ceo-model" className="ceo-model-select" value={model} onChange={e => setModel(e.target.value)}>
+      {CEO_MODEL_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+    </select>
+  </section>;
 }
 
 export function EmployeePanel({ person, threshold, anchor, onClose, business, employeeId, cast = [] }: { business?: Business; employeeId?: string; cast?: AgentProfile[]; person: Person; threshold: number; anchor: HTMLElement | null; onClose: () => void }) {
@@ -69,6 +80,7 @@ export function EmployeePanel({ person, threshold, anchor, onClose, business, em
   return <section ref={panel} style={position} className="employee-panel" role="dialog" aria-labelledby="employee-name">
     <div className="employee-heading"><div className="portrait" style={{ borderColor: person.color }}><Sprite person={person} quit={person.quit}/></div><div><h2 id="employee-name">{person.name}</h2><p>{person.role}</p></div><button className="close" onClick={onClose} aria-label="Close employee details">×</button></div>
     <div className="employee-content" tabIndex={0} aria-label="Employee statements and metrics"><p className={`current-action ${person.quit ? 'coral' : 'mint'}`}><span className="status-dot"/>{person.action}</p>
+      {person.role === 'CEO' && <CeoModelSelect/>}
       {business && employeeId && <section className="employee-assignment"><h3>Current work</h3><p>Supervisor: {cast.find(p => p.id === business.positions[employeeId]?.supervisor)?.name ?? business.positions[employeeId]?.supervisor ?? 'Executive owner'}</p>{business.tasks.filter(t => t.owner === employeeId && !['done','cancelled'].includes(t.status)).map(t => <p key={t.id}>{t.title} · {t.status} · Due {timeLabel(t.deadline)} · Priority {t.priority}</p>)}</section>}
       <div className="employee-dialogue"><h3>Public statement</h3><blockquote>{person.says ? `“${playerText(person.says)}”` : 'No statement yet'}</blockquote><h3>Private thought</h3><blockquote className="private-thought">{person.thinks ? `“${playerText(person.thinks)}”` : 'No thought recorded'}</blockquote></div>
       <div className="employee-metrics"><MetricBar label="Stress" value={person.stress} threshold={threshold}/><MetricBar label="Burnout" value={person.burnout} threshold={threshold}/><MetricBar label="Trust in management" value={person.trust} threshold={threshold}/><MetricBar label="Workload" value={person.workload} threshold={threshold}/></div>
