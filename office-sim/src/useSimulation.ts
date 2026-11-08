@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
+import type { CompanyTaskSummary } from '../shared/companyTasks';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 import { playerText } from './hudModel';
 
@@ -48,6 +49,10 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 export interface Simulation {
   runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
   injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
+  /** The company's objectives this run (the CEO's task), newest last. */
+  companyTasks: CompanyTaskSummary[];
+  /** Give the CEO an objective; resolves to an error message, or null when accepted. */
+  submitObjective: (objective: string, deadlineTicks: number) => Promise<string | null>;
   historyEpoch: number;
   acknowledge: (tick: number) => Promise<boolean>;
   cast: AgentProfile[];
@@ -189,6 +194,16 @@ export function useSimulation(): Simulation {
   return {
     runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
     injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
+    companyTasks: snapshot?.company_tasks ?? [],
+    submitObjective: async (objective, deadlineTicks) => {
+      if (USE_MOCKS) return 'Mock data mode: the simulation is not connected.';
+      try {
+        // The route answers with a summary, not a snapshot, so refresh the snapshot after it.
+        await api('/sim/company-tasks', { method: 'POST', body: { run_id: currentRun.current ?? snapshot?.run_id, idempotency_key: crypto.randomUUID(), objective, deadline_ticks: deadlineTicks } });
+        applySnapshot(await api<SimResponse>('/sim/state'));
+        return null;
+      } catch (e) { return errorText(e); }
+    },
     historyEpoch,
     acknowledge,
     cast: cast?.agents ?? [],

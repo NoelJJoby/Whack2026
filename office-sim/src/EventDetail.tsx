@@ -1,22 +1,57 @@
-import type { Business } from '../shared/business';
+import type { Business, LedgerEntry } from '../shared/business';
 import type { BusinessEvent, EventState } from '../shared/events';
 import type { AgentProfile } from '../shared/types';
+import { SITUATION_STATUS, dueIn, planLabel, shortTitle } from './companyModel';
 import { timeLabel } from './hudModel';
+
 export const money = (amount: number, currency = 'GBP') => new Intl.NumberFormat('en-GB',{ style: 'currency', currency, maximumFractionDigits: 0 }).format(amount/100);
-export function EventDetail({ event, events, business, cast, onPerson }: { event: BusinessEvent; events: EventState; business: Business; cast: AgentProfile[]; onPerson?: (id: string) => void }) {
+
+const LEDGER_LABEL: Record<LedgerEntry['category'], string> = {
+  booking: 'Deal signed', revenue: 'Revenue earned', collection: 'Cash collected', payroll: 'Payroll',
+  infrastructure: 'Infrastructure cost', response: 'Cost of the response', saving: 'Saving',
+};
+const SOURCE: Record<BusinessEvent['origin'], string> = {
+  external: 'From outside the company', employee: 'Reported by an employee', management: 'Raised by management', injection: 'Added by you',
+};
+
+/** One business situation, told in order: what happened, what the CEO decided, who is on it, how it ended. */
+export function EventDetail({ event, events, business, cast, onPerson, tick }: { event: BusinessEvent; events: EventState; business: Business; cast: AgentProfile[]; onPerson?: (id: string) => void; tick?: number }) {
   const tasks = business.tasks.filter(t => event.tasks.includes(t.id));
   const contract = business.contracts.find(c => c.id === `contract-${event.id}`);
-  const name = (id: string | null) => cast.find(a => a.id === id)?.name ?? id ?? 'Unallocated';
+  const name = (id: string | null) => cast.find(a => a.id === id)?.name ?? id ?? 'no one yet';
+  const person = (id: string | null) => onPerson && id ? <button className="link" onClick={() => onPerson(id)}>{name(id)}</button> : name(id);
+  const evidence = events.evidence.filter(e => e.eventId === event.id);
+  const decisions = events.decisions.filter(d => d.choices.some(c => c.eventId === event.id));
+  const ledger = business.ledger.filter(l => event.ledger.includes(l.id));
+  const status = SITUATION_STATUS[event.status];
+  const open = ['open', 'responding', 'monitoring'].includes(event.status);
   return <article className="event-story" id={`story-${event.id}`}>
-    <h3>{event.headline}</h3>
-    <p className={event.valence === 'positive' ? 'mint' : 'coral'}>{event.valence === 'positive' ? 'Opportunity / success' : 'Problem / risk'} · {event.rarity} · {event.status}</p>
-    <p>{event.origin === 'injection' ? 'Scenario override' : event.origin === 'employee' ? 'Employee outcome' : 'External development'} · Owner: {name(event.owner)} · Due {timeLabel(event.deadline)}</p>
-    {contract && <div className="contract-position"><p>Contract signed: {money(contract.value,business.currency)} · {(contract.value/event.target*100).toFixed(1)}% of Sales’ Q{event.quarter} target</p><p>Frozen target: {money(event.target,business.currency)}</p><p>Earned: {money(contract.recognised,business.currency)} · Collected: {money(contract.collected,business.currency)}</p><p>Remaining contract value is a forecast until delivery passes acceptance.</p></div>}
-    {event.domain === 'security' && <p>Exposure: {event.detected ? 'Detected' : 'Awaiting detection'} · {event.contained ? 'Contained' : 'Containment outstanding'} · Recovery: {event.status === 'resolved' ? 'Verified' : 'Outstanding'}</p>}
-    <section><h4>Known evidence</h4>{events.evidence.filter(e => e.eventId === event.id).map(e => <p key={e.id}><time>{timeLabel(e.tick)}</time> {e.text} <small>{e.certainty}; source: {e.source}; delivered to {e.recipients.map(name).join(', ')}</small></p>)}</section>
-    <section><h4>CEO decision</h4>{events.decisions.filter(d => d.choices.some(c => c.eventId === event.id)).map(d => <div key={d.id}><p>{timeLabel(d.tick)} · {d.fallback ? `Rules / fallback: ${d.fallback}` : 'AI decision'}</p><p>{d.rationale}</p>{d.choices.filter(c => c.eventId === event.id).map(c => <p key={c.optionId}>Plan: {c.optionId.split(':').slice(1).join(' ')}. Budget {money(c.budget,business.currency)}. Priority {c.priority}. Acceptance: {c.acceptance}</p>)}</div>)}{!event.decisions.length && <p>Awaiting management decision.</p>}</section>
-    <section><h4>Ops assignments</h4>{tasks.map(t => <div className="story-task" key={t.id}><strong>{t.title}</strong><p>{onPerson && t.owner ? <button onClick={() => onPerson(t.owner!)}>{name(t.owner)}</button> : name(t.owner)} · {t.status} · Due {timeLabel(t.deadline)}</p><p>Progress {(t.effort-t.remaining).toFixed(1)} / {t.effort} · {t.reviewRequired ? t.reviewed ? 'Reviewed' : 'Review required' : 'Standard acceptance'}</p></div>)}</section>
-    <section><h4>Employee work and reports</h4>{business.work.filter(r => tasks.some(t => t.id === r.taskId)).map(r => <p key={r.id}>{timeLabel(r.tick)} · {name(r.agent)}: {r.outcome}. Progress {r.progress.toFixed(1)}.</p>)}</section>
-    <section><h4>Business outcome</h4><p>{event.outcome ?? 'Unresolved. Future benefits and obligations remain forecasts.'}</p><ol>{event.milestones.map((m,i) => <li key={i}>{timeLabel(m.tick)} · {m.text}</li>)}</ol>{business.ledger.filter(l => event.ledger.includes(l.id)).map(l => <p key={l.id}>{l.category}: {money(l.amount,business.currency)} · {timeLabel(l.tick)}</p>)}</section>
+    <p className="story-status"><span className={`chip ${status.tone}`}>{status.text}</span> {open ? `Due ${timeLabel(event.deadline)}${tick !== undefined ? ` · ${dueIn(event.deadline, tick)}` : ''}` : ''}</p>
+    <section><h4>What happened</h4>
+      <p>{evidence[0]?.text ?? event.headline}</p>
+      <small>{SOURCE[event.origin]}{evidence[0] ? ` · ${evidence[0].certainty === 'observed' ? 'confirmed' : evidence[0].certainty}` : ''} · {timeLabel(event.openedTick)}</small>
+      {event.domain === 'security' && <p>{event.detected ? 'Detected' : 'Not yet detected'} · {event.contained ? 'contained' : 'not contained yet'}</p>}
+    </section>
+    <section><h4>What the CEO decided</h4>
+      {decisions.length ? decisions.map(d => d.choices.filter(c => c.eventId === event.id).map(c => <div className="story-decision" key={`${d.id}-${c.optionId}`}>
+        <p><strong>{planLabel(c.optionId, id => name(id))}</strong>{c.budget > 0 && ` · budget ${money(c.budget, business.currency)}`} <small>{timeLabel(d.tick)}{d.fallback ? ' · rule-based' : ''}</small></p>
+        {d.rationale && <blockquote>{d.rationale}</blockquote>}
+        {c.communicate.length > 0 && <small>Told {c.communicate.map(id => id === 'public' ? 'the public' : name(id)).join(', ')}</small>}
+      </div>)) : <p>No decision yet.</p>}
+    </section>
+    {tasks.length > 0 && <section><h4>Who's working on it</h4>{tasks.map(t => <div className="story-task" key={t.id}>
+      <p><strong>{shortTitle(t.title).split(':')[0]}</strong> · {person(t.owner)}</p>
+      <div className="objective-bar" aria-hidden="true"><i style={{ width: `${Math.max(0, Math.min(1, 1 - t.remaining / t.effort)) * 100}%` }}/></div>
+      <small>{t.status === 'done' ? 'Done' : t.status === 'review' ? 'In review' : t.status === 'active' ? 'In progress' : t.status === 'blocked' ? 'Blocked' : t.status === 'paused' ? 'On hold' : 'Not started'} · due {timeLabel(t.deadline)}{t.reviewRequired ? ` · ${t.reviewed ? 'reviewed' : 'needs review'}` : ''}</small>
+    </div>)}</section>}
+    {contract && <section><h4>The contract</h4><p>Worth {money(contract.value, business.currency)} · earned {money(contract.recognised, business.currency)} · collected {money(contract.collected, business.currency)}</p></section>}
+    <section><h4>Result</h4>
+      <p>{event.outcome ?? 'Still open.'}</p>
+      {ledger.length > 0 && <dl className="story-money">{ledger.map(l => <div key={l.id}><dt>{LEDGER_LABEL[l.category]}</dt><dd>{money(l.amount, business.currency)}</dd></div>)}</dl>}
+    </section>
+    {(event.milestones.length > 0 || evidence.length > 1) && <details><summary>Full timeline</summary><ol>
+      {[...event.milestones.map(m => ({ tick: m.tick, text: m.text })), ...evidence.slice(1).map(e => ({ tick: e.tick, text: `${e.text} (${e.source})` }))]
+        .sort((a, b) => a.tick - b.tick).map((m, i) => <li key={i}><time>{timeLabel(m.tick)}</time> {m.text}</li>)}
+    </ol></details>}
   </article>;
 }

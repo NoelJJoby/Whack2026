@@ -42,7 +42,7 @@ export function DialogueBar({ state, line, speaker, auto, voices, showThoughts, 
   const innerStarted = !active || phase === 'inner' || phase === 'reading';
   const announcement = `${shown.speaker.name}: “${shown.line.publicLine}”${thoughts ? ` Thinks: ${shown.line.inner}` : ''}`;
   return <section className={`dialogue-bar ${shown.line.kind === 'narrator' ? 'narrator' : ''} ${open ? 'open' : ''}`} aria-label="Dialogue" data-emotion={shown.line.emotion}>
-    <div className="dialogue-plate"><strong>{shown.speaker.name}</strong>{shown.speaker.team && <small>· {shown.speaker.team}</small>}{shown.line.quit && <span className="dialogue-tag">Left the company</span>}</div>
+    <div className="dialogue-plate"><strong>{shown.speaker.name}</strong>{shown.speaker.team && <small>· {shown.speaker.team}</small>}{shown.line.quit && <span className="dialogue-tag">Left the company</span>}{shown.line.company && <span className="dialogue-tag objective">Objective</span>}</div>
     <div className="dialogue-box">
       {shown.line.kind === 'agent' && <Portrait look={shown.speaker.look} mood={moodFor(shown.line.stress)}/>}
       <div className="dialogue-text" onClick={onNext} aria-hidden="true">

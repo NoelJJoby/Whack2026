@@ -2,6 +2,8 @@
 import { DEFAULT_PARAMS } from '../server/params';
 import type { TickEvent, TickFrame } from '../shared/api';
 import { businessNotices, playerText, type BusinessNotice } from './hudModel';
+import type { CompanyActivity } from '../shared/companyTasks';
+import { isSpoken, shortenQuoted } from './companyModel';
 import type { Action } from '../shared/types';
 import { emotionFor, type Emotion } from './voice/emotion';
 
@@ -21,6 +23,8 @@ export interface DialogueLine {
   kind: 'agent' | 'narrator';
   announcement?: TickEvent;
   business?: BusinessNotice;
+  /** An exchange about the CEO's objective, spoken by the employee who made it. */
+  company?: CompanyActivity;
   report?: boolean;
   calendarDay?: number;
   key: string;
@@ -68,12 +72,30 @@ export function buildRound(frame: TickFrame, prev?: TickFrame): DialogueLine[] {
   return [
     ...frame.events.map((event, i) => narrator(event.text, `announcement-${i}`, { announcement: event })),
     ...businessNotices(frame, prev).map(n => narrator(`${n.label}: ${n.text}`, n.key.slice(`${frame.tick}-`.length), { business: n })),
+    ...companyLines(frame),
     ...agents,
     ...(frame.day_report ? [
       ...frame.day_report.lines.map((text, i) => narrator(i === 0 ? `Day ${frame.day_report!.day} report. ${text}` : text, `report-${i}`, { report: true })),
       ...frame.day_report.fillerDays.map(day => narrator(`Day ${day}: a routine day; nothing happened.`, `filler-${day}`, { report: true, calendarDay: day })),
     ] : []),
   ];
+}
+
+/** Exchanges besides the brief and the result spoken per round; the rest stay in the wire and the Objective tab. */
+export const COMPANY_LINE_CAP = 3;
+
+/** The objective's spoken exchanges this hour, in the order they happened, as the speaker's own lines. */
+export function companyLines(frame: TickFrame): DialogueLine[] {
+  let others = 0;
+  return [...(frame.company_activity ?? [])].sort((a, b) => a.round - b.round || a.order - b.order).filter(a => {
+    if (!isSpoken(a)) return false;
+    if (a.kind === 'brief' || a.kind === 'outcome') return true;
+    return ++others <= COMPANY_LINE_CAP;
+  }).map(a => {
+    const stress = frame.state.agents[a.actor!]?.stress ?? 0;
+    return { kind: 'agent' as const, key: `${frame.tick}-company-${a.id}`, tick: frame.tick, agent: a.actor!, publicLine: playerText(shortenQuoted(a.dialogue)),
+      inner: '', quit: false, action: 'work' as Action, emotion: 'normal' as Emotion, tier: 0, stress, stressDelta: 0, company: a };
+  });
 }
 
 /** Delay before revealing the character after `shown` characters are visible. */

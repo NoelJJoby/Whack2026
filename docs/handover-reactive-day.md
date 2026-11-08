@@ -180,7 +180,7 @@ Then:
 - **Narrator lines:** `DialogueLine.kind: 'agent' | 'narrator'`, with no portrait or babble, styled in `DialogueBar.tsx`.
   - Shared announcements and shocks play first.
   - The 23:00 frame ends with the daily report, then one line per filler day. The clock (`Workday.tsx`) steps to each filler day as its line plays, replacing Theo's 250 ms timer.
-- **Presence** (`design/Office.tsx`, `index.css`):
+- **Presence** (`three/Agent3D.tsx`, `three/office3d.css`):
   - During a frame's round, show presence as of the start of that hour.
   - When the round ends, leavers grey out ("Left for the day") and stayers show "Working late".
   - At 23:00 everyone greys out before the report lines.
