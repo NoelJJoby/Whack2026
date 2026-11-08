@@ -13,6 +13,8 @@ export const PUNCTUATION_PAUSE_MS = 100;
 /** Auto mode's reading delay, counted from the end of typing. */
 export const AUTO_BASE_MS = 1500;
 export const AUTO_PER_WORD_MS = 250;
+/** Maximum future rounds kept for dialogue before their lines remain in the Office wire only. */
+export const MAX_WAITING_ROUNDS = 2;
 /** A stress change this large ranks above an ordinary line. */
 export const STRESS_JUMP = 10;
 
@@ -67,18 +69,27 @@ export function readingDelay(line: DialogueLine, showThoughts: boolean): number 
   return AUTO_BASE_MS + AUTO_PER_WORD_MS * text.split(/\s+/).filter(Boolean).length;
 }
 
+/** Presentation uses the simulation's selected speed for every dialogue timer. */
+export const playbackDelay = (delay: number, speed: number) => delay / speed;
+
 export type Phase = 'idle' | 'public' | 'inner' | 'reading';
 export interface PlayerState {
   round: DialogueLine[];
+  /** Tick currently presented by the HUD, office scene and dialogue. */
+  presentedTick: number;
   index: number;
   phase: Phase;
   shownPublic: number;
   shownInner: number;
-  /** The newest round that arrived while this one was still playing. */
+  /** The next round waiting to be presented (kept for the dialogue bar badge). */
   pending: DialogueLine[] | null;
+  /** Ordered future rounds. Unlike the old pending slot, none are overwritten. */
+  queued: Array<{ tick: number; lines: DialogueLine[] }>;
+  /** Rounds removed from dialogue during catch-up; their records remain in the Office wire. */
+  skippedTicks: number[];
 }
 export type PlayerAction =
-  | { type: 'round'; lines: DialogueLine[] }
+  | { type: 'round'; tick?: number; lines: DialogueLine[] }
   /** Reveal one more character. */
   | { type: 'type'; showThoughts: boolean }
   /** Finish the current line's typing at once. */
@@ -88,18 +99,32 @@ export type PlayerAction =
   /** Auto's reading delay elapsed. */
   | { type: 'auto' }
   | { type: 'skip' }
-  | { type: 'clear' };
+  /** Resume a reconnect/history replacement at its newest completed frame. */
+  | { type: 'resume'; tick: number }
+  | { type: 'clear'; tick?: number };
 
-export const idle: PlayerState = { round: [], index: 0, phase: 'idle', shownPublic: 0, shownInner: 0, pending: null };
+export const idle: PlayerState = { round: [], presentedTick: 0, index: 0, phase: 'idle', shownPublic: 0, shownInner: 0, pending: null, queued: [], skippedTicks: [] };
 
-const start = (lines: DialogueLine[] | null): PlayerState => lines?.length
-  ? { round: lines, index: 0, phase: 'public', shownPublic: 0, shownInner: 0, pending: null } : idle;
+const withPending = (state: Omit<PlayerState, 'pending'>): PlayerState => ({ ...state, pending: state.queued[0]?.lines ?? null });
 
-function advance(state: PlayerState, auto: boolean): PlayerState {
-  // Auto on: a newer round replaces the rest of this one. Auto off: it waits for the end.
-  if (state.pending && auto) return start(state.pending);
+/** Starts the first queued speaking round; empty rounds advance the presentation clock immediately. */
+function startNext(state: PlayerState): PlayerState {
+  let queued = state.queued;
+  let presentedTick = state.presentedTick;
+  while (queued.length) {
+    const [next, ...rest] = queued;
+    queued = rest;
+    presentedTick = Math.max(presentedTick, next.tick);
+    if (next.lines.length) {
+      return withPending({ ...state, round: next.lines, presentedTick, index: 0, phase: 'public', shownPublic: 0, shownInner: 0, queued });
+    }
+  }
+  return withPending({ ...state, round: [], presentedTick, index: 0, phase: 'idle', shownPublic: 0, shownInner: 0, queued });
+}
+
+function advance(state: PlayerState): PlayerState {
   if (state.index + 1 < state.round.length) return { ...state, index: state.index + 1, phase: 'public', shownPublic: 0, shownInner: 0 };
-  return start(state.pending);
+  return startNext(state);
 }
 
 export function current(state: PlayerState): DialogueLine | null {
@@ -109,11 +134,18 @@ export function current(state: PlayerState): DialogueLine | null {
 export function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
   const line = current(state);
   switch (action.type) {
-    case 'clear': return idle;
-    case 'round':
-      if (!action.lines.length) return state;
-      return state.phase === 'idle' ? start(action.lines) : { ...state, pending: action.lines };
-    case 'skip': return start(state.pending);
+    case 'clear': return action.tick ? { ...idle, presentedTick: action.tick } : idle;
+    case 'resume': return { ...idle, presentedTick: Math.max(state.presentedTick, action.tick) };
+    case 'round': {
+      const tick = action.tick ?? action.lines[0]?.tick ?? state.presentedTick;
+      if (tick <= state.presentedTick || state.queued.some(round => round.tick === tick)) return state;
+      const queued = [...state.queued, { tick, lines: action.lines }].sort((a, b) => a.tick - b.tick);
+      const skippedTicks = [...state.skippedTicks];
+      while (queued.length > MAX_WAITING_ROUNDS) skippedTicks.push(queued.shift()!.tick);
+      const next = withPending({ ...state, queued, skippedTicks });
+      return next.phase === 'idle' ? startNext(next) : next;
+    }
+    case 'skip': return startNext(state);
     case 'type':
       if (!line) return state;
       if (state.phase === 'public') {
@@ -130,9 +162,9 @@ export function playerReducer(state: PlayerState, action: PlayerAction): PlayerS
       if (!line || state.phase === 'reading') return state;
       return { ...state, phase: 'reading', shownPublic: line.publicLine.length, shownInner: line.inner.length };
     case 'next':
-      if (state.phase === 'idle') return start(state.pending);
+      if (state.phase === 'idle') return startNext(state);
       if (state.phase !== 'reading') return playerReducer(state, { type: 'complete' });
-      return advance(state, action.auto);
-    case 'auto': return state.phase === 'reading' ? advance(state, true) : state;
+      return advance(state);
+    case 'auto': return state.phase === 'reading' ? advance(state) : state;
   }
 }

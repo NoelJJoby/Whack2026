@@ -11,7 +11,7 @@ export function Workday({ tick, speed, running, started, complete, disabled, onS
 
   useEffect(() => {
     setFillerOffset(0);
-    if (fillerDays.length === 0 || !started) return;
+    if (fillerDays.length === 0 || !started || !running) return;
     // Smoothly roll through the 2 routine filler days after 17:00 so each month counts Days 1..30.
     const stepMs = Math.max(60, Math.round(250 / (speed || 1)));
     const t1 = setTimeout(() => setFillerOffset(1), stepMs);
@@ -20,7 +20,7 @@ export function Workday({ tick, speed, running, started, complete, disabled, onS
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [tick, speed, started, fillerDays.length]);
+  }, [tick, speed, started, running, fillerDays.length]);
 
   const displayedDay = fillerOffset > 0 && fillerDays[fillerOffset - 1] ? fillerDays[fillerOffset - 1] : dayOfMonth;
 

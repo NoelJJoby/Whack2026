@@ -77,6 +77,13 @@ export interface Simulation {
 
 const errorText = (e: unknown) => playerText(e instanceof Error ? e.message : 'Request failed. Try again.');
 
+/** SSE history can be replayed after reconnect; retain one frame per tick in presentation order. */
+export function orderedFrames(frames: TickFrame[]): TickFrame[] {
+  const byTick = new Map<number, TickFrame>();
+  for (const frame of frames) byTick.set(frame.tick, frame);
+  return [...byTick.values()].sort((a, b) => a.tick - b.tick);
+}
+
 export function useSimulation(): Simulation {
   const [cast, setCast] = useState<CastResponse | null>(USE_MOCKS ? mockCast : null);
   const [snapshot, setSnapshot] = useState<SimResponse | null>(USE_MOCKS ? mockResponse : null);
@@ -104,8 +111,9 @@ export function useSimulation(): Simulation {
   const replaceHistory = useCallback(
     (next: HistoryResponse) => {
       if (next.state.tick === 0) announcements.current?.clear();
-      lastTick.current = next.history.at(-1)?.tick ?? 0;
-      setHistory(next.history);
+      const history = orderedFrames(next.history);
+      lastTick.current = history.at(-1)?.tick ?? 0;
+      setHistory(history);
       applySnapshot(next, true);
     },
     [applySnapshot],
@@ -135,7 +143,7 @@ export function useSimulation(): Simulation {
         const { frame } = message;
         if (frame.tick === lastTick.current + 1) {
           lastTick.current = frame.tick;
-          setHistory((h) => [...h, frame]);
+          setHistory((h) => orderedFrames([...h, frame]));
           announcements.current?.receive(frame.events);
           applySnapshot(message);
         } else if (frame.tick > lastTick.current) {

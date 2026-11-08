@@ -5,7 +5,7 @@ import { scheduleEvents } from './events/scheduler';
 import { managementPhase } from './management';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
-import { isOvertime } from '../shared/workday';
+import { isOvertime, TICKS_PER_DAY } from '../shared/workday';
 import type { AgentRuntimeState, AgentState, EventType, SimulationState, TickRecord } from '../shared/types';
 import { availableActions, decide } from './bias';
 import { claimReach } from './claims';
@@ -354,7 +354,7 @@ export async function runTick(
       // Finite assigned capacity sets load; normal off-shift recovery makes healthy operation sustainable.
       const allocation = w.business.tasks.filter(task => task.owner === id && task.status === 'active').reduce((n,task) => n+task.allocated,0);
       a.baselineWorkload = Math.min(100,35+allocation*20);
-      if (t % 5 === 0) applyDelta(a,{ stress: -8, burnout: -4, trust_mgmt: 1 },params);
+      if (t % TICKS_PER_DAY === 0) applyDelta(a,{ stress: -8, burnout: -4, trust_mgmt: 1 },params);
     }
     w.business.idle += Math.max(0,w.business.available-w.business.used);
     updateLifecycle(w);

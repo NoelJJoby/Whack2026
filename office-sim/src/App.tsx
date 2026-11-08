@@ -1,6 +1,6 @@
 import { Events } from './Events';
 import { BusinessReport } from './BusinessReport';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Office, lookFor, type Person } from './design/Office';
 import { Workday } from './Workday';
 import { Controls } from './Controls';
@@ -29,18 +29,36 @@ function ToolIcon({ tool }: { tool: Tool }) {
 }
 export default function App() {
   const sim = useSimulation();
-  const { state, history, cast } = sim;
+  const { state: latestState, history, cast } = sim;
   const [selected, setSelected] = useState<string | null>(null);
   const [highlight, setHighlight] = useState<string[]>([]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [truth, setTruth] = useState(false);
+  const [showSyncDebug, setShowSyncDebug] = useState(false);
   const returnFocus = useRef<HTMLElement | null>(null);
+  const live = sim.connection === 'live';
+  const backendComplete = (latestState?.tick ?? 0) >= sim.maxTicks;
+  const running = latestState?.running ?? false;
+  const dialogue = useDialogue({
+    history, paused: menu !== null, running, speed: sim.speed,
+    // Not gated on `busy`: the first hour can arrive while the Start request is still in flight.
+    setPlaying: play => {
+      if (!live || backendComplete || !latestState?.started || play === running) return false;
+      void sim.togglePlay();
+      return true;
+    },
+    onSpace: () => toggle(),
+    archetypeOf: id => cast.find(p => p.id === id)?.archetype,
+  });
+  const presentedFrame = history.find(frame => frame.tick === dialogue.presentedTick);
+  const state = presentedFrame?.state ?? (dialogue.presentedTick === 0 ? latestState : null);
+  const visibleHistory = useMemo(() => history.filter(frame => frame.tick <= dialogue.presentedTick), [history, dialogue.presentedTick]);
   const latest = useMemo(() => {
     const records: Record<string, (typeof history)[number]['records'][number]> = {};
-    for (const frame of history) for (const record of frame.records) records[record.agent] = record;
+    for (const frame of visibleHistory) for (const record of frame.records) records[record.agent] = record;
     return records;
-  }, [history]);
+  }, [visibleHistory]);
   const people: Person[] = useMemo(() => cast.map((profile, index) => {
     const s = state?.agents[profile.id];
     const record = latest[profile.id];
@@ -50,34 +68,35 @@ export default function App() {
       says: record?.public_line ?? '', thinks: record?.inner_monologue ?? '', quit: s?.status === 'quit' || s?.status === 'laid_off',
     };
   }), [cast, latest, state]);
-  const entries = useMemo(() => feedEntries(history), [history]);
+  const entries = useMemo(() => feedEntries(visibleHistory), [visibleHistory]);
+  const announcement = sim.announcement && visibleHistory.some(frame => frame.events.some(event =>
+    event.type === sim.announcement!.event.type && event.text === sim.announcement!.event.text,
+  )) ? sim.announcement : null;
   const queued: FeedEntry[] = (state?.queue ?? []).map((type, index) => ({
     key: `queued-${index}`, label: 'Queued', time: timeLabel((state?.tick ?? 0) + 1),
     text: state?.queue_text?.[index] ?? type, ids: [],
   })).reverse();
   const wireEntries = [...queued, ...entries];
   const person = people.find(p => p.id === selected);
-  const hour = state?.tick ?? 0;
+  const hour = dialogue.presentedTick;
   const complete = hour >= sim.maxTicks;
-  const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
-  const running = state?.running ?? false;
-  const dialogue = useDialogue({
-    history, paused: menu !== null,
-    // Not gated on `busy`: the first hour can arrive while the Start request is still in flight.
-    setPlaying: play => {
-      if (!live || complete || !state?.started || play === running) return false;
-      void sim.togglePlay();
-      return true;
-    },
-    onSpace: () => toggle(),
-    archetypeOf: id => cast.find(p => p.id === id)?.archetype,
-  });
   function toggle() {
-    if (disabled || complete) return;
+    if (disabled || backendComplete) return;
     dialogue.releaseHold();
-    void (state?.started ? sim.togglePlay() : sim.start());
+    void (latestState?.started ? sim.togglePlay() : sim.start());
   }
+  useEffect(() => {
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'Backquote' || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      event.preventDefault();
+      setShowSyncDebug(value => !value);
+    };
+    window.addEventListener('keydown', down);
+    return () => window.removeEventListener('keydown', down);
+  }, []);
   const speaking = dialogue.line?.agent ?? null;
   const speaker: Speaker | null = useMemo(() => {
     if (!speaking) return null;
@@ -96,12 +115,15 @@ export default function App() {
   const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
   return <main className="game-window" aria-label="The Daily Grind">
     <Office people={people} selected={selected} onSelect={select} highlight={highlight} speaking={menu === null ? speaking : null}/>
-    <StockPrice history={history} current={sim.price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
-    <Workday tick={hour} speed={sim.speed} running={state?.running ?? false} started={state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
+    <StockPrice history={visibleHistory} current={presentedFrame?.price ?? null} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
+    <Workday tick={hour} speed={sim.speed} running={running} started={latestState?.started ?? false} complete={complete} disabled={disabled || backendComplete} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
     {sim.phase && <div className="management-phase" role="status">{sim.phase}…</div>}
     {sim.storageError && <div className="storage-error" role="alert">{sim.storageError}</div>}
-    {sim.announcement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(sim.announcement.event.text)}</p></div><button className="close" onClick={sim.dismissAnnouncement} aria-label="Dismiss announcement">×</button></section>}
+    {showSyncDebug && <aside className="sync-debug" aria-label="Time synchronization debug">
+      <strong>SYNC DEBUG</strong><span>presented: {dialogue.presentedTick} · {timeLabel(dialogue.presentedTick)}</span><span>latest: {latestState?.tick ?? 0}</span><span>line: {dialogue.line?.tick ?? '—'}</span><span>waiting: {dialogue.waitingRounds}</span><span>lag: {Math.max(0, (latestState?.tick ?? 0) - dialogue.presentedTick)}</span>
+    </aside>}
+    {announcement && <section className="announcement" aria-label="New announcement"><div role="status"><span>Announcement</span><p>{playerText(announcement.event.text)}</p></div><button className="close" onClick={sim.dismissAnnouncement} aria-label="Dismiss announcement">×</button></section>}
     <aside className={`office-wire ${expanded ? 'expanded' : ''}`} aria-label="Office wire">
       <div className="wire-heading"><h2>Office wire</h2><button onClick={() => openMenu('events')}>Business events</button><button aria-label={expanded ? 'Collapse Office wire history' : 'Expand Office wire history'} aria-expanded={expanded} aria-controls="wire-history" onClick={() => { setExpanded(!expanded); setHighlight([]); }}>{expanded ? 'Collapse' : 'History'}<span aria-hidden="true">{expanded ? ' −' : ' +'}</span></button></div>
       {(complete || sim.reportStatus === 'pending') && <button className="report-entry" onClick={() => openMenu('events')}>Business report · {sim.reportStatus === 'pending' ? 'Preparing…' : sim.reportStatus === 'factual_fallback' ? 'Factual report ready' : 'View report'}</button>}
@@ -119,8 +141,8 @@ export default function App() {
     <nav className="game-tools" aria-label="Office tools">{(['simulation', 'shake', 'rumours', 'company'] as Tool[]).map(id => <button key={id} onClick={() => openMenu(id)} aria-label={MENU_LABEL[id]} title={MENU_LABEL[id]} aria-haspopup="dialog" aria-expanded={menu === id}><ToolIcon tool={id}/></button>)}</nav>
     {sim.error && !menu && <button className="error-notice" onClick={() => openMenu('simulation')}><span role="status">{playerText(sim.error)}</span> <span>Open Simulation</span></button>}
     {menu && <MenuPanel title={MENU_LABEL[menu]} onClose={() => setMenu(null)}>
-      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || complete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={history} current={sim.price} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={history} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
-        <Controls running={state?.running} complete={complete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
+      {menu === 'events' ? <><Events state={state} cast={cast} onPerson={select}/><BusinessReport runId={sim.runId} tick={hour} status={sim.reportStatus} cast={cast}/></> : menu === 'shake' ? <EventComposer onInject={sim.inject} onInjectCustom={sim.injectCustom} onInjectBusiness={sim.injectBusiness} label={live ? 'Connected' : 'Offline'} error={sim.error} disabled={disabled || backendComplete} nextTick={hour + 1}/> : menu === 'stock' ? <StockChart history={visibleHistory} current={presentedFrame?.price ?? null} initialPrice={sim.initialPrice}/> : menu === 'company' || menu === 'rumours' ? <Company history={visibleHistory} view={menu === 'company' ? 'wellbeing' : 'reach'} truth={truth} onTruth={setTruth}/> : <>
+        <Controls running={running} complete={backendComplete} disabled={disabled} tick={hour} runLength={sim.maxTicks} runLengths={RUN_LENGTHS} onRunLength={value => void sim.setRunLength(value)} onStep={() => void sim.step()} onReset={() => void sim.reset()} onNewSeed={() => void sim.newSeed()}/>
         <fieldset className="dialogue-settings"><legend>Dialogue</legend>
           <label><input type="checkbox" checked={dialogue.auto} onChange={e => dialogue.setAuto(e.target.checked)}/> Auto advance</label>
           <label><input type="checkbox" checked={dialogue.voices} onChange={e => dialogue.setVoices(e.target.checked)}/> Voices</label>

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { workdayTime } from './Workday';
+import { clockAt } from '../server/llm/clock';
 import { StockPrice, stockSeries } from './StockPrice';
 import { mockHistory } from './mocks';
 
@@ -15,6 +16,12 @@ test('workday maps 5 ticks per day across 30-day calendar months (with 2 routine
   assert.deepEqual(workdayTime(50), { quarter: 1, month: 1, week: 2, day: 10, dayOfMonth: 28, fillerDays: [29, 30], hour: 17, progress: 100 });
   assert.deepEqual(workdayTime(51), { quarter: 1, month: 2, week: 3, day: 11, dayOfMonth: 1, fillerDays: [], hour: 9, progress: 20 });
   assert.deepEqual(workdayTime(150), { quarter: 1, month: 3, week: 6, day: 30, dayOfMonth: 28, fillerDays: [29, 30], hour: 17, progress: 100 });
+});
+test('frontend HUD and backend prompt clock share the same tick conversion through day rollover', () => {
+  for (const tick of [0, 1, 5, 6, 50, 51, 150]) {
+    const frontend = workdayTime(tick);
+    assert.deepEqual(clockAt(tick), { day: frontend.day, hour: frontend.hour }, `tick ${tick}`);
+  }
 });
 test('stock indicator starts at 100 and projects backend prices without mutating history', () => {
   assert.deepEqual(stockSeries([]), [{ tick: 0, price: 100 }]);
