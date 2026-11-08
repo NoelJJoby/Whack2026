@@ -1,13 +1,13 @@
 import { z } from 'zod';
-import type { CompanyActivity, CompanyTask, CompanyTaskStatus, CompanyTaskSummary, SubmitCompanyTask } from '../../shared/companyTasks';
+import { companyObjectiveLimits, isCompanyObjectiveText, type CompanyActivity, type CompanyTask, type CompanyTaskStatus, type CompanyTaskSummary, type SubmitCompanyTask } from '../../shared/companyTasks';
 import type { World } from '../engine-types';
 import { companyLimits } from './config';
 
 export const submissionSchema = z.object({
   run_id: z.string().min(1).max(80),
   idempotency_key: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9._-]+$/),
-  objective: z.string().trim().min(8).max(companyLimits.objectiveLength)
-    .refine(s => /\p{L}/u.test(s) && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(s), 'Enter a hypothetical objective in plain text'),
+  objective: z.string().trim().min(companyObjectiveLimits.minLength).max(companyObjectiveLimits.maxLength)
+    .refine(isCompanyObjectiveText, 'Enter a hypothetical objective in plain text'),
   deadline_ticks: z.number().int().min(companyLimits.minDeadline).max(companyLimits.maxDeadline).optional(),
 }).strict() satisfies z.ZodType<SubmitCompanyTask>;
 
