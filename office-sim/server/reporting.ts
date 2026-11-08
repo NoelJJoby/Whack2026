@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { BusinessReport, ReportFacts, ReportSection } from '../shared/reports';
+import type { BusinessReport, ReportFacts, ReportSection, QuarterSummary } from '../shared/reports';
 import { RunStore, digest } from './run-store';
 import { createMessageClient } from './llm/client';
 import { parseReply } from './llm/parse';
@@ -9,6 +9,8 @@ import { llmConfig } from './llm/config';
 import type { EngineTickLog, World } from './engine-types';
 import { productivity } from '../shared/scorecard';
 import { DEFAULT_PARAMS } from './params';
+import { buildQuarterSummaries, quarterOf, unavailableRecap } from './quarter-summary';
+import { buildQuarterRecapPrompt, validateQuarterRecap } from './llm/quarter-recap-prompt';
 
 /** Report-card metric ids, in display order; shared with the client's report card. */
 export function scorecardMetrics(txs: Array<{ kind: string; tick: number; world: World; audit: unknown }>): Record<string, number> {
@@ -53,7 +55,7 @@ export function factsFor(store: RunStore, runId: string): ReportFacts {
   for (const l of b.ledger) evidence.push({ id: l.id, tick: l.tick, text: `Ledger posting: ${l.category}; source ${l.source}; exact minor-unit amount ${l.amount}.` });
   const roots = w.eventState.cases.filter(e => e.rootId === e.id);
   const currentQuarter = b.quarters.at(-1)!;
-  const quarterRevenue = b.ledger.filter(l => l.category === 'revenue' && Math.floor((l.tick-1)/150)+1 === currentQuarter.quarter).reduce((n,l) => n+l.amount,0);
+  const quarterRevenue = b.ledger.filter(l => l.category === 'revenue' && quarterOf(l.tick) === currentQuarter.quarter).reduce((n,l) => n+l.amount,0);
   const metrics = { startingCash: first.business.cash, cash: b.cash, bookings: b.bookings, revenue: b.revenue, receivables: b.receivables, costs: b.costs,
     target: currentQuarter.salesTarget, quarterRevenue, targetAttainment: quarterRevenue/currentQuarter.salesTarget*100,
     positiveRoots: roots.filter(e => e.valence === 'positive').length, negativeRoots: roots.filter(e => e.valence === 'negative').length,
@@ -93,10 +95,98 @@ export function factualSections(f: ReportFacts): ReportSection[] {
     { title: 'Recommendations', observations: [{ text: RECOMMENDATIONS[0], evidenceIds: ['run-metrics'], metricIds: ['remainingTasks'], assessment: 'recommendation' }] },
   ];
 }
-export type ReportProvider = (prompt: string) => Promise<unknown>;
+export type ReportProvider = (prompt: string, signal?: AbortSignal) => Promise<unknown>;
 export class Reporting {
   private jobs = new Map<string,Promise<BusinessReport>>();
-  constructor(private store: RunStore, private provider?: ReportProvider) {}
+  private recapJobs = new Map<string, Promise<BusinessReport>>();
+  constructor(private store: RunStore, private provider?: ReportProvider, private recapProvider?: ReportProvider, private recapBudgetMs = 10_000) {}
+  private summary(runId: string): QuarterSummary | undefined {
+    const journal = this.store.read(runId);
+    // Legacy archives may have only opening/final snapshots: never invent a price peak.
+    if (journal.filter(tx => tx.kind === 'tick').length !== journal.at(-1)!.tick) return undefined;
+    return { schemaVersion: 1, promptVersion: 1, quarters: buildQuarterSummaries(runId, journal).map(facts => ({ facts, recap: unavailableRecap() })) };
+  }
+  private nextVersion(runId: string) { return Math.max(0,...this.store.reports(runId).map(r => r.version))+1; }
+  /** Save usable facts before starting any network work. Completion never awaits this job. */
+  completeRun(runId: string, onUpdate: () => void = () => {}): Promise<BusinessReport> {
+    const facts = factsFor(this.store,runId);
+    const existing = [...this.store.reports(runId)].reverse().find(r => r.cutoff === facts.cutoff && r.facts.hash === facts.hash && r.quarterSummary);
+    if (existing) return this.recapJobs.get(this.recapKey(existing)) ?? Promise.resolve(existing);
+    const report: BusinessReport = { id: randomUUID(), runId, version: this.nextVersion(runId), cutoff: facts.cutoff, tick: facts.tick,
+      generatedAt: new Date().toISOString(), status: 'factual_fallback', limitation: 'Detailed report from committed evidence. AI quarter assessments are labelled separately.',
+      facts, sections: factualSections(facts), schemaVersion: 1, promptVersion: 1, model: null, telemetry: [], quarterSummary: this.summary(runId) };
+    if (!report.quarterSummary) throw new Error('Missing quarter tick evidence');
+    const enabled = Boolean(this.recapProvider || process.env.ANTHROPIC_API_KEY?.trim());
+    if (enabled) report.quarterSummary!.quarters.forEach(q => { q.recap.status = 'pending'; });
+    this.store.saveReport(report);
+    return enabled ? this.analyse(report,onUpdate) : Promise.resolve(report);
+  }
+  private recapKey(report: BusinessReport) {
+    return `${report.runId}:${report.quarterSummary!.quarters.map(q => `${q.facts.quarter}:${q.facts.cutoff}:${q.facts.hash}`).join(':')}:recap-v1`;
+  }
+  retryRecap(runId: string, onUpdate: () => void = () => {}): Promise<BusinessReport> {
+    const base = this.store.reports(runId).at(-1);
+    if (!base?.quarterSummary) return this.completeRun(runId,onUpdate);
+    const key = this.recapKey(base);
+    if (this.recapJobs.has(key)) return this.recapJobs.get(key)!;
+    const pending = structuredClone(base);
+    pending.id = randomUUID(); pending.version = this.nextVersion(runId); pending.generatedAt = new Date().toISOString();
+    pending.quarterSummary!.recoveryAttempted = false;
+    pending.quarterSummary!.quarters.forEach(q => { q.recap = { ...unavailableRecap(), status: 'pending' }; });
+    this.store.saveReport(pending); onUpdate();
+    return this.analyse(pending,onUpdate);
+  }
+  recoverPending(onUpdate: () => void = () => {}) {
+    for (const run of this.store.list()) {
+      const report = this.store.reports(run.id).at(-1);
+      if (!report?.quarterSummary?.quarters.some(q => q.recap.status === 'pending')) continue;
+      if (report.quarterSummary.recoveryAttempted) {
+        const failed = structuredClone(report);
+        failed.id = randomUUID(); failed.version = this.nextVersion(run.id);
+        failed.quarterSummary!.quarters.forEach(q => { if (q.recap.status === 'pending') q.recap = unavailableRecap(); });
+        this.store.saveReport(failed);
+      } else {
+        report.quarterSummary.recoveryAttempted = true;
+        this.store.saveReport(report);
+        void this.analyse(report,onUpdate).catch(onUpdate);
+      }
+    }
+  }
+  private analyse(base: BusinessReport, onUpdate: () => void): Promise<BusinessReport> {
+    const key = this.recapKey(base);
+    if (this.recapJobs.has(key)) return this.recapJobs.get(key)!;
+    const job = (async () => {
+      const summary = structuredClone(base.quarterSummary!);
+      const telemetry: unknown[] = [];
+      const controller = new AbortController();
+      const deadline = performance.now()+this.recapBudgetMs;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_,reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('Recap deadline')); },this.recapBudgetMs); });
+      let provider = this.recapProvider;
+      if (!provider && process.env.ANTHROPIC_API_KEY?.trim()) {
+        const request = createMessageClient({ timeoutMs: this.recapBudgetMs, onMetrics: m => telemetry.push(m) });
+        provider = async (prompt,signal) => { const result = await request(prompt,{ purpose: 'quarter_recap', maxTokens: 2400, signal }); return result ? parseReply(result.message) : null; };
+      }
+      try {
+        for (const q of summary.quarters) {
+          if (q.recap.status !== 'pending') continue;
+          q.recap = unavailableRecap();
+          if (!provider) continue;
+          for (let attempt = 0; attempt < 2 && performance.now() < deadline; attempt++) {
+            try {
+              q.recap = validateQuarterRecap(await Promise.race([provider(buildQuarterRecapPrompt(q.facts),controller.signal),timeout]),q.facts);
+              break;
+            } catch { telemetry.push({ quarter: q.facts.quarter, attempt: attempt+1, outcome: 'invalid_or_unavailable' }); }
+          }
+        }
+      } finally { clearTimeout(timer); controller.abort(); }
+      const latest = [...this.store.reports(base.runId)].reverse().find(r => r.cutoff === base.cutoff && r.facts.hash === base.facts.hash) ?? base;
+      const report = { ...latest, id: randomUUID(), version: this.nextVersion(base.runId), generatedAt: new Date().toISOString(), quarterSummary: summary,
+        model: summary.quarters.some(q => q.recap.status === 'ready') ? llmConfig.model : null, telemetry: [...base.telemetry,...telemetry] };
+      this.store.saveReport(report); onUpdate(); return report;
+    })().finally(() => this.recapJobs.delete(key));
+    this.recapJobs.set(key,job); return job;
+  }
   generate(runId: string, regenerate = false, factualOnly = false): Promise<BusinessReport> {
     const facts = factsFor(this.store,runId);
     const key = `${runId}:${facts.cutoff}:${facts.hash}`;
@@ -105,10 +195,11 @@ export class Reporting {
     const current = [...existing].reverse().find(r => r.cutoff === facts.cutoff && r.facts.hash === facts.hash);
     if (current && !regenerate) return Promise.resolve(current);
     const version = Math.max(0,...existing.map(r => r.version))+1;
-    const job = this.build(facts,version,factualOnly).then(report => { this.store.saveReport(report); return report; }).finally(() => this.jobs.delete(key));
+    const quarterSummary = current?.quarterSummary ?? this.summary(runId);
+    const job = this.build(facts,version,factualOnly).then(report => { report.quarterSummary = [...this.store.reports(runId)].reverse().find(r => r.cutoff === facts.cutoff && r.facts.hash === facts.hash)?.quarterSummary ?? quarterSummary; report.version = this.nextVersion(runId); this.store.saveReport(report); return report; }).finally(() => this.jobs.delete(key));
     this.jobs.set(key,job); return job;
   }
-  pending(runId: string) { return [...this.jobs.keys()].some(k => k.startsWith(`${runId}:`)); }
+  pending(runId: string) { return [...this.jobs.keys(),...this.recapJobs.keys()].some(k => k.startsWith(`${runId}:`)); }
   private async build(facts: ReportFacts, version: number, factualOnly: boolean): Promise<BusinessReport> {
     let sections: ReportSection[] | null = null; const telemetry: unknown[] = [];
     let provider = factualOnly ? undefined : this.provider;
@@ -127,6 +218,17 @@ export class Reporting {
 }
 export function reportMarkdown(report: BusinessReport) {
   return [`# Business report · ${report.runId}`, `Cutoff: tick ${report.tick}, sequence ${report.cutoff}. ${report.limitation ?? ''}`,
+    ...(report.quarterSummary?.quarters.flatMap(({ facts: f, recap: r }) => [
+      `## ${f.partial ? 'Run summary · partial quarter' : 'Quarter complete'} · Q${f.quarter}`,
+      `Highest Stock Price: ${f.peak.price} · ${f.peak.label} · ${f.metrics.peakReturnPercent}% from opening. [quarter-${f.quarter}-price]`,
+      ...Object.entries(f.metrics).map(([k,v]) => `- ${k}: ${v}`),
+      `AI recap: ${r.status}. ${r.summary}`,
+      ...([['Best Move',r.bestMove],['Biggest Blunder',r.biggestBlunder]] as const).map(([label,h]) => {
+        const c = f.candidates.find(c => c.id === h?.candidateId);
+        return h ? `${label} (AI assessment): ${h.title}. ${c?.actor.role}: ${c?.actor.name}. ${c?.action}. ${h.explanation} [${h.evidenceIds.join(', ')}]` : `${label}: ${label === 'Best Move' ? 'No clear standout move' : 'No clear blunder recorded'}`;
+      }), ...r.lessons.map(l => `Next quarter: ${l.text} [${l.evidenceIds.join(', ')}]`),
+      ...f.evidence.map(e => `[${e.id}] ${e.text}`),
+    ]) ?? []),
     ...Object.entries(report.facts.metrics).map(([key,value]) => `- ${key}: ${value}`),
     ...report.sections.flatMap(s => [`\n## ${s.title}`, ...s.observations.map(o => `${o.assessment === 'recommendation' ? 'Recommendation: ' : ''}${o.text} [${o.evidenceIds.join(', ')}]`)])].join('\n\n');
 }

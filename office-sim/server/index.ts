@@ -186,9 +186,9 @@ export class OfficeSimManager {
   private generation = 0;
   private presented = 0;
 
-  constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider } = {}) {
+  constructor(directory = process.env.SIM_STORE_DIR ?? (process.env.NODE_TEST_CONTEXT ? mkdtempSync(join(tmpdir(),'office-sim-test-')) : fileURLToPath(new URL('../.runtime/runs',import.meta.url))), private readonly overrides: { provider?: TurnProvider; reportProvider?: import('./reporting').ReportProvider; recapProvider?: import('./reporting').ReportProvider } = {}) {
     this.store = new RunStore(directory);
-    this.reporting = new Reporting(this.store,this.overrides.reportProvider);
+    this.reporting = new Reporting(this.store,this.overrides.reportProvider,this.overrides.recapProvider);
     const latest = this.store.list().find(r => r.status === 'active' || r.status === 'complete');
     this.init(latest?.seed ?? this.seed,latest?.id);
     if (latest) {
@@ -196,6 +196,7 @@ export class OfficeSimManager {
       if (audit?.settings) { this.maxTicks = audit.settings.maxTicks; this.priceFeedback = audit.settings.priceFeedback; this.speed = audit.settings.speed; }
       else if (latest.status === 'complete') this.maxTicks = latest.tick;
     }
+    this.reporting.recoverPending(() => this.emitState());
   }
 
   get listenerCount() {
@@ -436,10 +437,11 @@ export class OfficeSimManager {
     const status = this.store.metadata(this.runId).status;
     if (status !== 'complete') this.store.commit(this.runId,this.world,'archive',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
   }
+  publishReportUpdate(runId: string) { if (this.runId === runId) this.emitState(); }
   private complete() {
     const id = this.runId;
     this.store.commit(id,this.world,'complete',{ settings: { maxTicks: this.maxTicks, priceFeedback: this.priceFeedback, speed: this.speed } });
-    void this.reporting.generate(id, false, isFastForward(this.speed)).then(() => { if (this.runId === id) this.emitState(); }).catch(() => {
+    void this.reporting.completeRun(id, () => { if (this.runId === id) this.emitState(); }).then(() => { if (this.runId === id) this.emitState(); }).catch(() => {
       if (this.runId === id) { this.storageError = 'Report could not be saved. Committed run evidence remains available for retry.'; this.emitState(); }
     });
     this.emitState();
@@ -749,6 +751,10 @@ app.post<{ Params: { id: string } }>('/api/runs/:id/report', async (request,repl
   const input = z.object({ regenerate: z.boolean().optional() }).strict().safeParse(request.body ?? {});
   if (!input.success) throw new ApiFailure(400,'invalid_report_request','Expected an optional regenerate boolean.');
   return sim.reporting.generate(request.params.id,input.data.regenerate ?? false);
+});
+app.post<{ Params: { id: string } }>('/api/runs/:id/recap', async (request,reply) => {
+  try { sim.store.metadata(request.params.id); } catch { return reply.status(404).send(errorBody('run_not_found','Run is unavailable.')); }
+  return sim.reporting.retryRecap(request.params.id, () => { sim.publishReportUpdate(request.params.id); });
 });
 app.get<{ Params: { id: string; reportId: string }; Querystring: { format?: string } }>('/api/runs/:id/reports/:reportId', async (request,reply) => {
   const report = sim.store.reports(request.params.id).find(r => r.id === request.params.reportId);

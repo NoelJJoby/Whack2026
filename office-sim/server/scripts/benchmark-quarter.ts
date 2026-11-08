@@ -8,6 +8,8 @@ import { TICKS_PER_QUARTER } from '../../shared/workday';
 // Isolate both the imported API singleton and the measured run from real run history.
 const directory = mkdtempSync(join(tmpdir(), 'quarter-benchmark-'));
 process.env.SIM_STORE_DIR = join(directory, 'singleton');
+// Benchmark simulation and factual reporting independently of the optional AI recap.
+process.env.ANTHROPIC_API_KEY = '';
 const { OfficeSimManager } = await import('../index');
 let calls = 0;
 const manager = new OfficeSimManager(join(directory, 'run'), {

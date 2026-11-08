@@ -34,12 +34,12 @@ function Staff({ state, cast, onPerson }: { state: SimulationState | null; cast:
 }
 
 /** The Business panel: the CEO's objective, business situations, money and staff, and the run report. */
-export function BusinessPage({ state, history, tick, cast, onPerson, initialCase, companyTasks, onSubmitObjective, objectiveDisabled, runId, reportStatus }: {
+export function BusinessPage({ state, history, tick, cast, onPerson, initialCase, initialTab, companyTasks, onSubmitObjective, objectiveDisabled, runId, reportStatus }: {
   state: SimulationState | null; history: TickFrame[]; tick: number; cast: AgentProfile[]; onPerson: (id: string) => void;
-  initialCase: string | null; companyTasks: CompanyTaskSummary[]; onSubmitObjective: (objective: string, deadline: number) => Promise<string | null>;
+  initialTab?: Tab; initialCase: string | null; companyTasks: CompanyTaskSummary[]; onSubmitObjective: (objective: string, deadline: number) => Promise<string | null>;
   objectiveDisabled: boolean; runId?: string; reportStatus?: string;
 }) {
-  const [tab, setTab] = useState<Tab>(initialCase ? 'situations' : 'objective');
+  const [tab, setTab] = useState<Tab>(initialCase ? 'situations' : initialTab ?? 'objective');
   const active = companyTasks.find(s => isActiveObjective(s.status));
   const open = (state?.eventState?.cases ?? []).filter(isOpenSituation).length;
   const tabs: Array<[Tab, string]> = [['objective', active ? 'Objective ●' : 'Objective'], ['situations', open ? `Situations (${open})` : 'Situations'], ['staff', 'Finances & staff'], ['report', 'Report']];

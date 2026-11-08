@@ -6,7 +6,7 @@ import { Sprite, type Person } from './people';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { metricState, playerText, type Metric } from './hudModel';
 
-export function MenuPanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function MenuPanel({ title, onClose, children, wide = false }: { wide?: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -14,9 +14,9 @@ export function MenuPanel({ title, onClose, children }: { title: string; onClose
     element.showModal();
     return () => { element.close(); if (previous?.isConnected) previous.focus(); };
   }, []);
-  return <dialog ref={dialog} className="tool-panel" aria-labelledby="tool-title" onKeyDown={event => {
+  return <dialog ref={dialog} className={`tool-panel${wide ? ' quarter-panel' : ''}`} aria-labelledby="tool-title" onKeyDown={event => {
     if (event.key !== 'Tab') return;
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), summary, a[href], [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), summary, a[href], [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
     const first = items[0];
     const last = items.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }

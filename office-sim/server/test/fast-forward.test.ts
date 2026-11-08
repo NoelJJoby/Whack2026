@@ -73,3 +73,31 @@ test('fast-forward preserves the rules simulation and produces a factual report 
     assert.ok(FAST_QUARTER_MS < 120_000);
   } finally { fast.pause(); regular.pause(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('a full fast-forward quarter starts one independent recap and saves it after a new run starts', async () => {
+  const dir = mkdtempSync(join(tmpdir(),'fast-quarter-recap-'));
+  let calls = 0, release!: (value: unknown) => void;
+  const manager = new OfficeSimManager(dir,{
+    recapProvider: async () => { calls++; return new Promise(resolve => { release = resolve; }); },
+  });
+  try {
+    manager.reseed(42); manager.setSpeed({ speed: FAST_FORWARD_SPEED });
+    for (let i = 0; i < TICKS_PER_QUARTER; i++) await manager.step();
+    const id = manager.response().run_id!;
+    assert.equal(manager.response().state.tick,240); assert.equal(calls,1);
+    const initial = manager.store.reports(id)[0];
+    assert.equal(initial.quarterSummary!.quarters[0].recap.status,'pending');
+    assert.equal(initial.quarterSummary!.quarters[0].facts.partial,false);
+    assert.equal(initial.quarterSummary!.quarters[0].facts.peak.price,Math.max(...manager.store.read(id).map(tx => tx.world.price.price)));
+    void manager.reporting.completeRun(id); assert.equal(calls,1);
+    manager.reset(); const newId = manager.response().run_id!; assert.notEqual(newId,id);
+    release({ schemaVersion: 1,kind: 'quarter_recap',summary: 'Operating results reflect completed work and outstanding obligations.',bestMove: null,biggestBlunder: null,lessons: [] });
+    await waitFor(() => !manager.reporting.pending(id));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(manager.store.reports(id).at(-1)!.quarterSummary!.quarters[0].recap.status,'ready');
+    assert.equal(manager.response().run_id,newId); assert.equal(manager.response().report_status,'none');
+    const restored = new OfficeSimManager(dir);
+    assert.deepEqual(restored.store.reports(id).at(-1)!.quarterSummary!.quarters[0].facts,initial.quarterSummary!.quarters[0].facts);
+    assert.equal(calls,1);
+  } finally { manager.pause(); rmSync(dir,{ recursive: true,force: true }); }
+});
