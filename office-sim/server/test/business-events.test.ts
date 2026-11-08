@@ -192,6 +192,51 @@ describe('causal management and information boundaries', () => {
   });
 });
 
+describe('management gaps: no manager, invalid decisions, scheduling', () => {
+  it('fails an open case at once when neither CEO nor ops is active, with a recorded reason', async () => {
+    let w = world(); w.agents.ceo.status = 'quit'; w.agents.ops.status = 'quit';
+    const e = openEvent(w,'delivery_concern');
+    w = await advance(w,1);
+    const after = w.eventState.cases.find(c => c.id === e.id)!;
+    assert.equal(after.status,'failed'); assert.match(after.outcome!,/No active CEO or operations manager/);
+    assert.ok(w.eventState.diagnostics.some(d => d.reason === 'no_active_management' && d.tick === w.tick));
+    assert.equal(w.eventState.decisions.length,0);
+  });
+  it('rejects an invalid CEO response through the real path, retries once, then falls back to rules', async () => {
+    let w = world(); const e = openEvent(w,'delivery_concern');
+    let calls = 0;
+    const provider: TurnProvider = async (a,ctx) => {
+      if (ctx.management?.kind === 'ceo') { calls++; return { schemaVersion: 1, kind: 'ceo', revision: w.tick, choices: [{ eventId: e.id, optionId: 'not-a-real-option' }], rationale: 'x' }; }
+      return createStubProvider(42)(a,ctx);
+    };
+    w = await advance(w,1,provider);
+    assert.equal(calls,2);
+    const decision = w.eventState.decisions.find(d => d.kind === 'ceo')!;
+    assert.equal(decision.fallback,'role_response_unavailable');
+    assert.ok(w.eventState.diagnostics.some(d => d.phase === 'ceo' && d.reason !== 'validated' && d.reason !== 'role_response_unavailable'));
+  });
+  it('rejects a stale-revision CEO response and never applies its choices', async () => {
+    let w = world(); const e = openEvent(w,'delivery_concern');
+    const provider: TurnProvider = async (a,ctx) => {
+      if (ctx.management?.kind === 'ceo') { const v = fallbackCeo(ctx.management); v.revision = w.tick - 1; return v; }
+      return createStubProvider(42)(a,ctx);
+    };
+    w = await advance(w,1,provider);
+    assert.ok(w.eventState.diagnostics.some(d => d.phase === 'ceo' && /Stale executive revision/.test(d.reason)));
+    assert.equal(w.eventState.decisions.find(d => d.kind === 'ceo')!.fallback,'role_response_unavailable');
+    assert.ok(w.eventState.cases.find(c => c.id === e.id)!.decisions.length > 0);
+  });
+  it('the scheduler opens a rare event at its seeded arrival tick, and every skip is logged with a reason', async () => {
+    const seed = 11; const billboardConfig = { ...config, billboard: true };
+    let w = world(seed); const due = w.eventState.scheduler.rare.due;
+    while (w.tick < due + 1) w = (await runTick(w, createStubProvider(seed), billboardConfig)).world;
+    const opened = w.eventState.cases.filter(c => c.rarity === 'rare' && c.openedTick >= due);
+    const skipped = w.eventState.scheduling.filter(s => s.rarity === 'rare' && s.tick >= due && s.reason !== 'scheduled');
+    assert.ok(opened.length > 0 || skipped.length > 0, 'the rare slot must either open a case or log why it did not');
+    assert.ok(w.eventState.scheduling.every(s => typeof s.reason === 'string' && s.reason.length > 0));
+  });
+});
+
 describe('employee vocabulary and validation', () => {
   it('preserves two task identities, rejects stale/foreign work and restricts reporting to known evidence', async () => {
     const raw = { proposals:[{ action:'work', weight:1,task_id:'a',assignment_version:1 },{ action:'work',weight:2,task_id:'b',assignment_version:2 }], public_line:'Ready.',inner_monologue:'Ready.',beliefs:{} };
