@@ -5,36 +5,77 @@ This project provides the integration shell for an office simulation backend and
 ## Run locally
 
 1. Copy `.env.example` to `.env`.
-2. Install dependencies:
+2. Add In required API Keys
+3. Install dependencies:
    ```bash
    pnpm install
    ```
-3. Run the automated test suite:
+4. Run the automated test suite:
    ```bash
    pnpm test
    ```
-4. Start the backend:
+5. Start the backend:
    ```bash
    PORT=3010 ./node_modules/.bin/tsx server/index.ts
    ```
-5. Start the frontend:
+6. Start the frontend:
    ```bash
    ./node_modules/.bin/vite --host 0.0.0.0 --port 5173
    ```
-6. Open the app at http://localhost:5173.
+7. Open the app at http://localhost:5173.
 
-## API surface
+## Demo run
 
-The Fastify server runs the real simulation engine. Types for every request, response and stream message are in `office-sim/shared/api.ts`.
+All commands run from `office-sim/`.
 
-- `GET /api/health`: `{ ok, mode, mode_reason }`
-- `GET /api/sim/cast`: the agent profiles
-- `GET /api/sim/state`: `{ mode, mode_reason, state }`
-- `GET /api/sim/history`: the same, plus `history` (one frame per tick)
-- `POST /api/sim/start`, `/play`, `/pause`, `/reset`, `/step`
-- `POST /api/sim/settings` with `{ "max_ticks": 1-128 }`: the run length (default 16, can't go below the current tick, kept across reset). Every response includes `max_ticks`.
-- `POST /api/sim/inject` with `{ "type": EventType, "is_true"?: boolean }`. Applied at the start of the next tick.
-- `GET /api/events`: SSE. It sends `history` on connect (and after reset), then a `tick` message per tick and a `state` message on play, pause or inject.
+- **Development** (hot reload): `pnpm dev`, then open http://localhost:5173. The API runs on port 3010.
+- **Production** (one server, built UI): `pnpm build && pnpm start`, then open http://localhost:3010.
+
+Settings:
+
+- `ANTHROPIC_API_KEY` in `office-sim/.env` runs the CEO and ops through the LLM. Without it the app runs on rules, and the HUD badge says so.
+- `SIM_SEED=<number>` replays a fixed company. Without it, each server start picks a new random seed, so set it for a repeatable run.
+
+## API Reference
+
+### Health & Core State
+- **`GET /api/health`**: `{ ok, mode, mode_reason }`
+- **`GET /api/sim/cast`**: Returns agent profiles
+- **`GET /api/sim/state`**: `{ mode, mode_reason, state }`
+- **`GET /api/sim/history`**: Same as state, plus `history` (one frame per tick)
+
+### Simulation Controls & Settings
+- **`POST /api/sim/start`**: Start the simulation
+- **`POST /api/sim/play`**: Resume the simulation
+- **`POST /api/sim/pause`**: Pause the simulation
+- **`POST /api/sim/reset`**: Reset the simulation state
+- **`POST /api/sim/step`**: Advance simulation by one step
+- **`POST /api/sim/new-seed`** with optional `{ seed?: number }`: Update or randomize the seed
+- **`POST /api/sim/speed`**: Adjust simulation speed
+- **`POST /api/sim/settings`** with `{ "max_ticks": 1-128 }`: Set run length (default 16, can't go below current tick, kept across reset). Every response includes `max_ticks`.
+
+### Tasks, Events & Injections
+- **`POST /api/sim/presented`**: Acknowledge a presented item
+- **`GET /api/sim/company-tasks`**: List all company tasks
+- **`POST /api/sim/company-tasks`**: Submit a new company task (body limit 12,288 bytes; returns 202 if created, 200 otherwise)
+- **`GET /api/sim/company-tasks/:id`**: Get specific company task details
+- **`POST /api/sim/inject`**: Inject a general event at the start of the next tick
+- **`POST /api/sim/inject-business`**: Inject a business event
+- **`POST /api/sim/inject-custom`** with body limit 4,096 bytes: Inject a custom event
+- **`POST /api/sim/ceo-resign`**: Trigger CEO resignation
+- **`GET /api/event-catalog`**: Retrieve the event catalog (`CATALOG`)
+
+### Runs & Reports
+- **`GET /api/runs`**: List of all runs
+- **`GET /api/runs/:id`** with optional `?cutoff=<number>`: Get run metadata, world state at cutoff, reports, and pending items
+- **`GET /api/runs/:id/history`**: Get raw transaction history for a specific run
+- **`POST /api/runs/:id/report`** with optional `{ regenerate?: boolean }`: Generate or regenerate a business report
+- **`POST /api/runs/:id/recap`**: Retry recap generation
+- **`GET /api/runs/:id/reports/:reportId`** with optional `?format=markdown`: Download specific report as JSON or Markdown attachment
+
+### Real-Time Streaming
+- **`GET /api/events`**: Server-Sent Events (SSE) stream. Sends `history` on connect (and after reset), then a `tick` message per tick and a `state` message on play, pause, or inject. Includes a periodic heartbeat ping.
+
 
 Errors always look like `{ "error": { "code", "message" } }`, with status 400 (invalid input), 404 or 409 (`sim_running`, `tick_in_progress`, `run_complete`).
 
@@ -50,35 +91,15 @@ The UI shows the active mode in the top bar
 
 `VITE_USE_MOCKS=true ./node_modules/.bin/vite` renders the design-preview mock data without a server. It's off by default.
 
-## Integration checklist
-
-- Confirm the server starts cleanly on port 3010.
-- Confirm the client can connect to `/api/events`.
-- Confirm start/play/pause/reset/step routes mutate the singleton state.
-- Confirm inject accepts a valid event type and truth flag, and rejects anything else with a 400.
-- Confirm state payloads and feed history remain consistent across updates.
 
 ## Backend share price
 
 The existing main-branch stock ticker/chart now consumes the deterministic backend price through current snapshots and SSE history. No extra chart, controls or styling are added. Price combines fixed-seat output, decaying news, six-tick false-claim corrections and an isolated seeded noise stream. Optional feedback defaults off; select it before starting via `/api/sim/settings` with `{ "price_feedback": true }`, or CLI `--price-feedback`.
 
-See [backend implementation and measured acceptance](docs/share-price-implementation.md) for API details, commands, ten-seed results and the remaining calm-volatility tuning target.
-
 ## Overtime
 
 Each tick represents one hour ending at the displayed time. Hours ending at 18:00 through 24:00 are overtime; the next simulated day resumes at 08:00 (the overnight interval is skipped). Every active employee receives +2 stress and +1 burnout per overtime hour, in addition to their chosen action, before passive updates and the quit check. Values are clamped to the existing 0–100 limits. The separate `overwork` action means taking on extra work and retains its own effects; the long-hours policy remains a separate workload and trust shock. The model assumes everyone active is still on shift, even when their action is an interview or other non-work activity. There is currently no leaving-early or overnight recovery mechanic. These values are initial tuning parameters in `server/params.ts`.
 
-## Demo run
-
-All commands run from `office-sim/`.
-
-- **Development** (hot reload): `pnpm dev`, then open http://localhost:5173. The API runs on port 3010.
-- **Production** (one server, built UI): `pnpm build && pnpm start`, then open http://localhost:3010.
-
-Settings:
-
-- `ANTHROPIC_API_KEY` in `office-sim/.env` runs the CEO and ops through the LLM. Without it the app runs on rules, and the HUD badge says so.
-- `SIM_SEED=<number>` replays a fixed company. Without it, each server start picks a new random seed, so set it for a repeatable run.
 
 ### Two-minute quarter
 
@@ -92,12 +113,3 @@ Run `pnpm benchmark:quarter` from `office-sim` to time a complete paced quarter,
 
 Measured locally on 2026-11-08: seed 42 completed all 240 ticks and the factual report in **96.81 seconds**, with no viewer acknowledgements or AI calls. The production build and all 319 automated tests passed. Browser verification covered the fast-forward control, live clock/price updates and pause.
 
-## Autonomous business demo
-
-Run `pnpm dev` from `office-sim` and open http://localhost:5173. The API runs on port 3010. For a built single-server deployment, use `pnpm build && pnpm start` (port 3010 by default). See [implementation and run notes](docs/events-implementation-status.md) for event stories, durable reports, configuration and measured verification.
-
-## Company objectives
-
-Submit a hypothetical objective to `POST /api/sim/company-tasks` using the current run ID and an idempotency key. Inspect its brief, work, findings, and outcome through the company-task API and committed SSE frames.
-
-From `office-sim`, run `node --import tsx server/scripts/company-task-demo.ts` for a rules-mode launch scenario. See the [implementation plan and release notes](docs/task-driven-company-implementation-plan.md#release-implementation-and-verification) for the request body, route details, and verification results.
