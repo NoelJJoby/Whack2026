@@ -8,7 +8,7 @@
 :root { font-family: 'VT323', monospace; color: #e3e5d5; background: #273f50; font-synthesis: none; --mint: #8abca2; --gold: #d7b66c; --coral: #e8947f; --muted: #b5bfb0; --border: #536457; --panel: #1d2928; }
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; width: 100%; height: 100%; }
-body { overflow: hidden; }
+body { overflow: hidden; font-size: 18px; }
 button, input { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
 button { border: 0; background: transparent; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .45; }
@@ -47,7 +47,7 @@ h3 { font-size: 14px; font-weight: 500; }
   background: #ab9368
 }
 .roof span {
-  font: 9px 'VT323', monospace;
+  font: 11px 'VT323', monospace;
   color: #d5c198;
   letter-spacing: 1px
 }
@@ -65,7 +65,7 @@ h3 { font-size: 14px; font-weight: 500; }
   position: absolute;
   left: 10px;
   top: 7px;
-  font: 8px 'VT323', monospace;
+  font: 10px 'VT323', monospace;
   letter-spacing: 1px;
   color: #d0b88d;
   z-index: 1
@@ -183,7 +183,7 @@ h3 { font-size: 14px; font-weight: 500; }
   top: 45px;
   left: 50%;
   transform: translateX(-50%);
-  font: 12px 'VT323', monospace;
+  font: 14px 'VT323', monospace;
   color: #ede7cf;
   white-space: nowrap;
   background: #28312be8;
@@ -296,7 +296,7 @@ h3 { font-size: 14px; font-weight: 500; }
   position: absolute;
   top: -15px;
   left: -6px;
-  font: 8px 'VT323', monospace;
+  font: 10px 'VT323', monospace;
   background: #86a98a;
   color: #233b33;
   white-space: nowrap;
@@ -322,12 +322,12 @@ h3 { font-size: 14px; font-weight: 500; }
 .building { left: 10%; right: 9%; top: 29%; bottom: var(--dialogue-reserve); display: flex; flex-direction: column; border-width: 8px; box-shadow: 0 0 0 3px #a18a60, 10px 10px 0 #17242a80; }
 .roof { height: 30px; flex: 0 0 30px; }
 .floor { height: auto; flex: 1; min-height: 0; border-bottom-width: 12px; }
-.floor-label { font-size: 11px; top: 11px; left: 14px; letter-spacing: .5px; }
+.floor-label { font-size: 13px; top: 11px; left: 14px; letter-spacing: .5px; }
 .station { bottom: 24px; height: 78px; width: 70px; }
 .desk { transform: scale(1.4); transform-origin: bottom center; }
 .person { left: 20px; bottom: 2px; min-width: 44px; min-height: 48px; display: grid; place-items: center; transition: none; }
 .person .sprite { width: 44px; height: 66px; }
-.name-label { top: calc(100% - 2px); font-size: 15px; padding: 2px 6px; }
+.name-label { top: calc(100% - 2px); font-size: 17px; padding: 2px 6px; }
 .person:hover .name-label, .person:focus-visible .name-label { color: #ffe2a2; }
 .selected .person:before { top: -16px; left: 16px; }
 .departed .person { transform: none; opacity: .65; }
@@ -337,7 +337,7 @@ h3 { font-size: 14px; font-weight: 500; }
 .wall-picture { transform: scale(1.4); transform-origin: top; top: 36px; }
 .bookcase, .plant, .cooler, .exit { transform: scale(1.4); transform-origin: bottom; }
 .clock-hud { position: absolute; top: 17px; left: 50%; transform: translateX(-50%); width: max-content; padding: 0 12px 10px; background: #243b4499; text-shadow: 1px 1px #20313a; }
-.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+.clock-readout { display: flex; gap: 14px; align-items: center; justify-content: center; font-size: 16px; font-variant-numeric: tabular-nums; }
 .clock-readout strong { font: 32px 'VT323', monospace; color: #f2e6bf; font-variant-numeric: tabular-nums; }
 .playback-status { color: #d2d9c6; font-size: 12px; min-width: 48px; }
 .playback { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 6px; }
