@@ -54,3 +54,9 @@ export function engineLabel(mode: string | null, reason: string | null): string 
   if (reason === 'llm_failed') return 'Rules mode · LLM unavailable';
   return 'Rules mode';
 }
+
+const STATUS_LABEL: Record<string, string> = { open: 'Awaiting decision', responding: 'Responding', monitoring: 'Monitoring', resolved: 'Resolved', failed: 'Failed', cancelled: 'Cancelled', superseded: 'Superseded' };
+/** Plain-language case status. A failed case says why in its outcome, so the label stays short. */
+export function caseStatusLabel(status: string): string {
+  return STATUS_LABEL[status] ?? status;
+}

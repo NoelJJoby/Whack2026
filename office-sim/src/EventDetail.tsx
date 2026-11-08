@@ -1,7 +1,7 @@
 import type { Business } from '../shared/business';
 import type { BusinessEvent, EventState } from '../shared/events';
 import type { AgentProfile } from '../shared/types';
-import { timeLabel } from './hudModel';
+import { caseStatusLabel, timeLabel } from './hudModel';
 export const money = (amount: number, currency = 'GBP') => new Intl.NumberFormat('en-GB',{ style: 'currency', currency, maximumFractionDigits: 0 }).format(amount/100);
 export function EventDetail({ event, events, business, cast, onPerson }: { event: BusinessEvent; events: EventState; business: Business; cast: AgentProfile[]; onPerson?: (id: string) => void }) {
   const tasks = business.tasks.filter(t => event.tasks.includes(t.id));
@@ -9,7 +9,7 @@ export function EventDetail({ event, events, business, cast, onPerson }: { event
   const name = (id: string | null) => cast.find(a => a.id === id)?.name ?? id ?? 'Unallocated';
   return <article className="event-story" id={`story-${event.id}`}>
     <h3>{event.headline}</h3>
-    <p className={event.valence === 'positive' ? 'mint' : 'coral'}>{event.valence === 'positive' ? 'Opportunity / success' : 'Problem / risk'} · {event.rarity} · {event.status}</p>
+    <p className={event.valence === 'positive' ? 'mint' : 'coral'}>{event.valence === 'positive' ? 'Opportunity / success' : 'Problem / risk'} · {event.rarity} · {caseStatusLabel(event.status)}</p>
     <p>{event.origin === 'injection' ? 'Scenario override' : event.origin === 'employee' ? 'Employee outcome' : 'External development'} · Owner: {name(event.owner)} · Due {timeLabel(event.deadline)}</p>
     {contract && <div className="contract-position"><p>Contract signed: {money(contract.value,business.currency)} · {(contract.value/event.target*100).toFixed(1)}% of Sales’ Q{event.quarter} target</p><p>Frozen target: {money(event.target,business.currency)}</p><p>Earned: {money(contract.recognised,business.currency)} · Collected: {money(contract.collected,business.currency)}</p><p>Remaining contract value is a forecast until delivery passes acceptance.</p></div>}
     {event.domain === 'security' && <p>Exposure: {event.detected ? 'Detected' : 'Awaiting detection'} · {event.contained ? 'Contained' : 'Containment outstanding'} · Recovery: {event.status === 'resolved' ? 'Verified' : 'Outstanding'}</p>}
