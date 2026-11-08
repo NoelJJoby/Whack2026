@@ -124,6 +124,8 @@ export interface LlmOutput {
 }
 
 export interface SimulationState {
+  /** "CEO resign" collapse: the CEO left and the office is panicking since this tick. */
+  collapse?: { since: number };
   business?: import('./business').Business;
   eventState?: import('./events').EventState;
   tick: number;

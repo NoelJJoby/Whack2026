@@ -1,4 +1,5 @@
 import { activeCompanyTask, newCompanyTask, submissionSchema, taskSummary } from './company-tasks/state';
+import { ceoId, collapseOf, everyoneGone, scheduleCollapse } from './collapse';
 import { announcementsAt } from './announcements';
 import type { CompanyTaskDetail, CompanyTaskList } from '../shared/companyTasks';
 import type { EngineTickLog } from './engine-types';
@@ -426,6 +427,8 @@ export class OfficeSimManager {
       this.running = false; this.phase = null; this.clearTimer(); this.emitState(); throw error;
     }
     this.world = result.world; this.phase = null; this.storageError = null;
+    // After the CEO resigns, the run ends the hour the last person walks out.
+    if (everyoneGone(this.world)) this.maxTicks = this.world.tick;
     const inbox = foldInbox(this.inbox, result.taskEvents ?? [], result.world, DEFAULT_PARAMS);
     this.inbox = inbox.state;
     const records = enrichRecords(result);
@@ -620,6 +623,23 @@ export class OfficeSimManager {
     return this.response();
   }
 
+  /**
+   * "CEO resign" button: next hour the CEO walks out and everyone hears it; the office then panics,
+   * burns out and resigns until nobody is left, which ends the run (and opens the quarter report).
+   */
+  ceoResign() {
+    this.assertNotComplete();
+    if (!this.started && this.world.tick === 0) throw new ApiFailure(409, 'not_started', 'Start the run before the CEO can resign.');
+    if (collapseOf(this.world)) throw new ApiFailure(409, 'already_resigned', 'The CEO has already resigned.');
+    const ceo = ceoId(this.world);
+    if (!ceo || this.world.agents[ceo].status !== 'active') throw new ApiFailure(409, 'no_ceo', 'There is no CEO left to resign.');
+    const next = scheduleCollapse(queueEvent(this.world, { type: 'new_management', isTrue: true, custom: true,
+      text: `${this.world.agents[ceo].profile.name}, the CEO, has resigned effective immediately. Nobody knows who is in charge.` }));
+    this.persistInput(next, { ceo_resign: true });
+    this.feed.push('Queued: the CEO resigns');
+    return this.play();
+  }
+
   injectBusiness(body: unknown) {
     const parsed = z.object({ template_id: z.string(), is_true: z.boolean().optional() }).strict().safeParse(body);
     if (!parsed.success || !CATALOG.some(d => d.id === parsed.data.template_id)) throw new ApiFailure(400,'invalid_event','Choose a known structured business template.');
@@ -759,6 +779,7 @@ app.get('/api/sim/company-tasks', async () => sim.listCompanyTasks());
 app.get<{ Params: { id: string } }>('/api/sim/company-tasks/:id', async request => sim.companyTask(request.params.id));
 app.post('/api/sim/inject', async (request) => sim.inject(request.body));
 app.post('/api/sim/inject-business', async request => sim.injectBusiness(request.body));
+app.post('/api/sim/ceo-resign', async () => sim.ceoResign());
 app.get('/api/event-catalog', async () => CATALOG);
 app.post('/api/sim/inject-custom', { bodyLimit: 4_096 }, async (request) => sim.injectCustom(request.body));
 app.post('/api/sim/speed', async (request) => sim.setSpeed(request.body));

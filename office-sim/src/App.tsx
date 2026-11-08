@@ -27,6 +27,7 @@ import { DialogueBar, type Speaker } from './DialogueBar';
 import { meetingLines } from './dialogueQueue';
 import { EMOTES, FEED_EMOJI } from './emotes';
 import { useBackgroundMusic } from './useBackgroundMusic';
+import { CeoResignButton } from './CeoResignButton';
 import './index.css';
 import './inbox.css';
 
@@ -75,6 +76,15 @@ export default function App() {
   const { state, history } = presentation;
   const hour = presentation.tick;
   const complete = hour >= sim.maxTicks && !presentation.playing;
+  const serverComplete = (sim.state?.tick ?? 0) >= sim.maxTicks;
+  // After a CEO-resign collapse, give the last resignations a few seconds to walk out first.
+  const [endReady, setEndReady] = useState(false);
+  const collapsed = Boolean(state?.collapse);
+  useEffect(() => {
+    if (!complete) { setEndReady(false); return; }
+    const id = setTimeout(() => setEndReady(true), collapsed ? 7000 : 0);
+    return () => clearTimeout(id);
+  }, [complete, collapsed]);
   // The End of Quarter report opens once per completed run, unless the player is busy in a panel.
   useEffect(() => {
     if (previousRun.current !== sim.runId) {
@@ -82,12 +92,13 @@ export default function App() {
       setMenu(current => current === 'quarter' ? null : current);
       return;
     }
-    if (!complete) { setMenu(current => current === 'quarter' ? null : current); return; }
+    // Once the server has finished the run, a passing playback state never closes the report.
+    if (!complete && !serverComplete) { setMenu(current => current === 'quarter' ? null : current); return; }
+    if (!endReady) return;
     const key = `${sim.runId}:${sim.maxTicks}`;
     if (!sim.runId || menu || selected || openedCompletions.current.has(key)) return;
     openedCompletions.current.add(key); setMenu('quarter');
-  }, [complete, sim.runId, sim.maxTicks, menu, selected]);
-  const serverComplete = (sim.state?.tick ?? 0) >= sim.maxTicks;
+  }, [complete, serverComplete, endReady, sim.runId, sim.maxTicks, menu, selected]);
   const live = sim.connection === 'live';
   const disabled = !live || sim.busy;
   const running = sim.state?.running ?? false;
@@ -232,9 +243,12 @@ export default function App() {
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null} showDebug={showSyncDebug}
-      announcement={presentation.frame?.events.find(e => e.official) ?? null} onSkipMeeting={dialogue.skipMeeting}/>
+      announcement={presentation.frame?.events.find(e => e.official) ?? null} onSkipMeeting={dialogue.skipMeeting}
+      panic={Boolean(state?.collapse && hour >= state.collapse.since)}/>
     <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
+    <CeoResignButton onResign={sim.ceoResign}
+      disabled={!live || serverComplete || Boolean(sim.state?.collapse) || !(sim.state?.started) || !people.some(p => p.role === 'CEO' && !p.quit)}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}
     {sim.phase && !presentation.playing && <div className="management-phase" role="status">{sim.phase}…</div>}

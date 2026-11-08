@@ -11,6 +11,7 @@ import { computeTriggers, recordPeers, type Trigger } from './triggers';
 import { settleEmotion, type SettledEmotion } from './emotion';
 import { advanceConversations, incomingFor, type Incoming } from './conversations';
 import { prepareAnnouncements, rememberActions } from './announcements';
+import { ceoResigns, collapseLines, collapseOf, collapsePressure, collapseResignations } from './collapse';
 import { detectIncidents } from './incidents';
 import { executeWork, validEmployeeOutput, workContext } from './tasks';
 import { isDayEnd, isOfficeHour, isOvertime } from '../shared/workday';
@@ -291,6 +292,8 @@ export async function runTick(
   const assertCurrent = () => { if (config.isCurrent && !config.isCurrent()) throw new Error('run_changed'); };
   assertCurrent();
   arrive(w);
+  // "CEO resign" button: the CEO walks out at the start of the first collapse hour.
+  const ceoLeft = ceoResigns(w);
   const feedbackDeltas = config.priceFeedback ? applyPriceFeedback(world.price, w.ids.map(id => w.agents[id]), params) : [];
 
   // 1. Apply events: scripted for this tick, then anything the judges queued.
@@ -410,6 +413,11 @@ export async function runTick(
     })), params);
   }
 
+  // During a CEO-resign collapse, rules-mode turns (no AI reply) speak panic lines instead of routine ones.
+  for (const id of order) {
+    const lines = llm[id]?.output ? null : collapseLines(w, id);
+    if (lines) Object.assign(decisions[id], lines);
+  }
   // Emotions are validated against the triggers; replies and targeted actions advance conversations.
   const emotions: Record<string, SettledEmotion> = {};
   for (const id of order) emotions[id] = settleEmotion(w.agents[id], decisions[id].action, triggers[id] ?? [], llm[id]?.output?.emotion, llm[id]?.output?.cause);
@@ -451,8 +459,10 @@ export async function runTick(
     passiveUpdate(w.agents[id], params);
   }
   // 6. Quit check.
-  const quits: string[] = [];
-  for (const id of activeIds) {
+  const quits: string[] = ceoLeft ? [ceoLeft] : [];
+  // During a collapse, pressure climbs and full burnout bars resign (at most three an hour) instead.
+  if (collapseOf(w)) { collapsePressure(w, params); quits.push(...collapseResignations(w)); }
+  else for (const id of activeIds) {
     if (checkQuit(w.agents[id], t, params)) {
       w.agents[id].status = 'quit';
       w.agents[id].quitTick = t;
@@ -468,7 +478,7 @@ export async function runTick(
     accountability.chases.push(...reviewed.chases); accountability.meetings.push(...reviewed.meetings);
   }
   if (config.business && w.companyTasks) observeCompanyTick(w, quits, config.endOfRun?.() ?? false);
-  const presence = depart(w, decisions, params);
+  const presence = collapseOf(w) ? null : depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
   const valuation = updatePrice(world.price, {
     ...(config.business ? { operating: {
@@ -634,6 +644,7 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
       present: agent.status === 'active' && agent.present !== false,
     };
   }
+  const collapse = collapseOf(world);
   const reach = claimReach(world);
   return {
     business: structuredClone(world.business),
@@ -641,6 +652,7 @@ export function toSimulationState(world: World, feed: string[] = []): Simulation
     tick: world.tick,
     seed: world.seed,
     started: world.tick > 0,
+    ...(collapse ? { collapse: { since: collapse.startTick } } : {}),
     running: false,
     event: null,
     queue: world.queue.map((e) => e.type),
