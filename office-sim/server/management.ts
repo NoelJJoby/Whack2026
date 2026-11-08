@@ -116,8 +116,18 @@ function scheduleSignature(ctx: ManagementContext, company?: CompanySchedule) {
   return company ? JSON.stringify([signature, company.waitingForSupplier, company.escalations]) : signature;
 }
 
+/** With no active CEO or ops there is nobody to decide: fail open cases now, with a recorded reason, instead of letting them stall to deadline. */
+function failUnmanaged(w: World) {
+  for (const e of w.eventState.cases.filter(e => e.status === 'open' && !terminal(e))) {
+    e.status = 'failed'; e.outcome = 'No active CEO or operations manager to respond; the case lapsed without a decision.';
+    e.milestones.push({ tick: w.tick, text: e.outcome });
+    w.eventState.diagnostics.push({ tick: w.tick, phase: 'management', reason: 'no_active_management', intent: { eventId: e.id } });
+  }
+}
+
 export async function managementPhase(w: World, provider: TurnProvider | null, mode: string, phase?: (phase: string) => void) {
   const owners = managementOwners(w);
+  if (!owners.ceo && !owners.ops) failUnmanaged(w);
   for (const kind of ['ceo','ops'] as const) {
     const actor = owners[kind]; if (!actor) continue;
     if (kind === 'ops') prepareCompanySchedule(w);
