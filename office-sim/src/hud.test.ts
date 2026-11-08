@@ -159,3 +159,11 @@ test('display adapters remove engine hour terminology from errors and accessible
   assert.ok(markup.includes('Trust in management'));
   assert.ok(!/\bticks?\b/i.test(markup));
 });
+
+test('the engine badge names the decision-maker for each mode and reason', async () => {
+  const { engineLabel } = await import('./hudModel');
+  assert.equal(engineLabel('llm_bias', 'configured'), 'LLM + bias engine');
+  assert.equal(engineLabel('rules', 'no_api_key'), 'Rules mode · No API key');
+  assert.equal(engineLabel('rules', 'llm_failed'), 'Rules mode · LLM unavailable');
+  assert.equal(engineLabel('rules', 'configured'), 'Rules mode');
+});

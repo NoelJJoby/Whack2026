@@ -10,7 +10,7 @@ import { CompanyTaskComposer } from './CompanyTaskComposer';
 import { Company } from './Company';
 import { StockPrice, StockChart } from './StockPrice';
 import { EmployeePanel, MenuPanel } from './GamePanel';
-import { ACTION_LABEL, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
+import { ACTION_LABEL, engineLabel, feedEntries, playerText, timeLabel, type FeedEntry } from './hudModel';
 import { quitParams } from '../server/params';
 import { RUN_LENGTHS, useSimulation } from './useSimulation';
 import { useDialogue } from './useDialogue';
@@ -121,12 +121,13 @@ export default function App() {
   }, []);
   function openMenu(next: Menu) { setSelected(null); setHighlight([]); setMenu(next); }
   const connectionText = sim.connection === 'reconnecting' ? 'Connection lost' : sim.connection === 'connecting' ? 'Connecting…' : sim.connection === 'mock' ? 'Preview' : null;
-  const diagnostic = sim.mode === 'llm_bias' ? 'LLM + bias engine' : sim.modeReason === 'no_api_key' ? 'Rules mode · No API key' : sim.modeReason === 'llm_failed' ? 'Rules mode · LLM unavailable' : 'Rules mode';
+  const diagnostic = engineLabel(sim.mode, sim.modeReason);
   return <main className="game-window" aria-label="The Daily Grind">
     <OfficeView key={sim.historyEpoch} people={people} selected={selected} onSelect={select} highlight={highlight}
       ready={Boolean(state) && people.length > 0 && presentation.epoch === sim.historyEpoch}
       line={menu === null && dialogue.line?.kind === 'agent' ? dialogue.line : null}
       showThoughts={dialogue.showThoughts} records={latest} speed={sim.speed} paused={playbackPaused || menu !== null}/>
+    <span className="engine-badge" aria-label="Decision engine">{diagnostic}</span>
     <StockPrice history={history} current={price} initialPrice={sim.initialPrice} expanded={menu === 'stock'} onOpen={() => openMenu('stock')}/>
     <Workday tick={hour} calendarDay={dialogue.line?.calendarDay ?? (!presentation.playing ? presentation.frame?.day_report?.fillerDays.at(-1) : undefined)} speed={sim.speed} running={!playbackPaused && (running || serverComplete && presentation.playing)} started={sim.state?.started ?? false} complete={complete} disabled={disabled} onSpeed={value => void sim.setSpeed(value)} onToggle={toggle}/>
     {connectionText && <div className={`connection-status ${sim.connection === 'reconnecting' ? 'coral' : ''}`} role="status">{connectionText}</div>}

@@ -46,3 +46,11 @@ export function feedEntries(history: TickFrame[]): FeedEntry[] {
     })),
   ]);
 }
+
+/** The engine label shown to players: which decision-maker is driving the office. */
+export function engineLabel(mode: string | null, reason: string | null): string {
+  if (mode === 'llm_bias') return 'LLM + bias engine';
+  if (reason === 'no_api_key') return 'Rules mode · No API key';
+  if (reason === 'llm_failed') return 'Rules mode · LLM unavailable';
+  return 'Rules mode';
+}
