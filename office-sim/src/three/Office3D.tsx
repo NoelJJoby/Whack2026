@@ -309,7 +309,13 @@ export default function Office3D({ people: cast, tick, selected, onSelect, highl
   };
   // Follow mode works with both scene selection and Office wire selection.
   const [follow, setFollow] = useState<string | null>(null);
-  useEffect(() => { if (selected) setFollow(selected); }, [selected]);
+  // Closing the employee panel also releases the camera, so one close button is enough.
+  const wasSelected = useRef(selected);
+  useEffect(() => {
+    if (selected) setFollow(selected);
+    else if (wasSelected.current) setFollow(f => f === wasSelected.current ? null : f);
+    wasSelected.current = selected;
+  }, [selected]);
   // Meeting cutscene: driven by the dialogue bar's current line, so skipping or finishing the lines ends it.
   const meeting = !cutscene && line?.meeting ? line.meeting : null;
   const called = meeting ? people.find(p => p.id === meeting.agent) : undefined;
