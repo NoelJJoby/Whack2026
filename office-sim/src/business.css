@@ -8,6 +8,7 @@
 .chip.coral { color: var(--coral); border-color: currentColor; }
 .chip.gold { color: var(--gold); border-color: currentColor; }
 .link { padding: 0; color: var(--mint); text-decoration: underline; }
+.link:disabled { opacity: 0.45; cursor: not-allowed; text-decoration: none; }
 .muted { color: var(--muted); }
 
 /* Objective */

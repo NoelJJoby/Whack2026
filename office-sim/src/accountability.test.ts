@@ -61,3 +61,22 @@ test('stand-up chases are spoken by the manager, capped per round', () => {
   assert.equal(chases.length, CHASE_LINE_CAP);
   assert.ok(chases.every(l => l.agent === 'omar'));
 });
+
+test('inbox "Simulate CEO warning": plays a warning cutscene for the owner, gated on who is in the office', async () => {
+  const { warningPreview } = await import('./meetingPreview');
+  const thread = { id: 'th', taskId: 'task-1', title: 'Onboard Cedar: kickoff', ownerId: 'tom', agentIds: ['tom'], deadline: 40, contractLinked: false,
+    status: 'blocked', severity: 'warning', primary: null, also: [], messages: [], openedTick: 1, updatedTick: 2 } as unknown as import('../shared/inbox').InboxThread;
+  const people = [{ id: 'dan', name: 'Dan', role: 'CEO', quit: false, present: true }, { id: 'tom', name: 'Tom', role: 'Engineer', quit: false, present: true }];
+  const ready = warningPreview(thread, people, 9, 'k');
+  assert.ok(ready?.ok);
+  const lines = meetingLines(ready.scene);
+  assert.deepEqual(lines.map(l => l.agent), ['dan', 'tom']);
+  assert.equal(lines[1].meeting!.stamp, 'Warning');
+  assert.match(lines[0].publicLine, /Onboard Cedar/);
+  // Gone home: shown but unavailable, with the reason.
+  assert.deepEqual(warningPreview(thread, [people[0], { ...people[1], present: false }], 9), { ok: false, why: 'Tom has left for the day.' });
+  // Hidden: resolved, no owner, or the owner has left the company.
+  assert.equal(warningPreview({ ...thread, status: 'resolved' }, people, 9), null);
+  assert.equal(warningPreview({ ...thread, ownerId: null }, people, 9), null);
+  assert.equal(warningPreview(thread, [people[0], { ...people[1], quit: true }], 9), null);
+});

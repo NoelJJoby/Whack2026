@@ -3,6 +3,7 @@ import type { InboxThread, InboxToast, ReasonCode } from '../shared/inbox';
 import { timeLabel } from './hudModel';
 import { FILTER_LABEL, filterThreads, isUnread, sortThreads, toastText, type InboxFilter } from './inboxModel';
 import { Sprite, type Person } from './people';
+import type { WarningPreview } from './meetingPreview';
 
 const CODE_LABEL: Partial<Record<ReasonCode, string>> = {
   UNASSIGNED: 'No owner', ON_HOLD: 'On hold', REJECTED_NO_CAPABILITY: 'Assignment rejected', REJECTED_OVER_CAPACITY: 'Assignment rejected',
@@ -22,11 +23,13 @@ function lead(t: InboxThread) {
   return (t.primary && [...t.messages].reverse().find(m => m.code === t.primary!.code)) || t.messages.at(-1);
 }
 
-function Thread({ thread, people, open, unread, onToggle, onJump, onFocus, onReplay }: {
+function Thread({ thread, people, open, unread, onToggle, onJump, onFocus, onReplay, warning, onWarn }: {
   thread: InboxThread; people: Person[]; open: boolean; unread: boolean;
   onToggle: () => void; onJump: () => void; onFocus: (id: string) => void;
   /** Present when the thread's meeting can be replayed. */
   onReplay?: () => void;
+  /** "Simulate CEO warning": hidden when null, disabled with a reason when unavailable. */
+  warning?: WarningPreview; onWarn?: () => void;
 }) {
   const message = lead(thread);
   const owner = people.find(p => p.id === (thread.ownerId ?? thread.agentIds[0]));
@@ -58,6 +61,7 @@ function Thread({ thread, people, open, unread, onToggle, onJump, onFocus, onRep
       <div className="inbox-actions">
         <button className="link" onClick={onJump}>Jump to task</button>
         {onReplay && <button className="link" onClick={onReplay}>Replay meeting</button>}
+        {warning && onWarn && <button className="link" onClick={onWarn} disabled={!warning.ok} title={warning.ok ? 'Play the CEO warning cutscene for this task\'s owner. The simulation is not changed.' : warning.why}>Simulate CEO warning</button>}
         {thread.agentIds.map(id => { const p = people.find(x => x.id === id); return p ? <button key={id} className="link" onClick={() => onFocus(id)}>Focus {p.name}</button> : null; })}
       </div>
     </div>}
@@ -65,10 +69,11 @@ function Thread({ thread, people, open, unread, onToggle, onJump, onFocus, onRep
 }
 
 /** Task inbox: one thread per task explaining why it isn't progressing, who it's on, and what unblocks it. */
-export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus, canReplay, onReplay }: {
+export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus, canReplay, onReplay, warningFor, onWarn }: {
   threads: InboxThread[]; people: Person[]; read: ReadonlySet<string>; focusId: string | null;
   onRead: (thread: InboxThread[]) => void; onJump: (thread: InboxThread) => void; onFocus: (agentId: string) => void;
   canReplay?: (thread: InboxThread) => boolean; onReplay?: (thread: InboxThread) => void;
+  warningFor?: (thread: InboxThread) => WarningPreview; onWarn?: (thread: InboxThread) => void;
 }) {
   const [filter, setFilter] = useState<InboxFilter>('all');
   const [open, setOpen] = useState<string | null>(focusId);
@@ -84,7 +89,8 @@ export function Inbox({ threads, people, read, focusId, onRead, onJump, onFocus,
     {unread.length > 0 && <button className="link inbox-mark" onClick={() => onRead(unread)}>Mark all read</button>}
     {shown.length ? <ul className="inbox-list">{shown.map(t => <Thread key={t.id} thread={t} people={people} open={open === t.id} unread={isUnread(t, read)}
       onToggle={() => setOpen(open === t.id ? null : t.id)} onJump={() => onJump(t)} onFocus={onFocus}
-      onReplay={onReplay && canReplay?.(t) ? () => onReplay(t) : undefined}/>)}</ul>
+      onReplay={onReplay && canReplay?.(t) ? () => onReplay(t) : undefined}
+      warning={open === t.id ? warningFor?.(t) : null} onWarn={onWarn ? () => onWarn(t) : undefined}/>)}</ul>
       : <p className="empty-state">{filter === 'all' ? 'Nothing is stuck. Tasks that stop progressing show up here with the reason.' : `No ${FILTER_LABEL[filter].toLowerCase()} tasks.`}</p>}
   </div>;
 }
