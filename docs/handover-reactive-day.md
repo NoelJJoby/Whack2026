@@ -2,7 +2,9 @@
 
 **Branch:** `reactive-day` (from `main` at `4646c63`). Nothing is pushed or merged; ask the project owner before doing either.
 
-**State:** Step 1 of 6 is done and green. Step 2 is code-complete but has **5 failing tests** (WIP commit `c475dc3`). Steps 3–6 haven't started.
+**Current state (8 November, resumed on Theo's computer):** All six steps are implemented. The inherited five failures are fixed. Before the owner's request to stop testing: 217 server tests, 26 UI unit tests, type-check/build and Chromium playback acceptance passed. No push or merge was performed by the resuming agent. See `docs/reactive-day-status.md` for measured results and the final untested adjustments.
+
+The remainder below preserves the original handover as historical implementation context.
 
 ## The goal
 

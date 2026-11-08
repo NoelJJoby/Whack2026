@@ -505,6 +505,7 @@ export const voiceParams = {
   bannedSentences: ['Sure.'],
   /** Case-insensitive regexes for archetype labels used as names. */
   labelPatterns: [
+    '\\b[cte]\\d+\\b',
     '\\bclimbers?\\b', '\\bloyalists?\\b', '\\bgossip hubs?\\b', '\\bs[ck]eptics?\\b',
     '\\bbreadwinners?\\b', '\\bflight risks?\\b', '\\bops (?:would|will|knows?|says?|thinks?|said)\\b',
   ],

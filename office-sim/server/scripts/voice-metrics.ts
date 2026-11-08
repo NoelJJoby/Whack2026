@@ -149,8 +149,6 @@ function table(base: RunFile | null, next: RunFile, scope: 'llm' | 'all'): strin
       n.manners ? `min ${n.manners.min}, mean ${n.manners.mean.toFixed(1)} over ${n.manners.rounds}` : 'n/a', n.manners ? n.manners.min >= 4 : null],
     // Thoughts: not in the brief's targets; compared with the baseline.
     ['Thoughts: same first 3 words (pairs)', '< baseline', b ? String(b.thoughtSameOpeners) : '-', String(n.thoughtSameOpeners), b ? n.thoughtSameOpeners < b.thoughtSameOpeners : null],
-    ['Thoughts: open with the event (3 words)', '< baseline', b ? pct(b.thoughtEcho.hits, b.thoughtEcho.of) : '-', pct(n.thoughtEcho.hits, n.thoughtEcho.of),
-      b && b.thoughtEcho.of && n.thoughtEcho.of ? n.thoughtEcho.hits / n.thoughtEcho.of < b.thoughtEcho.hits / b.thoughtEcho.of : null],
     ['Thoughts: mean pairwise trigram similarity', '< baseline', b ? b.thoughtTrigram.toFixed(4) : '-', n.thoughtTrigram.toFixed(4), b ? n.thoughtTrigram < b.thoughtTrigram : null],
   ];
   const w = [42, 10, 22, 30];

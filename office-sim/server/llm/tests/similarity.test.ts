@@ -51,5 +51,7 @@ describe('similarity', () => {
     assert.ok(isEchoOpener("A surprise bonus? Huh. Let's see it in my paycheck first.", bonus, 5));
     const custom = eventTerms({ type: 'merger', text: 'The canteen is closing for renovation.', custom: true }, V.eventKeyTerms);
     assert.ok(isEchoOpener('The canteen closing? Great.', custom, 5));
+    assert.ok(!isEchoOpener('How does the canteen closure affect the evening shift?', custom));
+    assert.ok(!isEchoOpener('Rae, does the bonus change our tax paperwork?', bonus));
   });
 });

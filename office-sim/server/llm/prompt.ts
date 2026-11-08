@@ -123,7 +123,7 @@ export function buildTurnPrompt(
     speech?.news?.length ? `News that affects you:\n${speech.news.map(text => `- ${JSON.stringify(text)}`).join('\n')}` : '',
     `Colleagues still here: ${ctx.colleagues.map(c => (c.group ? `${c.name} (${c.group})` : c.name)).join(', ') || 'None.'}`,
     `What you can do:\n${ctx.available.map(action => `- ${action}: ${actionMeanings[action]}`).join('\n')}\nComplain, gossip and verify need a colleague's name as "target". When proposing gossip, verify or leak, you may give a claim key from above (such as c1) as "claim".`,
-    ...(ctx.work ? ['Work, overwork and review_work require a task key (such as t1) as task_id. support_colleague also requires the named colleague as target. report_issue requires an evidence key (such as e1) as evidence_id and a management colleague name as target. Use only the authorised combinations above; current assignment versions are filled in automatically.'] : []),
+    ...(ctx.work ? ['Work, overwork and review_work require a task key (such as t1) as task_id; include only action, weight and task_id for these actions. support_colleague also requires the named colleague as target. report_issue requires an evidence key (such as e1) as evidence_id and a management colleague name as target. Omit fields that do not apply to the action, including null fields. Use only the authorised combinations above; current assignment versions are filled in automatically.'] : []),
     speech ? `How you talk: ${speech.voice}\nThis time: ${speech.manner}` : '',
     speech?.examples.length
       ? `Things you've said at the coffee machine recently, to show how you sound (don't repeat them):\n${speech.examples.map(l => `- ${JSON.stringify(l)}`).join('\n')}`
@@ -136,6 +136,8 @@ export function buildTurnPrompt(
       speech?.news?.length || ctx.events.length
         ? "- React to the news in your own words: say what you make of it and what it means for you. Don't read the headline back, and don't open by repeating it as a question."
         : "- Nothing new: talk about your work, what you've heard, or what's on your mind.",
+      speech?.news?.length ? '- Make the subject clear: name one concrete detail of the news before giving your reaction. Even a brief reply should say which situation you mean.' : '',
+      '- Keep short task, evidence and claim keys in the JSON fields only; never speak or think those keys.',
       '- Sound like yourself, not like your colleagues.',
       `- Never use these: ${quoteList([...v.bannedSentences, ...v.bannedPhrases])}.`,
       '- Call colleagues by their name only.',

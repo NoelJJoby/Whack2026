@@ -276,6 +276,14 @@ export async function reviewRound(input: ReviewInput): Promise<{ logs: Record<st
     } else if (first[id]?.flags.length) {
       still++;
     }
+    // One regeneration can still return an internal key or label. Never send
+    // those words to the spectator; decisions and beliefs remain untouched.
+    const final = llm[id]?.output;
+    if (final) {
+      const leaks = (text: string) => patternHits(text, [...v.labelPatterns, ...v.tickPatterns]).length > 0;
+      if (leaks(final.public_line) || bannedHits(final.public_line, v).length) final.public_line = '';
+      if (leaks(final.inner_monologue)) final.inner_monologue = '';
+    }
     logs[id] = {
       ...style,
       flags: first[id]?.flags ?? [],
