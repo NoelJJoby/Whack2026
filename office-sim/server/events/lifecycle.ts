@@ -1,7 +1,8 @@
 import type { BusinessEvent, Evidence, EventState, Rarity } from '../../shared/events';
 import type { World } from '../engine-types';
 import { makeTask, signContract } from '../business';
-import { days, workdayTime } from '../../shared/workday';
+import { dayIndexOf, days, OFFICE_TICKS_PER_DAY, TICKS_PER_DAY, workdayTime } from '../../shared/workday';
+import { cadenceParams } from '../params';
 import { CATALOG, type EventDefinition } from './catalog';
 import { stream } from '../rng';
 export const terminal = (e: BusinessEvent) => ['resolved','failed','cancelled','superseded'].includes(e.status);
@@ -11,12 +12,22 @@ export function managementOwners(w: World) {
   const ops = positions.find(p => p.role === 'ops' && w.agents[p.id]?.status === 'active')?.id ?? null;
   return { ceo: ceo ?? ops, ops: ops ?? ceo, acting: !ceo };
 }
-export function interval(seed: number, rarity: Rarity, index: number) {
-  // Common every 2-4 workdays, rare every 8-12 (calibrated at 5 ticks a day as 10-20 and 40-60 ticks).
-  return (rarity === 'common' ? days(2) : days(8)) + stream(seed, index, `arrivals-${rarity}`, 'event').int((rarity === 'common' ? days(2) : days(4)) + 1);
+/**
+ * When slot `index` of a rarity next falls due, after `fromTick` (0 = the start of the run).
+ * Common: a random office hour of the workday `commonEveryDays` later (the first workday at the start).
+ * Rare: a random office hour of a random workday in the next `rareEveryDays`-day period.
+ */
+export function arrival(seed: number, rarity: Rarity, index: number, fromTick: number): number {
+  const rng = stream(seed, index, `arrivals-${rarity}`, 'event');
+  const day = dayIndexOf(fromTick);
+  const every = rarity === 'common' ? cadenceParams.commonEveryDays : cadenceParams.rareEveryDays;
+  const start = rarity === 'common'
+    ? (fromTick === 0 ? 0 : day + every)
+    : (fromTick === 0 ? 0 : (Math.floor(day / every) + 1) * every) + rng.int(every);
+  return start * TICKS_PER_DAY + 1 + rng.int(OFFICE_TICKS_PER_DAY);
 }
 export function initialEvents(seed: number): EventState {
-  const common = interval(seed, 'common', 0); const rare = interval(seed, 'rare', 0);
+  const common = arrival(seed, 'common', 0, 0); const rare = arrival(seed, 'rare', 0, 0);
   return { cases: [], evidence: [], decisions: [], directives: [], scheduler: { common: { index: 0, nominal: common, due: common }, rare: { index: 0, nominal: rare, due: rare } }, scheduling: [], cooldowns: {}, incidents: [], diagnostics: [] };
 }
 export function addEvidence(w: World, e: BusinessEvent, text: string, source: string, recipients: string[], certainty: Evidence['certainty'] = 'observed', deliveryTick = w.tick) {

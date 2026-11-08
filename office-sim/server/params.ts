@@ -277,6 +277,16 @@ export const quitParams = {
   interviewWindow: 3,
 };
 
+/** How often things happen, in active workdays. */
+export const cadenceParams = {
+  /** One common business case every this many workdays, at a random office hour. */
+  commonEveryDays: 1,
+  /** One rare business case at a random office hour in each period of this many workdays. */
+  rareEveryDays: 10,
+  /** One billboard shock (merger, layoffs, scandal...) at a random office hour in each period of this many workdays. */
+  shockPeriodDays: 14,
+};
+
 /** Run-level setup. */
 export const setupParams = {
   /** Fixed traits are drawn as archetype value +/- this, from the run seed. */
@@ -520,6 +530,7 @@ export const DEFAULT_PARAMS = {
   setup: setupParams,
   price: priceParams,
   voice: voiceParams,
+  cadence: cadenceParams,
 };
 
 export type Params = typeof DEFAULT_PARAMS;

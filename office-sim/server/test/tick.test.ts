@@ -6,6 +6,7 @@ import { DEFAULT_PARAMS as P } from '../params';
 import { CALM_SCENARIO, CURATED_EVENT_TYPES, SHOCK_SCENARIO, buildScenario, fixtureCast } from '../scripts/fixture';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, queueEvent, runSimulation, runTick, toSimulationState } from '../tick';
+import { isOfficeHour, TICKS_PER_DAY, TICKS_PER_QUARTER } from '../../shared/workday';
 
 const config = (over: Partial<RunConfig> = {}): RunConfig => ({
   seed: 42, mode: 'llm_bias', ticks: 16, scenario: SHOCK_SCENARIO, gossip: true, billboard: true, priceFeedback: false, ...over,
@@ -14,21 +15,25 @@ const config = (over: Partial<RunConfig> = {}): RunConfig => ({
 const run = (c: RunConfig, provider = createStubProvider(c.seed)) => runSimulation(fixtureCast(c.seed), c, provider);
 
 describe('tick loop: seeded event scheduling', () => {
-  it('buildScenario uses the curated event pool and spaces events realistically across a 150-tick quarter', () => {
-    const schedule = buildScenario(77, 150);
-    assert.ok(schedule.length >= 6 && schedule.length <= 7, `expected 6-7 events per quarter, got ${schedule.length}`);
-    assert.ok(schedule.every((event) => CURATED_EVENT_TYPES.includes(event.type)));
-    assert.ok(schedule[0].tick >= 1 && schedule[0].tick <= 4);
-    for (let i = 1; i < schedule.length; i++) {
-      const gap = schedule[i].tick - schedule[i - 1].tick;
-      assert.ok(gap >= 22 && gap <= 26, `gap ${gap} outside 22-26 ticks (~1 workweek)`);
+  it('buildScenario puts one shock at a random office hour in each 14-workday period', () => {
+    const period = P.cadence.shockPeriodDays * TICKS_PER_DAY;
+    for (let seed = 1; seed <= 2000; seed++) {
+      const schedule = buildScenario(seed, TICKS_PER_QUARTER * 2);
+      assert.ok(schedule.every((event) => CURATED_EVENT_TYPES.includes(event.type)));
+      assert.ok(schedule.every((event) => isOfficeHour(event.tick)), `seed ${seed}: shock outside office hours`);
+      const periods = schedule.map((event) => Math.floor((event.tick - 1) / period));
+      assert.equal(new Set(periods).size, periods.length, `seed ${seed}: two shocks in one period`);
+      // Every complete period inside the run has exactly one.
+      for (let p = 0; (p + 1) * period <= TICKS_PER_QUARTER * 2; p++) assert.ok(periods.includes(p), `seed ${seed}: period ${p} has no shock`);
     }
+    const quarter = buildScenario(77, TICKS_PER_QUARTER).length;
+    assert.ok(quarter >= 2 && quarter <= 3, `expected 2-3 shocks per quarter, got ${quarter}`);
   });
 
   it('the same seed gives the same schedule, a different seed gives a different one', () => {
-    const a = buildScenario(99, 150);
-    const b = buildScenario(99, 150);
-    const c = buildScenario(100, 150);
+    const a = buildScenario(99, TICKS_PER_QUARTER * 2);
+    const b = buildScenario(99, TICKS_PER_QUARTER * 2);
+    const c = buildScenario(100, TICKS_PER_QUARTER * 2);
     assert.deepEqual(a, b);
     assert.notDeepEqual(a, c);
   });
@@ -37,9 +42,9 @@ describe('tick loop: seeded event scheduling', () => {
     const truths = new Set<boolean>();
     const sources = new Set<string>();
     for (let seed = 1; seed <= 100; seed++) {
-      const types = buildScenario(seed, 150).map((event) => event.type);
+      const types = buildScenario(seed, TICKS_PER_QUARTER * 2).map((event) => event.type);
       assert.equal(new Set(types).size, types.length, `seed ${seed} repeats an event within a quarter`);
-      for (const event of buildScenario(seed, 150)) {
+      for (const event of buildScenario(seed, TICKS_PER_QUARTER * 2)) {
         truths.add(event.isTrue!);
         if (event.source) sources.add(event.source);
       }
@@ -49,8 +54,8 @@ describe('tick loop: seeded event scheduling', () => {
   });
 
   it('extending the run length keeps the earlier schedule', () => {
-    const short = buildScenario(5, 50);
-    assert.deepEqual(buildScenario(5, 150).slice(0, short.length), short);
+    const short = buildScenario(5, TICKS_PER_QUARTER);
+    assert.deepEqual(buildScenario(5, TICKS_PER_QUARTER * 2).slice(0, short.length), short);
   });
 });
 

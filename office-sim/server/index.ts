@@ -229,7 +229,7 @@ export class OfficeSimManager {
   }
 
   private tickConfig(): TickConfig {
-    return { mode: this.mode, scenario: [], gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
+    return { mode: this.mode, scenario: this.billboard(), gossip: true, billboard: true, priceFeedback: this.priceFeedback, business: true };
   }
 
   state(): SimulationState {

@@ -8,12 +8,13 @@ import { fixtureCast } from '../scripts/fixture';
 import { createTurnProvider } from '../llm';
 import { createStubProvider } from '../stub-provider';
 import { fallbackCeo, fallbackOps, managementContext } from '../management';
-import { openEvent, interval } from '../events/lifecycle';
+import { openEvent, arrival } from '../events/lifecycle';
 import { RunStore } from '../run-store';
 import { Reporting, factsFor, validateReport } from '../reporting';
 import { DEFAULT_PARAMS } from '../params';
 import { BUSINESS_PARAMS, makeTask, openBusinessTick, validateOrganisation } from '../business';
-import { calendarSpan, days, isOfficeHour, TICKS_PER_DAY, TICKS_PER_MONTH } from '../../shared/workday';
+import { calendarSpan, dayIndexOf, isOfficeHour, TICKS_PER_DAY, TICKS_PER_MONTH } from '../../shared/workday';
+import { cadenceParams } from '../params';
 import { CATALOG, eligible } from '../events/catalog';
 import { employeeSchema } from '../llm/schemas';
 import { toLlmOutput } from '../llm-adapter';
@@ -53,10 +54,16 @@ describe('business model invariants', () => {
     assert.equal(eligible(w,CATALOG.find(d => d.id === 'release_success')!),false);
     w.business.opportunities.forEach(o => o.stage = 'signed');
     assert.equal(eligible(w,CATALOG.find(d => d.id === 'client_win')!),false);
+    // Common: the next workday, at an office hour. Rare: an office hour somewhere in the next period.
     for (let seed = 1; seed <= 100; seed++) for (let index = 0; index < 30; index++) {
-      const c = interval(seed,'common',index); const r = interval(seed,'rare',index);
-      assert.ok(c >= days(2) && c <= days(4)); assert.ok(r >= days(8) && r <= days(12));
+      const from = index * 37 + 1;
+      const c = arrival(seed,'common',index,from); const r = arrival(seed,'rare',index,from);
+      assert.ok(isOfficeHour(c) && isOfficeHour(r));
+      assert.equal(dayIndexOf(c), dayIndexOf(from) + cadenceParams.commonEveryDays);
+      const period = Math.floor(dayIndexOf(from) / cadenceParams.rareEveryDays) + 1;
+      assert.equal(Math.floor(dayIndexOf(r) / cadenceParams.rareEveryDays), period);
     }
+    assert.ok(isOfficeHour(arrival(1,'common',0,0)) && dayIndexOf(arrival(1,'common',0,0)) === 0, 'the first common case lands on day one');
   });
 });
 
