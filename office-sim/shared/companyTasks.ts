@@ -1,5 +1,11 @@
 import type { Task, WorkResult } from './business';
 
+export const companyObjectiveLimits = { minLength: 8, maxLength: 1200 } as const;
+
+export function isCompanyObjectiveText(text: string) {
+  return /\p{L}/u.test(text) && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(text);
+}
+
 export type CompanyTaskStatus = 'queued' | 'delegated' | 'in_progress' | 'blocked' | 'review' | 'completed' | 'failed' | 'abandoned';
 export type WorkCategory = 'research' | 'planning' | 'engineering' | 'coordination';
 export type CompanyEffect = 'ordinary_work' | 'reviewed_release';

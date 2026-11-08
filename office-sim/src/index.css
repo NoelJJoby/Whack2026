@@ -505,3 +505,16 @@ a:focus-visible, select:focus-visible { outline: 2px solid #ffe2a2; outline-offs
 .presence-label { display: block; position: absolute; top: calc(100% + 19px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 10px; line-height: 1.2; color: #d0cbbd; }
 .dialogue-bar.narrator .dialogue-plate { color: #e2ad58; }
 .dialogue-bar.narrator .dialogue-text { padding-left: 12px; }
+
+.task-composer { display: grid; gap: 12px; }
+.task-composer .event-panel { padding: 14px; min-width: 0; }
+.task-intro, .task-objective { font-size: 18px; line-height: 1.25; }
+.task-composer .event-headline-label, .task-composer .event-headline-check, .task-note { font-size: 15px; }
+.task-note { color: var(--muted); line-height: 1.25; }
+.task-note.coral { color: var(--coral); }
+.task-form .event-headline { font-size: 18px; line-height: 1.25; }
+.task-form .event-headline::placeholder { color: var(--muted); opacity: 1; }
+.task-form-footer, .task-receipt-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.task-form-footer .post-event { font-size: 16px; min-height: 40px; margin-left: auto; }
+.task-receipt-heading h3 { font-size: 16px; color: var(--muted); }
+.task-objective { white-space: pre-wrap; overflow-wrap: anywhere; }

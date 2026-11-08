@@ -1,22 +1,24 @@
 import type { Business } from '../shared/business';
 import type { AgentProfile } from '../shared/types';
 import { timeLabel } from './hudModel';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Sprite, type Person } from './design/Office';
 import { BURNOUT_RECOVERY_THRESHOLD, BURNOUT_STRESS_THRESHOLD } from '../shared/stressThresholds';
 import { metricState, playerText, type Metric } from './hudModel';
 
-export function MenuPanel({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function MenuPanel({ title, onClose, children, open = true }: { title: string; onClose: () => void; children: ReactNode; open?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
+    if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
     const element = dialog.current!;
     element.showModal();
     return () => { element.close(); if (previous?.isConnected) previous.focus(); };
-  }, []);
-  return <dialog ref={dialog} className="tool-panel" aria-labelledby="tool-title" onKeyDown={event => {
+  }, [open]);
+  return <dialog ref={dialog} className="tool-panel" aria-labelledby={titleId} onKeyDown={event => {
     if (event.key !== 'Tab') return;
-    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), summary, a[href], [tabindex]:not([tabindex="-1"])')).filter(element => element.getClientRects().length > 0);
+    const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), summary, a[href], [tabindex]:not([tabindex="-1"])')).filter(element => element.tabIndex >= 0 && element.getClientRects().length > 0);
     const first = items[0];
     const last = items.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -26,7 +28,7 @@ export function MenuPanel({ title, onClose, children }: { title: string; onClose
       const r = dialog.current.getBoundingClientRect();
       if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) onClose();
     }
-  }}><div className="tool-heading"><h2 id="tool-title">{title}</h2><button className="close" autoFocus onClick={onClose} aria-label={`Close ${title}`}>×</button></div><div className="tool-content">{children}</div></dialog>;
+  }}><div className="tool-heading"><h2 id={titleId}>{title}</h2><button className="close" autoFocus onClick={onClose} aria-label={`Close ${title}`}>×</button></div><div className="tool-content">{children}</div></dialog>;
 }
 
 export function MetricBar({ label, value, threshold }: { label: Metric; value: number; threshold: number }) {

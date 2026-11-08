@@ -4,6 +4,7 @@ import { TICKS_PER_MONTH, TICKS_PER_QUARTER, TICKS_PER_WEEK } from '../shared/wo
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ApiError, CastResponse, HistoryResponse, ModeReason, PriceDTO, SimResponse, StreamMessage, TickFrame } from '../shared/api';
+import type { CompanyTaskSummary } from '../shared/companyTasks';
 import type { AgentProfile, EventType, SimulationMode, SimulationState } from '../shared/types';
 import { mockCast, mockHistory, mockResponse } from './mocks';
 import { playerText } from './hudModel';
@@ -47,6 +48,7 @@ export type Connection = 'connecting' | 'live' | 'reconnecting' | 'mock';
 
 export interface Simulation {
   runId?: string; phase?: string | null; reportStatus?: string; storageError?: string | null;
+  companyTasks: CompanyTaskSummary[];
   injectBusiness: (templateId: string, isTrue: boolean) => Promise<boolean>;
   historyEpoch: number;
   acknowledge: (tick: number) => Promise<boolean>;
@@ -188,6 +190,7 @@ export function useSimulation(): Simulation {
   const running = snapshot?.state.running ?? false;
   return {
     runId: snapshot?.run_id, phase: snapshot?.phase, reportStatus: snapshot?.report_status, storageError: snapshot?.storage_error,
+    companyTasks: snapshot?.company_tasks ?? [],
     injectBusiness: (templateId, isTrue) => post('/sim/inject-business',{ template_id: templateId, is_true: isTrue }),
     historyEpoch,
     acknowledge,
