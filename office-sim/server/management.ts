@@ -1,3 +1,4 @@
+import { companySchedulingView, prepareCompanySchedule, recordCompanySchedule, validateCompanyAssignments, type CompanySchedule } from './company-tasks/adapter';
 import type { BusinessOption, ManagementContext, ManagementDecision } from '../shared/events';
 import type { World, TurnProvider, TurnContext } from './engine-types';
 import { ceoSchema, opsSchema } from './llm/schemas';
@@ -43,8 +44,8 @@ export function managementContext(w: World, kind: 'ceo' | 'ops', actor: string):
     tasks: structuredClone(w.business.tasks.filter(t => !['done','cancelled'].includes(t.status))),
   };
 }
-function contextForProvider(w: World, ctx: ManagementContext): TurnContext {
-  return { tick: w.tick, mode: 'llm_bias', state: structuredClone(w.agents[ctx.actor].state), available: [], colleagues: [], claims: [], events: [], management: ctx };
+function contextForProvider(w: World, ctx: ManagementContext, companySchedule?: CompanySchedule): TurnContext {
+  return { tick: w.tick, mode: 'llm_bias', state: structuredClone(w.agents[ctx.actor].state), available: [], colleagues: [], claims: [], events: [], management: ctx, ...(companySchedule ? { companySchedule } : {}) };
 }
 export function fallbackCeo(ctx: ManagementContext) {
   let cash = ctx.finances.cash - ctx.finances.committed;
@@ -57,11 +58,14 @@ export function fallbackCeo(ctx: ManagementContext) {
         deadline: Math.max(ctx.revision+1,e.deadline), acceptance: 'Completed acceptance work and verified business conditions.', communicate: [] as string[], reviewTick: Math.max(ctx.revision+1,Math.min(e.deadline,ctx.revision+days(1))) };
     }), rationale: 'Preserve delivery, address urgent risks and use feasible non-layoff measures.' };
 }
-export function fallbackOps(ctx: ManagementContext) {
+export function fallbackOps(ctx: ManagementContext, schedule?: CompanySchedule) {
   const remaining = new Map(ctx.employees.map(e => [e.id,e.capacity]));
   const assignments: ManagementDecision['assignments'] = [];
   for (const t of [...ctx.tasks].sort((a,b) => a.priority-b.priority || a.deadline-b.deadline || a.id.localeCompare(b.id))) {
-    const employee = ctx.employees.find(e => (remaining.get(e.id) ?? 0) > 0 && e.capabilities.includes(t.department) && (t.status !== 'review' || e.id !== t.owner) && t.dependencies.every(id => !ctx.tasks.some(d => d.id === id)));
+    const employees = ctx.employees.filter(e => (remaining.get(e.id) ?? 0) > 0 && e.capabilities.includes(t.department) && (t.status !== 'review' || e.id !== t.owner) && t.dependencies.every(id => !ctx.tasks.some(d => d.id === id)));
+    const preferred = t.status === 'review' ? t.reviewer : t.owner;
+    const employee = schedule?.waitingForSupplier.includes(t.id) ? undefined
+      : (schedule ? employees.find(e => e.id === preferred) : undefined) ?? employees[0];
     if (employee) { const allocation = Math.min(1,remaining.get(employee.id) ?? 0); remaining.set(employee.id,(remaining.get(employee.id) ?? 0)-allocation); assignments.push({ taskId: t.id, employeeId: employee.id, state: 'active', allocation }); }
     else assignments.push({ taskId: t.id, employeeId: t.owner, state: 'paused', allocation: 0 });
   }
@@ -81,11 +85,11 @@ function validateCeo(w: World, ctx: ManagementContext, raw: unknown) {
   if (spend > Math.max(0, ctx.finances.cash-ctx.finances.committed)) throw new Error('Unaffordable decision');
   return v;
 }
-function validateOps(w: World, ctx: ManagementContext, raw: unknown) {
+function validateOps(w: World, ctx: ManagementContext, raw: unknown, schedule?: CompanySchedule) {
   const v = opsSchema.parse(raw); if (v.revision !== w.tick) throw new Error('Stale operations revision');
   const used = new Map<string,number>(); const seen = new Set<string>();
   // Include preserved allocations so a partial response cannot overbook.
-  const merged = ctx.tasks.map(t => v.assignments.find(a => a.taskId === t.id) ?? { taskId: t.id, employeeId: t.owner, state: t.status === 'active' || t.status === 'review' ? 'active' : 'paused', allocation: t.allocated });
+  const merged = ctx.tasks.map(t => v.assignments.find(a => a.taskId === t.id) ?? { taskId: t.id, employeeId: schedule && t.status === 'review' ? t.reviewer ?? null : t.owner, state: t.status === 'active' || (t.status === 'review' && (!schedule || t.allocated > 0)) ? 'active' as const : 'paused' as const, allocation: t.allocated });
   for (const a of v.assignments) { if (!ctx.tasks.some(t => t.id === a.taskId) || seen.has(a.taskId)) throw new Error('Unknown/duplicate task'); seen.add(a.taskId); }
   for (const a of merged) {
     if (a.state === 'paused') { if (seen.has(a.taskId) && a.allocation !== 0) throw new Error('Paused work consumes no allocation'); continue; }
@@ -95,6 +99,7 @@ function validateOps(w: World, ctx: ManagementContext, raw: unknown) {
     used.set(p.id,(used.get(p.id) ?? 0)+a.allocation);
     if (used.get(p.id)! > p.capacity) throw new Error('Overbooked employee');
   }
+  if (schedule) validateCompanyAssignments(ctx, schedule, merged);
   return v;
 }
 /** Scheduling only changes when work, capacity or directives change, not on each progress increment. */
@@ -106,15 +111,23 @@ export function opsInputSignature(ctx: ManagementContext): string {
     tasks: ctx.tasks.map(t => [t.id,t.owner,t.reviewer,t.status,t.allocated,t.priority,t.deadline,t.dependencies]),
   });
 }
+function scheduleSignature(ctx: ManagementContext, company?: CompanySchedule) {
+  const signature = opsInputSignature(ctx);
+  return company ? JSON.stringify([signature, company.waitingForSupplier, company.escalations]) : signature;
+}
+
 export async function managementPhase(w: World, provider: TurnProvider | null, mode: string, phase?: (phase: string) => void) {
   const owners = managementOwners(w);
   for (const kind of ['ceo','ops'] as const) {
     const actor = owners[kind]; if (!actor) continue;
+    if (kind === 'ops') prepareCompanySchedule(w);
     const ctx = managementContext(w,kind,actor);
+    const company = kind === 'ops' ? companySchedulingView(w, ctx.tasks) : undefined;
+    if (company) ctx.tasks = company.tasks;
     const materialReport = ctx.evidence.some(e => e.tick === w.tick && e.certainty === 'observed' && ctx.cases.some(c => c.id === e.eventId));
     const needsCeo = materialReport || ctx.cases.some(e => e.deadline > w.tick && (!w.eventState.directives.some(d => d.eventId === e.id && d.active) || w.eventState.directives.some(d => d.eventId === e.id && d.active && d.reviewTick <= w.tick)));
-    const needsOps = ctx.tasks.some(t => !t.owner || t.status === 'review' || t.status === 'blocked' || t.status === 'pending' || (t.status === 'paused' && ctx.employees.some(e => e.capabilities.includes(t.department) && !ctx.tasks.some(a => a.owner === e.id && a.status === 'active')))) || w.eventState.decisions.some(d => d.tick === w.tick && d.kind === 'ceo');
-    const opsChanged = opsInputSignature(ctx) !== w.eventState.lastOpsInput;
+    const needsOps = Boolean(company) || ctx.tasks.some(t => !t.owner || t.status === 'review' || t.status === 'blocked' || t.status === 'pending' || (t.status === 'paused' && ctx.employees.some(e => e.capabilities.includes(t.department) && !ctx.tasks.some(a => a.owner === e.id && a.status === 'active')))) || w.eventState.decisions.some(d => d.tick === w.tick && d.kind === 'ceo');
+    const opsChanged = scheduleSignature(ctx, company?.schedule) !== w.eventState.lastOpsInput;
     if (kind === 'ceo' ? !needsCeo : !needsOps || !opsChanged) continue;
     phase?.(kind === 'ceo' ? 'CEO deciding' : 'Ops assigning');
     let value: ReturnType<typeof fallbackCeo> | ReturnType<typeof fallbackOps> | null = null; let fallback: string | null = null;
@@ -122,12 +135,12 @@ export async function managementPhase(w: World, provider: TurnProvider | null, m
     if (mode.startsWith('llm') && provider) for (let attempt = 0; attempt < 2; attempt++) {
       let rejectedIntent: unknown = null;
       try {
-        const raw = await withRequestMetrics(metrics, () => provider(w.agents[actor].profile,contextForProvider(w,ctx)));
+        const raw = await withRequestMetrics(metrics, () => provider(w.agents[actor].profile,contextForProvider(w,ctx,company?.schedule)));
         rejectedIntent = raw;
-        value = kind === 'ceo' ? validateCeo(w,ctx,raw) : validateOps(w,ctx,raw); break;
+        value = kind === 'ceo' ? validateCeo(w,ctx,raw) : validateOps(w,ctx,raw,company?.schedule); break;
       } catch (error) { w.eventState.diagnostics.push({ tick: w.tick, phase: kind, reason: error instanceof Error ? error.message : 'Invalid response', intent: JSON.stringify(rejectedIntent)?.slice(0,4000) }); }
     }
-    if (!value) { fallback = mode.startsWith('llm') ? 'role_response_unavailable' : 'rules'; value = kind === 'ceo' ? fallbackCeo(ctx) : fallbackOps(ctx); }
+    if (!value) { fallback = mode.startsWith('llm') ? 'role_response_unavailable' : 'rules'; value = kind === 'ceo' ? fallbackCeo(ctx) : fallbackOps(ctx,company?.schedule); }
     const id = `decision-${kind}-${w.tick}`;
     const d: ManagementDecision = { id, tick: w.tick, revision: w.tick, author: actor, kind, rationale: value.rationale, fallback,
       choices: value.kind === 'ceo' ? value.choices : [], assignments: value.kind === 'ops' ? value.assignments : [] };
@@ -166,6 +179,12 @@ export async function managementPhase(w: World, provider: TurnProvider | null, m
         t.owner = assignment.employeeId; t.status = assignment.state; t.allocated = assignment.allocation;
       }
     }
-    if (kind === 'ops') w.eventState.lastOpsInput = opsInputSignature(managementContext(w,'ops',actor));
+    if (kind === 'ops') {
+      if (company) recordCompanySchedule(w, ctx.tasks, d);
+      const next = managementContext(w,'ops',actor);
+      const view = company ? companySchedulingView(w, next.tasks) : undefined;
+      if (view) next.tasks = view.tasks;
+      w.eventState.lastOpsInput = scheduleSignature(next, view?.schedule);
+    }
   }
 }

@@ -1,3 +1,7 @@
+import { collaborate, companyKnowledge } from './company-tasks/collaboration';
+import { prepareCompanyTask } from './company-tasks/intake';
+import { observeCompanyTick } from './company-tasks/lifecycle';
+import { tickActivity } from './company-tasks/state';
 import { CATALOG, eligible } from './events/catalog';
 import { initialiseBusiness, openBusinessTick } from './business';
 import { initialEvents, openEvent, updateLifecycle } from './events/lifecycle';
@@ -120,7 +124,9 @@ export function buildContext(
 ): TurnContext {
   const beliefs: Record<string, number> = {};
   for (const h of agent.claims) if (h.belief !== null) beliefs[h.claimId] = h.belief;
+  const knowledge = companyKnowledge(world, agent.id);
   return {
+    ...(knowledge ? { companyKnowledge: knowledge } : {}),
     tick: world.tick,
     mode: config.mode,
     state: structuredClone(agent.state),
@@ -251,7 +257,7 @@ export interface TickResult {
   log: EngineTickLog;
 }
 
-export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>> & { business?: boolean; onPhase?: (phase: string) => void; isCurrent?: () => boolean };
+export type TickConfig = Pick<RunConfig, 'mode' | 'scenario' | 'gossip' | 'billboard'> & Partial<Pick<RunConfig, 'priceFeedback'>> & { business?: boolean; onPhase?: (phase: string) => void; isCurrent?: () => boolean; endOfRun?: () => boolean };
 
 /**
  * One tick: previous-return feedback -> apply event -> agent turns (LLM, all on the start-of-tick
@@ -283,6 +289,7 @@ export async function runTick(
     ? pending.filter(ev => !ev.templateId).map((ev, i) => applyEvent(w, ev, params, stream(w.seed, t, `event-${i}`, 'event')))
     : [];
 
+  let attention: Record<string, number> | undefined;
   if (config.business) {
     openBusinessTick(w);
     // Legacy scenario injections are informational overrides. Structured business injections
@@ -303,7 +310,13 @@ export async function runTick(
     detectIncidents(w);
     // New cases open and management meets in office hours only.
     if (config.billboard && isOfficeHour(t)) scheduleEvents(w);
-    if (isOfficeHour(t)) await managementPhase(w,provider,config.mode,phase => { assertCurrent(); config.onPhase?.(phase); });
+    if (isOfficeHour(t)) {
+      const phase = (label: string) => { assertCurrent(); config.onPhase?.(label); };
+      if (w.companyTasks) await prepareCompanyTask(w, provider, config.mode, phase, assertCurrent);
+      await managementPhase(w,provider,config.mode,phase);
+    }
+    assertCurrent();
+    if (w.companyTasks) attention = await collaborate(w, provider, config.mode, assertCurrent);
     assertCurrent(); config.onPhase?.('Employees working');
   }
   // 2. Agent turns in seeded random order.
@@ -378,7 +391,11 @@ export async function runTick(
   const results: Record<string, ResolveResult> = {};
   for (const id of order) {
     results[id] = resolveAction(w, id, decisions[id], params, rngFactory(w.seed, t, id));
-    if (config.business) executeWork(w,w.agents[id],decisions[id]);
+    if (config.business) {
+      const reserved = attention?.[id];
+      if (reserved) w.business.used += reserved;
+      executeWork(w,w.agents[id],decisions[id], reserved ? Number((w.business.positions[id].capacity - reserved).toFixed(2)) : undefined);
+    }
   }
   if (config.business) {
     for (const id of activeIds) {
@@ -410,6 +427,7 @@ export async function runTick(
     }
   }
 
+  if (config.business && w.companyTasks) observeCompanyTick(w, quits, config.endOfRun?.() ?? false);
   const presence = depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
   const valuation = updatePrice(world.price, {
@@ -445,7 +463,9 @@ export async function runTick(
   const states: EngineTickLog['states'] = {};
   for (const id of w.ids) states[id] = { ...structuredClone(w.agents[id].state), status: w.agents[id].status };
 
+  const companyActivity = tickActivity(w);
   const log: EngineTickLog = {
+    ...(companyActivity ? { companyActivity } : {}),
     ...(config.business ? { business: { decisions: w.eventState.decisions.filter(d => d.tick === t).map(d => d.id), work: w.business.work.filter(r => r.tick === t).map(r => r.id), events: w.eventState.cases.filter(e => e.openedTick === t).map(e => e.id), ledger: w.business.ledger.filter(e => e.tick === t).map(e => e.id) } } : {}),
     price: valuation.record,
     tick: t,

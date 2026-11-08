@@ -1,3 +1,4 @@
+import { canUseCompanyWork } from './company-tasks/collaboration';
 import type { Decision, EngineAgent, Proposal, TurnContext, World } from './engine-types';
 import type { Task } from '../shared/business';
 import { BUSINESS_PARAMS, post, signContract } from './business';
@@ -8,9 +9,9 @@ import { stream } from './rng';
 import { employeeSchema } from './llm/schemas';
 export function workContext(w: World, agent: EngineAgent): NonNullable<TurnContext['work']> {
   const tasks = w.business.tasks;
-  const assignments = tasks.filter(t => t.owner === agent.id && t.status === 'active');
+  const assignments = tasks.filter(t => t.owner === agent.id && t.status === 'active' && canUseCompanyWork(w, t.id, agent.id));
   const reviewable = tasks.filter(t => t.status === 'review' && t.reviewer === agent.id && t.allocated > 0);
-  const supportable = tasks.filter(t => t.owner && t.owner !== agent.id && t.status === 'active' && w.business.positions[agent.id].capabilities.includes(t.department)).map(t => ({ taskId: t.id, colleagueId: t.owner!, version: t.version }));
+  const supportable = tasks.filter(t => t.owner && t.owner !== agent.id && t.status === 'active' && w.business.positions[agent.id].capabilities.includes(t.department) && canUseCompanyWork(w, t.id, t.owner)).map(t => ({ taskId: t.id, colleagueId: t.owner!, version: t.version }));
   const eventIds = new Set([...assignments,...reviewable].map(t => t.eventId));
   return { schemaVersion: 1, revision: w.tick, supervisor: managementOwners(w).ops, role: w.business.positions[agent.id].role,
     assignments: structuredClone(assignments), reviewable: structuredClone(reviewable), supportable,
@@ -82,11 +83,16 @@ function completeTask(w: World, t: Task) {
     consumeSlot(w,'common','replaced_by_work_outcome',e.id);
   }
 }
-export function executeWork(w: World, agent: EngineAgent, decision: Decision): string {
+export function executeWork(w: World, agent: EngineAgent, decision: Decision, remainingAttention?: number): string {
   const b = w.business; const ctx = workContext(w,agent); let progress = 0; let outcome = 'Time spent away from assigned delivery';
   const t = b.tasks.find(t => t.id === decision.task_id);
   const current = t && t.version === decision.assignment_version;
-  if (decision.action === 'report_issue') {
+  if (remainingAttention !== undefined && (
+    (decision.action === 'report_issue' || decision.action === 'support_colleague') && remainingAttention < 1
+    || decision.action === 'review_work' && t && remainingAttention < t.allocated
+  )) {
+    outcome = 'Task coordination left insufficient time for a full-turn action';
+  } else if (decision.action === 'report_issue') {
     const evidence = w.eventState.evidence.find(e => e.id === decision.evidence_id && e.recipients.includes(agent.id));
     const event = w.eventState.cases.find(e => e.id === evidence?.eventId);
     if (event && evidence && decision.target && w.agents[decision.target]?.status === 'active') {
@@ -101,10 +107,11 @@ export function executeWork(w: World, agent: EngineAgent, decision: Decision): s
     b.controls = Math.min(0.8,b.controls+0.01); b.used += 1; outcome = 'Colleague support improved preventive controls';
   } else if ((decision.action === 'work' || decision.action === 'overwork') && current && t.owner === agent.id && t.status === 'active' && agent.status === 'active') {
     if (t.dependencies.some(id => b.tasks.find(t => t.id === id)?.status !== 'done')) outcome = 'Blocked by incomplete dependency';
+    else if (!canUseCompanyWork(w, t.id, agent.id)) outcome = 'Blocked until the required finding is delivered';
     else if (w.tick < b.supplierAvailableAt && ['delivery','release','onboarding'].includes(t.kind)) outcome = 'Blocked by supplier; work remains outstanding';
     else {
-      progress = Math.min(t.remaining,t.allocated*(decision.action === 'overwork' ? 1.2 : 1));
-      t.remaining = Math.max(0,Number((t.remaining-progress).toFixed(4))); b.used += Math.min(1,progress);
+      progress = Math.min(t.remaining,Math.min(t.allocated, remainingAttention ?? t.allocated)*(decision.action === 'overwork' ? 1.2 : 1));
+      t.remaining = Math.max(0,Number((t.remaining-progress).toFixed(4))); b.used += Math.min(remainingAttention ?? 1,progress);
       outcome = 'Assigned work advanced';
       if (t.remaining === 0) {
         const risk = Math.max(0.002,Math.min(BUSINESS_PARAMS.errorMax,(BUSINESS_PARAMS.errorBase + agent.state.burnout/100*BUSINESS_PARAMS.fatigueError + Math.max(0,agent.state.workload-70)/30*BUSINESS_PARAMS.overloadError)*(1-b.controls)*(t.reviewed ? 1-BUSINESS_PARAMS.reviewReduction : 1)));

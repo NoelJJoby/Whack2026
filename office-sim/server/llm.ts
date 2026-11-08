@@ -1,3 +1,4 @@
+import { buildCompanyTaskPrompt } from './llm/company-task-prompt';
 import { buildManagementPrompt } from './llm/management-prompt';
 import type { EngineProfile, TurnProvider } from './engine-types';
 import { createMessageClient } from './llm/client';
@@ -17,8 +18,15 @@ export function createTurnProvider(
   let request: ReturnType<typeof createMessageClient> | undefined;
   const provider: TurnProvider = async (agent, ctx) => {
     try {
-      const prompt = ctx.management ? buildManagementPrompt(ctx.management) : buildTurnPrompt(agent, ctx, options.personaFor?.(agent));
       request ??= createMessageClient(options);
+      if (ctx.companyTurn) {
+        const turn = ctx.companyTurn;
+        const result = await request(buildCompanyTaskPrompt(agent, ctx, turn), {
+          purpose: `company-${turn.kind}`, maxTokens: turn.kind === 'brief' ? 2200 : 120,
+        });
+        return result ? parseReply(result.message) : null;
+      }
+      const prompt = ctx.management ? buildManagementPrompt(ctx.management, ctx.companySchedule) : buildTurnPrompt(agent, ctx, options.personaFor?.(agent));
       const result = await request(prompt, { purpose: ctx.management?.kind ?? 'employee', ...(ctx.management ? { maxTokens: 2200 } : {}) });
       // The prompt shows names and claim keys; the engine needs ids.
       // Engine validation, its one retry and rules fallback remain in tick.ts.
