@@ -1,3 +1,6 @@
+import type { CompanyActivity, CompanyTask } from '../shared/companyTasks';
+import type { CompanyTurn } from './llm/company-task-prompt';
+import type { CompanySchedule } from './company-tasks/adapter';
 import type { Business } from '../shared/business';
 import type { EventState, ManagementContext, EmployeeWorkContext } from '../shared/events';
 // Engine-local types: anything the engine needs that shared/types.ts does not
@@ -165,6 +168,7 @@ export interface CustomPriceEffect {
 export interface AppliedEvent { type: EventType; is_true: boolean; claim: string; custom?: CustomPriceEffect }
 
 export interface World {
+  companyTasks?: CompanyTask[];
   business: Business;
   eventState: EventState;
   price: PriceState;
@@ -247,6 +251,9 @@ export interface RunConfig {
 
 /** What an agent is told. Never includes truth tags. */
 export interface TurnContext {
+  companyTurn?: CompanyTurn;
+  companySchedule?: CompanySchedule;
+  companyKnowledge?: { objective: string; work: Array<{ title: string; acceptance: string; receivedFindings: string[] }> };
   management?: ManagementContext;
   work?: EmployeeWorkContext;
   tick: number;
@@ -337,6 +344,7 @@ export interface HopLog {
 }
 
 export interface EngineTickLog {
+  companyActivity?: CompanyActivity[];
   business?: { decisions: string[]; work: string[]; events: string[]; ledger: string[] };
   price: PriceRecord;
   tick: number;

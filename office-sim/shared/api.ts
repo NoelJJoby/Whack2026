@@ -1,6 +1,7 @@
 // HTTP + SSE contract between server/index.ts and the web client.
 // PENDING TEAM SIGN-OFF (integration plan item S2). Additive only: nothing in
 // shared/types.ts changes.
+import type { CompanyActivity, CompanyTaskSummary } from './companyTasks';
 import type { AgentProfile, EventType, SimulationMode, SimulationState, TickRecord } from './types';
 
 /** Why the server runs in its current mode. */
@@ -26,6 +27,7 @@ export interface PriceDTO {
 }
 
 export interface SimResponse {
+  company_tasks?: CompanyTaskSummary[];
   run_id?: string;
   revision?: number;
   phase?: string | null;
@@ -75,6 +77,7 @@ export interface TickEvent {
 }
 
 export interface TickFrame {
+  company_activity?: CompanyActivity[];
   /** Factual close-of-day narration, generated only at 23:00. */
   day_report?: DayReport;
   price: PriceDTO;

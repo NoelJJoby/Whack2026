@@ -42,6 +42,7 @@ test('play computes one hour, waits for acknowledgement, resumes and clears its 
 
 test('step bypasses the gate and factual daily reports appear only at 23:00', async () => {
   const m = new OfficeSimManager(directory());
+  m.reseed(42); // The quiet fixture has no billboard shocks in its first two workdays.
   for (let n = 1; n <= 16; n++) {
     await m.step();
     const frame = m.history().history.at(-1)!;

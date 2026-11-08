@@ -1,7 +1,10 @@
 import { Component, lazy, Suspense, type ComponentProps, type ReactNode } from 'react';
 import type OfficeScene from './Office3D';
 
-const Office3D = lazy(() => import('./Office3D'));
+const loadOffice3D = () => import('./Office3D');
+const Office3D = lazy(loadOffice3D);
+// Start downloading the 3D bundle at startup so it is ready before the first data arrives.
+void loadOffice3D();
 
 class SceneBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
