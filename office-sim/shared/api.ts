@@ -75,11 +75,26 @@ export interface TickEvent {
 }
 
 export interface TickFrame {
+  /** Factual close-of-day narration, generated only at 23:00. */
+  day_report?: DayReport;
   price: PriceDTO;
   tick: number;
   records: TickRecord[];
   events: TickEvent[];
   state: SimulationState;
+}
+
+export interface DayReport {
+  day: number;
+  lines: string[];
+  fillerDays: number[];
+}
+
+/** POST /api/sim/presented: furthest hour the viewer has reached. */
+export interface PresentedRequest {
+  tick: number;
+  /** Prevent an acknowledgement from a previous run opening a new run's gate. */
+  run_id?: string;
 }
 
 export interface HistoryResponse extends SimResponse {

@@ -97,8 +97,9 @@ export function modifiers(s: Scaled, fresh: boolean, p: Params): ActionMap {
   return out;
 }
 
+/** Colleagues in the office this hour: after 17:00 you can only talk to people still working late. */
 export function activeColleagues(agent: EngineAgent, world: World): string[] {
-  return world.ids.filter((id) => id !== agent.id && world.agents[id].status === 'active');
+  return world.ids.filter((id) => id !== agent.id && world.agents[id].status === 'active' && world.agents[id].present !== false);
 }
 
 export interface MaskOptions {

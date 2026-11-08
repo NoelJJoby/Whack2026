@@ -101,13 +101,13 @@ function hasTerm(t: string[], terms: readonly string[]): boolean {
   return terms.some((term) => text.includes(` ${term}`));
 }
 
-/**
- * Echo opener: a key term within the first `firstWords` words, or a first
- * sentence that is a question containing one ("Twenty-hour days? Sure.").
+/** A headline repeated back as a question ("Twenty-hour days? Sure.").
+ * Concrete questions about consequences are welcome; the caller separately
+ * checks verbatim headline similarity, including questions with an interrogative.
  */
-export function isEchoOpener(line: string, terms: readonly string[], firstWords: number): boolean {
+export function isEchoOpener(line: string, terms: readonly string[], _firstWords?: number): boolean {
   if (terms.length === 0) return false;
-  if (hasTerm(tokens(line).slice(0, firstWords), terms)) return true;
   const first = sentences(line)[0] ?? '';
-  return first.endsWith('?') && hasTerm(tokens(first), terms);
+  const inquiry = /\b(?:what|how|why|who|when|where|does|do|can|could|will|would|has|have)\b/i.test(first);
+  return first.endsWith('?') && !inquiry && hasTerm(tokens(first), terms);
 }

@@ -35,6 +35,8 @@ export interface Person extends Look {
     says: string;
     thinks: string;
     quit: boolean;
+    present?: boolean;
+    late?: boolean;
 }
 /** Portrait expression by stress band. */
 export type Mood = 'calm' | 'stretched' | 'snapping';
@@ -85,8 +87,8 @@ export function Office({ people, selected, onSelect, highlight, speaking = null 
       {index === 1 && <div className="cooler"><i /><b /></div>}
       {index === 2 && <div className="exit"><span>EXIT →</span><i /></div>}
       {people.filter(p => p.floor === index).map(p => {
-        return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : ''} ${speaking === p.id ? 'speaking' : ''}`} style={{ left: `${p.x}%` }}>
-        <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" data-employee={p.id} aria-label={`Inspect ${p.name}`} aria-haspopup="dialog" aria-expanded={selected === p.id} onClick={() => onSelect(p.id)}><Sprite person={p} quit={p.quit}/><span className="name-label">{p.name}{p.stress > BURNOUT_STRESS_THRESHOLD && <b>!</b>}</span></button>
+        return <div key={p.id} className={`station ${selected === p.id ? 'selected' : ''} ${highlight.includes(p.id) ? 'highlighted' : ''} ${p.quit ? 'departed' : p.present === false ? 'off-shift' : ''} ${speaking === p.id ? 'speaking' : ''}`} style={{ left: `${p.x}%` }}>
+        <div className="desk"><i className="monitor"/><i className="mug"/></div><button className="person" data-employee={p.id} aria-label={`Inspect ${p.name}`} aria-haspopup="dialog" aria-expanded={selected === p.id} onClick={() => onSelect(p.id)}><Sprite person={p} quit={p.quit}/><span className="name-label">{p.name}{p.stress > BURNOUT_STRESS_THRESHOLD && <b>!</b>}</span>{!p.quit && (p.present === false || p.late) && <small className="presence-label">{p.present === false ? 'Left for the day' : 'Working late'}</small>}</button>
       </div>;
       })}
     </div>)}

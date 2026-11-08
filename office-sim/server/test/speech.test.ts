@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import type { RunConfig, TurnContext, TurnProvider } from '../engine-types';
 import { DEFAULT_PARAMS as P } from '../params';
 import { buildScenario, fixtureCast } from '../scripts/fixture';
-import { checkLine, checkThought, joinSpeech } from '../speech';
+import { checkLine, checkThought, joinSpeech, planRound } from '../speech';
 import { createStubProvider } from '../stub-provider';
 import { createWorld, runSimulation, runTick } from '../tick';
 
@@ -14,6 +14,21 @@ const config = (seed: number, over: Partial<RunConfig> = {}): RunConfig => ({
 
 const speechOf = (r: Awaited<ReturnType<typeof runSimulation>>) =>
   r.logs.map((l) => l.decisions.map((d) => ({ agent: d.agent, manner: d.speech?.manner, stance: d.speech?.stance, addressee: d.speech?.addressee })));
+
+it('news styles use only delivered evidence and allow direct reactions without headline echoes', () => {
+  const w = createWorld(fixtureCast(42), 42); w.tick = 3;
+  (w as typeof w & { businessEnabled: boolean }).businessEnabled = true;
+  w.eventState.evidence.push({ id: 'private', eventId: 'private-case', tick: 3, deliveryTick: 3, source: 'ceo', recipients: ['gossip'], text: 'Client rollout delayed until Friday.', certainty: 'observed' });
+  const styles = planRound(w, ['gossip', 'skeptic'], P);
+  assert.ok(styles.gossip.news!.includes('Client rollout delayed until Friday.'));
+  assert.equal(styles.gossip.manner === 'change_subject', false);
+  assert.deepEqual(styles.skeptic.news, []);
+  w.tick += P.voice.news.windowTicks;
+  assert.deepEqual(planRound(w, ['gossip'], P).gossip.news, []);
+  assert.deepEqual(checkLine('a', 'The rollout delay leaves my team without a plan.', [], [], [['rollout', 'delay']], P.voice, ['Client rollout delayed until Friday.']).flags, []);
+  assert.ok(checkLine('a', 'Client rollout delayed until Friday.', [], [], [['rollout']], P.voice, ['Client rollout delayed until Friday.']).flags.includes('echo'));
+  assert.ok(checkLine('a', 'Rollout delayed?', [], [], [['rollout']], P.voice).flags.includes('echo'));
+});
 
 describe('speech: determinism', () => {
   it('the same seed gives identical voice cards and manners across two runs', async () => {
@@ -132,11 +147,11 @@ describe('speech: repetition check and regeneration', () => {
     assert.equal(r.log.speech!.budget_left, decisions.length * (1 + P.bias.llmRetries) - decisions.length - (decisions.length - 1));
   });
 
-  it('flags thoughts that open with the event, copy a colleague or leak', () => {
+  it('allows thoughts about the event while rejecting copied openers and leaks', () => {
     const v = P.voice;
     const earlier = [{ agent: 'a', line: 'Two a.m. until launch, nobody asked me.' }];
     const terms = [['hour', '2', 'two']];
-    assert.deepEqual(checkThought('b', 'Two a.m. until launch, and my kids?', earlier, [], terms, v), ['thought:opener', 'thought:echo']);
+    assert.deepEqual(checkThought('b', 'Two a.m. until launch, and my kids?', earlier, [], terms, v), ['thought:opener']);
     assert.deepEqual(checkThought('b', 'My kids are asleep by the time two a.m. comes.', earlier, [], terms, v), []);
     assert.deepEqual(checkThought('b', 'The climber is loving this, nine ticks in.', [], [], [], v), ['thought:label', 'thought:tick']);
   });
