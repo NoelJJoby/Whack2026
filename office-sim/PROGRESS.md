@@ -15,7 +15,8 @@
   ASSETS_TODO.md. M1: 60 fps, p95 17 ms. Compass removed (user).
 - Tweaks: walkers sidestep/yield via shared `crowd`; complain = arms up (not typing); CEO quits with a
   briefcase + 'CEO resigns'; Office3D `panic` prop (placeholder flail/run, not wired to events yet).
-  Dev previews: `?preview=panic`, `?preview=ceo-quit`.
+  CEO quit mid-session = cutscene (Director in Office3D: lock orbit, zoom+follow, letterbox, headline;
+  CEO raises fist 3 s, real-time pace). Dev previews: `?preview=panic`, `?preview=ceo-quit`.
 
 ## Next
 - Feature freeze from 05:30. Flip default to 3D only on the user's say-so (VITE_VIEW=3d).

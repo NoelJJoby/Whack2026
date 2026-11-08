@@ -16,6 +16,7 @@ const DWELL = 2;
 const HIP_SIT = 0.55, HIP_STAND = 0.78;
 const PANIC_RUN = 2.4; // panic speed multiplier
 const PERSONAL = 0.75; // agents closer than this sidestep each other
+const CEO_GESTURE = 3; // seconds the resigning CEO stands with a raised fist before walking out
 
 /** Shared live positions so walkers can avoid each other. */
 export type Crowd = Map<string, { x: number; z: number; phase: number; moving: boolean }>;
@@ -53,8 +54,10 @@ function Bubble({ name, line, showThoughts }: { name: string; line: DialogueLine
 
 const lerpAngle = (a: number, b: number, t: number) => a + (Math.atan2(Math.sin(b - a), Math.cos(b - a))) * t;
 
-export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, selected, highlighted, line, showThoughts, onSelect }: {
+export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, cinematic = false, selected, highlighted, line, showThoughts, onSelect }: {
   person: Person; nav: Nav; crowd: Crowd; behaviour: Behaviour; phase: number; speed: number;
+  /** Starring in the CEO-resigns cutscene: real-time pace and a raised-fist beat before walking out. */
+  cinematic?: boolean;
   selected: boolean; highlighted: boolean; line: DialogueLine | null; showThoughts: boolean; onSelect: (id: string) => void;
 }) {
   const root = useRef<Group>(null);
@@ -66,7 +69,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
   // Already gone if they had quit before this view mounted; otherwise they walk out first.
   const [gone, setGone] = useState(person.quit);
   const home = nav.pos.get(seatNode(person.id)) ?? [0, 0];
-  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: person.quit, dwell: 0, wait: 0, side: 0 });
+  const mv = useRef({ x: home[0], z: home[1], node: seatNode(person.id), queue: [] as string[], heading: 0, t: phase, gone: person.quit, dwell: 0, wait: 0, side: 0, hold: 0, held: false, goal: '', nav: null as Nav | null });
   // Ticks can outpace walking: finish the current move, then switch. Quitting and panic interrupt at once.
   const [behaviour, setBehaviour] = useState(latest);
   const key = (b: Behaviour) => `${b.goal}|${b.kind}|${b.tag}|${b.face}`;
@@ -75,12 +78,6 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
   }, [latest.kind]);
   useEffect(() => () => { crowd.delete(person.id); }, [crowd, person.id]);
 
-  useEffect(() => {
-    const m = mv.current;
-    const start = m.queue[0] ?? m.node;
-    const route = nav.route(start, behaviour.goal);
-    m.queue = m.queue.length ? [start, ...route.slice(1)] : route.slice(1);
-  }, [nav, behaviour.goal]);
 
   const k = behaviour.kind;
   const shirt = useMemo(() => k === 'overwork' ? `#${new Color(person.color).lerp(new Color('#d9483b'), 0.5).getHexString()}` : person.color, [k, person.color]);
@@ -88,8 +85,18 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
   useFrame((_, delta) => {
     const m = mv.current, g = root.current;
     if (!g || m.gone) return;
-    const dt = Math.min(delta, 0.1) * speed;
+    // Re-route here rather than in an effect, so no frame ever sees a new goal with the old (empty) route.
+    if (m.goal !== behaviour.goal || m.nav !== nav) {
+      const start = m.queue[0] ?? m.node;
+      const route = nav.route(start, behaviour.goal);
+      m.queue = m.queue.length ? [start, ...route.slice(1)] : route.slice(1);
+      m.goal = behaviour.goal; m.nav = nav;
+    }
+    if (k === 'quit' && cinematic && !m.held) { m.hold = CEO_GESTURE; m.held = true; }
+    const dt = Math.min(delta, 0.1) * (cinematic ? 1 : speed);
     m.t += dt;
+    const holding = m.hold > 0;
+    if (holding) m.hold -= Math.min(delta, 0.1);
     const panic = k === 'panic';
     // Give way to anyone walking towards us (lower phase has priority, never for long), and sidestep when close.
     let side = 0, blocked = false;
@@ -103,7 +110,7 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
       if (m.queue.length && !panic && k !== 'quit' && o.moving && o.phase < phase && ox * hx + oz * hz > 0.2 && d < 0.6) blocked = true;
     }
     m.wait = blocked ? m.wait + dt : 0;
-    const step = blocked && m.wait < 1.2 ? 0 : dt * WALK * (panic ? PANIC_RUN : 1);
+    const step = holding || (blocked && m.wait < 1.2) ? 0 : dt * WALK * (panic ? PANIC_RUN : 1);
     if (m.queue.length) {
       const id = m.queue[0];
       const [px, pz] = nav.pos.get(id)!;
@@ -124,13 +131,15 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
     }
     m.dwell = arrived ? m.dwell + dt : 0;
     if (arrived && m.dwell > DWELL && key(latest) !== key(behaviour)) { m.dwell = 0; setBehaviour(latest); }
-    const walking = !arrived;
+    const walking = !arrived && !holding;
     const sitting = arrived && (k === 'desk' || k === 'overwork' || k === 'sofa');
     crowd.set(person.id, { x: m.x, z: m.z, phase, moving: walking });
     // Sidestep only while walking (drawn offset; the logical path stays on the waypoint graph).
     m.side += ((walking ? Math.max(-0.35, Math.min(0.35, side)) : 0) - m.side) * Math.min(1, dt * 6);
     g.position.set(m.x + hz * m.side, FLOOR, m.z - hx * m.side);
-    g.rotation.y = lerpAngle(g.rotation.y, arrived && behaviour.face !== null ? behaviour.face : m.heading, Math.min(1, dt * 10));
+    // The resigning CEO turns to face the camera for their moment.
+    const facing = holding ? 0.35 : arrived && behaviour.face !== null ? behaviour.face : m.heading;
+    g.rotation.y = lerpAngle(g.rotation.y, facing, Math.min(1, dt * 10));
 
     const t = m.t, swing = Math.sin(t * (panic ? 16 : 9));
     if (body.current) body.current.position.y = (sitting ? HIP_SIT : HIP_STAND) + (walking ? Math.abs(swing) * (panic ? 0.1 : 0.04) : Math.sin(t * 2) * 0.008);
@@ -143,7 +152,8 @@ export function Agent3D({ person, nav, crowd, behaviour: latest, phase, speed, s
     arms.forEach((ref, i) => {
       if (!ref.current) return;
       let a = Math.sin(t * 1.5 + i) * 0.05, out = 0;
-      if (panic) { a = -2.6 + Math.sin(t * 20 + i * Math.PI) * 0.8; out = 0.5 + Math.sin(t * 15 + i) * 0.3; }
+      if (holding) { a = i ? -3.0 + Math.sin(t * 12) * 0.22 : 0.1; out = i ? 0.15 : 0; }
+      else if (panic) { a = -2.6 + Math.sin(t * 20 + i * Math.PI) * 0.8; out = 0.5 + Math.sin(t * 15 + i) * 0.3; }
       else if (k === 'quit') a = -1.2;
       else if (walking) a = (i ? swing : -swing) * 0.6;
       else if (k === 'desk') a = typing(14, i);

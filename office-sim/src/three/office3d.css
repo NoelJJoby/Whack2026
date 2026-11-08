@@ -71,3 +71,17 @@
 .view-3d .connection-status { top: 158px; }
 
 .o3-tag.panic { background: #f04a3a; color: #fff; font-weight: 700; animation: o3-blink .3s steps(2) infinite; }
+
+/* CEO-resigns cutscene: letterbox bars and a breaking-news headline. */
+.o3-cutscene { position: absolute; inset: 0; z-index: 5; pointer-events: none; } /* above agent tags (z ≤ 4) */
+.o3-cutscene .bar { position: absolute; left: 0; right: 0; height: 9vh; background: #05080f; animation: o3-bar .6s ease-out both; }
+.o3-cutscene .bar.top { top: 0; transform-origin: top; }
+.o3-cutscene .bar.bottom { bottom: 0; transform-origin: bottom; }
+.o3-headline { position: absolute; left: 50%; top: max(17%, 112px); transform: translateX(-50%); text-align: center; animation: o3-slam .5s 1.4s cubic-bezier(.2, 1.6, .4, 1) both; }
+.o3-headline span { display: inline-block; padding: 4px 12px; background: #d8352a; color: #fff; font-size: 16px; letter-spacing: .2em; text-transform: uppercase; animation: o3-blink 1s steps(2) 1.9s infinite; }
+.o3-headline strong { display: block; margin-top: 8px; padding: 6px 28px 10px; background: #fbf7ec; color: #14203a; border: 3px solid #14203a; box-shadow: 8px 8px 0 #d8352a; font: 400 clamp(40px, 6.5vw, 88px)/1 'VCR OSD Mono', monospace; text-transform: uppercase; white-space: nowrap; }
+.o3-headline em { display: inline-block; margin-top: 12px; padding: 4px 10px; background: #13203aeb; border: 1px solid #d7b66c; color: #e3e5d5; font-style: normal; font-size: 15px; }
+.o3-cutscene.out .bar, .o3-cutscene.out .o3-headline { animation: o3-fade 1.2s ease-in forwards; }
+@keyframes o3-bar { from { transform: scaleY(0); } }
+@keyframes o3-slam { from { opacity: 0; transform: translateX(-50%) scale(2.2); } }
+@keyframes o3-fade { to { opacity: 0; } }

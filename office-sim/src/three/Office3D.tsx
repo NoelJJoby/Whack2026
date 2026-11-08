@@ -1,8 +1,8 @@
 // 3D isometric voxel office (VITE_VIEW=3d). Same props as the 2D <Office>; renders only what it is given.
-import { useEffect, useMemo, useRef, useState, type ElementRef } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, PerformanceMonitor, Stats } from '@react-three/drei';
-import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, type OrthographicCamera } from 'three';
+import { DoubleSide, MeshBasicMaterial, MeshLambertMaterial, Vector3, type OrthographicCamera } from 'three';
 import type { Person } from '../design/Office';
 import type { DialogueLine } from '../dialogueQueue';
 import type { TickRecord } from '../../shared/types';
@@ -78,6 +78,50 @@ function FitZoom() {
   return null;
 }
 
+interface Cutscene { id: string; name: string; ending: boolean }
+type Controls = ElementRef<typeof OrbitControls>;
+
+/** CEO-resigns camera: zoom onto the CEO, follow them out, then ease back to the player's view. */
+function Director({ cutscene, crowd, controls, onDone }: {
+  cutscene: Cutscene | null; crowd: Crowd; controls: RefObject<Controls>; onDone: () => void;
+}) {
+  const saved = useRef<{ zoom: number; target: Vector3; position: Vector3 } | null>(null);
+  const started = useRef(0);
+  const goal = useMemo(() => new Vector3(), []);
+  useFrame(({ clock }, delta) => {
+    const c = controls.current;
+    if (!c) return;
+    const cam = c.object as OrthographicCamera;
+    const ease = 1 - Math.exp(-Math.min(delta, 0.1) * 3);
+    let zoomTo: number;
+    if (cutscene && !cutscene.ending) {
+      if (!saved.current) { saved.current = { zoom: cam.zoom, target: c.target.clone(), position: cam.position.clone() }; started.current = clock.elapsedTime; }
+      const star = crowd.get(cutscene.id);
+      // The CEO leaves the crowd once they are off the plot: the scene is over.
+      if (!star) { if (clock.elapsedTime - started.current > 3) onDone(); return; }
+      // Aim a little beyond the CEO so they sit in the lower third, clear of the headline.
+      const az = c.getAzimuthalAngle();
+      goal.set(star.x - Math.sin(az) * 2, 1, star.z - Math.cos(az) * 2);
+      zoomTo = saved.current.zoom * 2.4;
+    } else if (saved.current) {
+      goal.copy(saved.current.target);
+      zoomTo = saved.current.zoom;
+      if (c.target.distanceTo(goal) < 0.05 && Math.abs(cam.zoom - zoomTo) < 0.2) {
+        cam.position.copy(saved.current.position); c.target.copy(goal); cam.zoom = zoomTo;
+        cam.updateProjectionMatrix(); c.update(); saved.current = null;
+        return;
+      }
+    } else return;
+    // Move camera and target together so the viewing angle never changes.
+    const shift = goal.clone().sub(c.target).multiplyScalar(ease);
+    c.target.add(shift); cam.position.add(shift);
+    cam.zoom += (zoomTo - cam.zoom) * ease;
+    cam.updateProjectionMatrix();
+    c.update();
+  });
+  return null;
+}
+
 export default function Office3D({ people: cast, selected, onSelect, highlight, line = null, showThoughts = false, records = {}, speed = 1, panic = false }: {
   people: Person[];
   selected: string | null;
@@ -95,7 +139,8 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
 }) {
   const [previewing, setPreviewing] = useState(false);
   useEffect(() => { if (PREVIEW) { const id = setTimeout(() => setPreviewing(true), 3000); return () => clearTimeout(id); } }, []);
-  const people = useMemo(() => previewing && PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: true } : p) : cast, [cast, previewing]);
+  // The CEO preview seats the CEO first (even if they already quit this run), then makes them resign.
+  const people = useMemo(() => PREVIEW === 'ceo-quit' ? cast.map(p => p.role === 'CEO' ? { ...p, quit: previewing } : p) : cast, [cast, previewing]);
   const panicking = panic || (previewing && PREVIEW === 'panic');
   const layoutKey = people.map(p => `${p.id}:${p.role}`).join();
   // One desk each, even if two people share an archetype.
@@ -109,6 +154,22 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
     }));
   }, [layoutKey]);
   const crowd = useMemo<Crowd>(() => new Map(), []);
+  // The CEO resigning mid-session (not already gone when the view loads) triggers the cutscene.
+  const [cutscene, setCutscene] = useState<Cutscene | null>(null);
+  const ceo = people.find(p => p.role === 'CEO');
+  const ceoWasQuit = useRef<boolean | null>(null);
+  // Only trust the CEO's status once the simulation state has loaded (cast can arrive first, showing
+  // everyone as active), so a CEO who left before this page opened never replays the scene.
+  const stateLoaded = Object.keys(records).length > 0 || PREVIEW === 'ceo-quit';
+  useEffect(() => {
+    if (!ceo || !stateLoaded) return;
+    if (ceoWasQuit.current === false && ceo.quit) setCutscene({ id: ceo.id, name: ceo.name, ending: false });
+    ceoWasQuit.current = ceo.quit;
+  }, [ceo?.id, ceo?.quit, stateLoaded]);
+  const endCutscene = () => {
+    setCutscene(c => c && { ...c, ending: true });
+    setTimeout(() => setCutscene(null), 1500);
+  };
   const controls = useRef<ElementRef<typeof OrbitControls>>(null);
   // Integrated GPUs: drop to 1x pixels if the frame rate falls.
   const [maxDpr, setMaxDpr] = useState(1.5);
@@ -142,15 +203,20 @@ export default function Office3D({ people: cast, selected, onSelect, highlight, 
             <mesh position={[seat.x + 0.85, FLOOR + 1.29, dz + 0.3]} scale={[0.28, 0.13, 0.28]} material={bulb}><boxGeometry /></mesh>
             <mesh position={[seat.x + 0.3, FLOOR + 0.81, dz]} rotation-x={-Math.PI / 2} scale={[1.5, 0.8, 1]} material={lampPool}><planeGeometry /></mesh>
           </>}
-          <Agent3D person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} selected={selected === p.id} highlighted={highlight.includes(p.id)}
+          <Agent3D person={p} nav={nav} crowd={crowd} behaviour={b} phase={i} speed={speed} cinematic={cutscene?.id === p.id} selected={selected === p.id} highlighted={highlight.includes(p.id)}
             line={line?.agent === p.id ? line : null} showThoughts={showThoughts} onSelect={onSelect} />
         </group>;
       })}
-      <OrbitControls ref={controls} makeDefault target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
+      <OrbitControls ref={controls} makeDefault enabled={!cutscene} target={TARGET} enablePan={false} minPolarAngle={0.6} maxPolarAngle={1.1}
         minAzimuthAngle={-0.8} maxAzimuthAngle={0.8} minZoom={12} maxZoom={140} />
       <FitZoom />
+      <Director cutscene={cutscene} crowd={crowd} controls={controls} onDone={endCutscene} />
       {import.meta.env.DEV && <Stats className="o3-stats" />}
     </Canvas>
+    {cutscene && <div className={`o3-cutscene ${cutscene.ending ? 'out' : ''}`} role="status">
+      <i className="bar top" /><i className="bar bottom" />
+      <div className="o3-headline"><span>Breaking news</span><strong>CEO resigns</strong><em>{cutscene.name} walks out of the office</em></div>
+    </div>}
     <div className="o3-zoom">
       <button onClick={() => zoom(1.25)} aria-label="Zoom in">+</button>
       <button onClick={() => zoom(0.8)} aria-label="Zoom out">−</button>
