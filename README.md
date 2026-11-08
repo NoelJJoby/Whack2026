@@ -44,7 +44,7 @@ Errors always look like `{ "error": { "code", "message" } }`, with status 400 (i
 - Without a key, it runs in `rules` mode and reports `mode_reason: "no_api_key"`.
 - If every LLM call in a tick fails, it switches to `rules` for the rest of the run (`mode_reason: "llm_failed"`). Reset tries the LLM again.
 
-The UI shows the active mode in the top bar.
+The UI shows the active mode in the top bar
 
 ## Dev flag
 
