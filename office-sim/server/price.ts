@@ -120,11 +120,14 @@ export function updatePrice(previous: PriceState, input: PriceInput, p: PricePar
   for (const delta of input.feedbackDeltas) for (const d of [delta.requested, delta.actual]) {
     finite(d.stress, 'feedback stress'); finite(d.trust_mgmt, 'feedback trust');
   }
-  const rawOutput = finite(input.operating ? input.operating.productiveUnits/input.seats.length : input.seats.reduce((sum, seat) => {
-    const b = clamp(finite(seat.burnout, 'burnout')) / 100;
-    if (seat.action === null) return sum;
-    return sum + finite(p.productivity[seat.action], 'productivity') + (seat.action === 'overwork' ? p.overworkBonus * (1 - b) : 0);
-  }, 0) / input.seats.length, 'output');
+  // Operating output is already normalised per active seat by the caller; cap it at full capacity so one busy tick cannot spike the price.
+  const rawOutput = input.operating
+    ? clamp(finite(input.operating.productiveUnits, 'output'), 0, 1)
+    : finite(input.seats.reduce((sum, seat) => {
+      const b = clamp(finite(seat.burnout, 'burnout')) / 100;
+      if (seat.action === null) return sum;
+      return sum + finite(p.productivity[seat.action], 'productivity') + (seat.action === 'overwork' ? p.overworkBonus * (1 - b) : 0);
+    }, 0) / input.seats.length, 'output');
   const oEma = input.officeClosed ? previous.oEma : finite(p.outputAlpha * rawOutput + (1 - p.outputAlpha) * previous.oEma, 'smoothed output');
   const born: NewsItem[] = [];
   const add = (id: string, kind: NewsItem['kind'], claimId: string, eventTruth?: boolean) => {

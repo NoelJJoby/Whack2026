@@ -385,9 +385,10 @@ export async function runTick(
 
   const presence = depart(w, decisions, params);
   const leaks = order.flatMap(id => results[id].leak ? [results[id].leak!] : []);
+  const activeBusinessSeats = Math.max(1, w.ids.filter(id => w.agents[id].status === 'active' && w.agents[id].present !== false).length);
   const valuation = updatePrice(world.price, {
     ...(config.business ? { operating: {
-      productiveUnits: w.business.work.filter(r => r.tick === t).reduce((n,r) => n + Math.min(1,r.progress),0) + w.eventState.decisions.filter(d => d.tick === t).length*0.5,
+      productiveUnits: (w.business.work.filter(r => r.tick === t).reduce((n,r) => n + Math.min(1,r.progress),0) + w.eventState.decisions.filter(d => d.tick === t).length * 0.5) / activeBusinessSeats,
       capacity: w.business.available,
       fundamentals: Math.max(-0.5,Math.min(0.5,(w.business.cash-w.business.startingCash)/w.business.startingCash*0.08)),
       news: w.eventState.cases.filter(e => e.publicTick === t).map(e => ({ id: `public-${e.id}`, kind: (e.domain === 'security' ? 'security' : e.domain === 'sales' ? 'contract' : e.domain === 'people' ? 'operating_review' : 'delivery') as import('../shared/events').BusinessNewsKind, isTrue: e.truth })),
